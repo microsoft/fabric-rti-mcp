@@ -155,7 +155,6 @@ coverage*.info
 
 # NCrunch
 _NCrunch_*
-.NCrunch_*
 .*crunch*.local.xml
 nCrunchTemp_*
 
@@ -399,3 +398,22 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+
+build/
+
+*.egg-info
+*.egg
+*.pypirc
+
+# Executable files
+kusto-mcp.exe.spec
+*.whl
+*.exe
+dist/*
+*.mypy_cache
+*.pytest_cache
+*.venv
+dist/
+
+*/**/_version.py
