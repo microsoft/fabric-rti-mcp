@@ -1,0 +1,5 @@
+recursive-include fabric_rti_mcp/bin *
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__

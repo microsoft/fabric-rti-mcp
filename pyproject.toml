@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "microsoft-fabric-rti-mcp"
+dynamic = ["version"]
+description = "Microsoft Fabric RTI MCP"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Development Status :: 2 - Pre-Alpha",
+]
+dependencies = [
+    "httpx~=0.28.1",
+    "fastmcp~=2.5.0",
+    "azure-kusto-data~=5.0.0",
+    "azure-identity",
+    "azure-kusto-ingest~=5.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "pytest>=7.0.0"
+]
+
+[project.scripts]
+fabric-rti-mcp = "fabric_rit_mcp.server:main"
+
+[tool.setuptools]
+packages = ["fabric_rti_mcp"]
+
+[tool.setuptools.package-data]
+fabric_rti_mcp = ["bin/*"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+multi_line_output = 3
+include_trailing_comma = true
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+warn_no_return = true
+warn_unreachable = true
+strict = true
+exclude = ['scripts/build_executables.py', 'setup_dist.py', 'fabric_rti_mcp/_version.py']
+
+[tool.setuptools_scm]
+write_to = "fabric_rti_mcp/_version.py"
