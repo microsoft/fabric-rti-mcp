@@ -98,4 +98,4 @@ def get_tasks_with_status(status_type: str, project_id: Optional[str] = None) ->
 - Group tests by module/functionality in the `tests/` directory
 - Follow the Arrange-Act-Assert pattern for test structure
 - Focus on testing specific service code (e.g. kusto). No need to test common code.
-- Use `magicmock` for mocking external dependencies. Mock all IO calls in unit tests.
+- Use `MagicMock` for mocking external dependencies. Mock all IO calls in unit tests.
