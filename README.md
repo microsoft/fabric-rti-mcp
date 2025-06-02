@@ -1,7 +1,7 @@
 [![Install with UVX in VS Code](https://img.shields.io/badge/VS_Code-Install_Microsoft_Fabric_RTI_MCP_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ms-fabric-rti&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22microsoft-fabric-rti-mcp%22%5D%7D) [![PyPI Downloads](https://static.pepy.tech/badge/microsoft-fabric-rti-mcp)](https://pepy.tech/projects/microsoft-fabric-rti-mcp)
 ## 🎯 Overview
 
-A Model Context Protocol (MCP) server implementation for Microsoft Fabric Real-Time Intelligence (RTI). 
+A Model Context Protocol (MCP) server implementation for [Microsoft Fabric Real-Time Intelligence (RTI)](https://aka.ms/fabricrti). 
 This server enables AI agents to interact with Fabric RTI services by providing tools through the MCP interface, allowing for seamless data querying and analysis capabilities.
 
 ### 🔍 How It Works
@@ -14,7 +14,12 @@ The Fabric RTI MCP Server creates a seamless integration between AI agents and F
 - ⚡ Consistent error handling that makes sense
 
 ### ✨ Supported Services
-- **Eventhouse (Kusto)**: Execute KQL queries against Microsoft Fabric RTI [Eventhouse](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/eventhouse).
+- **Eventhouse (Kusto)**: Execute KQL queries against Microsoft Fabric RTI [Eventhouse](https://aka.ms/eventhouse) and [Azure Data Explorer(ADX)](https://aka.ms/adx).
+
+## 🚧 Coming soon
+- **Activator**
+- **Eventstreams**
+- **Other RTI items**
 
 ### 🔍 Explore your data
 
@@ -65,7 +70,7 @@ The process should end with the below settings in your `settings.json` file.
 {
     "mcp": {
         "server": {
-            "kusto-mcp": {
+            "fabric-rti-mcp": {
                 "command": "uvx",
                 "args": [
                     "microsoft-fabric-rti-mcp"
