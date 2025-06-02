@@ -19,6 +19,20 @@
             "env": {
                 "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/"
             }
+        },
+        // debug tests
+        {
+            "name": "Python Debugger: Test Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}"
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/"
+            }
         }
     ]
 }

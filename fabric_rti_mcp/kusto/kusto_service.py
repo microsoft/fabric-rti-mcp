@@ -3,18 +3,15 @@ import uuid
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
-from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
+from azure.kusto.data import (
+    ClientRequestProperties,
+    KustoClient,
+    KustoConnectionStringBuilder,
+)
 
 from fabric_rti_mcp import __version__  # type: ignore
 from fabric_rti_mcp.kusto.kusto_connection import KustoConnection
 from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
-
-# TODO: this should be done another way
-DESTRUCTIVE_TOOLS = {
-    "kusto_command",
-    "kusto_ingest_inline_into_table",
-    "kusto_ingest_csv_file_into_table",
-}
 
 
 class KustoConnectionCache(defaultdict[str, KustoConnection]):
@@ -26,6 +23,18 @@ class KustoConnectionCache(defaultdict[str, KustoConnection]):
 
 KUSTO_CONNECTION_CACHE: Dict[str, KustoConnection] = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+
+
+def get_kusto_connection(cluster_uri: str) -> KustoConnection:
+    # clean uo the cluster URI since agents can send messy inputs
+    cluster_uri = cluster_uri.strip()
+    if cluster_uri.endswith("/"):
+        cluster_uri = cluster_uri[:-1]
+    return KUSTO_CONNECTION_CACHE[cluster_uri]
+
+
+def get_kusto_query_client(cluster_uri: str) -> KustoClient:
+    return get_kusto_connection(cluster_uri).query_client
 
 
 def _execute(
@@ -43,7 +52,7 @@ def _execute(
     database = database.strip()
     query = query.strip()
 
-    client = KUSTO_CONNECTION_CACHE[cluster_uri].query_client
+    client = get_kusto_query_client(cluster_uri)
     crp: ClientRequestProperties = ClientRequestProperties()
     crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
@@ -221,3 +230,9 @@ def kusto_ingest_inline_into_table(
         cluster_uri,
         database=database,
     )
+
+
+DESTRUCTIVE_TOOLS = {
+    kusto_command.__name__,
+    kusto_ingest_inline_into_table.__name__,
+}
