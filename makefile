@@ -1,6 +1,6 @@
 fmt:
 	isort .
-	black .
+	black . --line-length=120
 
 lint:
 	flake8 .
