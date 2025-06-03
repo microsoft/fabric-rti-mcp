@@ -1,6 +1,10 @@
 fmt:
 	isort .
+<<<<<<< HEAD
 	black .
+=======
+	black . --line-length=120
+>>>>>>> main
 
 lint:
 	flake8 .

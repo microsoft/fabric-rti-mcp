@@ -79,8 +79,8 @@ def get_tasks_with_status(status_type: str, project_id: Optional[str] = None) ->
 ## Architecture
 
 ### Tool Development Guidelines
-- At the moment, there is no service discovery mechanism for Fabric workspaces. As such, we creating a service, use the service's globally unique name such as FQN or URI.
-- Make sure to properly document each tool's function, it's arguments, and expected output. If the output is complex, show an example of the output format.
+- At the moment, there is no service discovery mechanism for Fabric workspaces. As such, when creating a service, use the service's globally unique name such as FQN or URI.
+- Make sure to properly document each tool's function, its arguments, and expected output. If the output is complex, show an example of the output format.
 - Avoid using @tool decorator, prefer a bootstrapping function (`service_module.register_service(mcp_instance)`). This allow for better flexibility and decoupling.
 - Minimize the number of tools. Too many tools confuse agents. Make sure each tool has a clear purpose and is not redundant with others.
 - 
@@ -98,4 +98,4 @@ def get_tasks_with_status(status_type: str, project_id: Optional[str] = None) ->
 - Group tests by module/functionality in the `tests/` directory
 - Follow the Arrange-Act-Assert pattern for test structure
 - Focus on testing specific service code (e.g. kusto). No need to test common code.
-- Use `magicmock` for mocking external dependencies. Mock all IO calls in unit tests.
+- Use `MagicMock` for mocking external dependencies. Mock all IO calls in unit tests.
