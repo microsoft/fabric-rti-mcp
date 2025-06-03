@@ -34,7 +34,7 @@ dev = [
 ]
 
 [project.scripts]
-fabric-rti-mcp = "fabric_rit_mcp.server:main"
+microsoft-fabric-rti-mcp = "fabric_rti_mcp.server:main"
 
 [tool.setuptools]
 packages = ["fabric_rti_mcp"]
