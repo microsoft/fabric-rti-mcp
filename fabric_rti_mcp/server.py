@@ -15,7 +15,7 @@ def register_tools(mcp: FastMCP) -> None:
 def main() -> None:
     # writing to stderr because stdout is used for the transport
     # and we want to see the logs in the console
-    logger.error("Starting Fabric RIT MCP server")
+    logger.error("Starting Fabric RTI MCP server")
     logger.error(f"Version: {__version__}")
     logger.error(f"Python version: {sys.version}")
     logger.error(f"Platform: {sys.platform}")
