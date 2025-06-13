@@ -74,7 +74,11 @@ The process should end with the below settings in your `settings.json` file.
                 "command": "uvx",
                 "args": [
                     "microsoft-fabric-rti-mcp"
-                ]
+                ],
+                "env": {
+                    "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
+                    "KUSTO_DATABASE": "Datasets" //optionally provide database
+                }
             }
         }
     }
@@ -102,7 +106,11 @@ The process should end with the below settings in your `settings.json` file.
                     "run",
                     "-m",
                     "fabric_rti_mcp.server"
-                ]
+                ],
+                "env": {
+                    "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
+                    "KUSTO_DATABASE": "Datasets" //optionally provide database
+                }
             }
         }
     }
