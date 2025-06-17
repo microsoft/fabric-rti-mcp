@@ -60,8 +60,8 @@ The Fabric RTI MCP Server is available on [PyPI](https://pypi.org/project/micros
 #### From VS Code
     1. Open the command palette (Ctrl+Shift+P) and run the command `MCP: Add Server`
     2. Select install from Pip
-    3. When prompted, enter the package name `fabric-rti-mcp`
-    4. Follow the prompts to install the package and add it to your settings.json file
+    3. When prompted, enter the package name `microsoft-fabric-rti-mcp`
+    4. Follow the prompts to install the package and add it to your settings.json file (see bellow)
 
 The process should end with the below settings in your `settings.json` file.
 
@@ -84,6 +84,8 @@ The process should end with the below settings in your `settings.json` file.
     }
 }
 ```
+**Note:** If your `settings.json` file contains a `cwd` field, using `"cwd": "${input:workingDirectory}"` may not work as expected.  
+If you encounter issues, replace it with the actual path to an empty folder you want to work from (e.g. `"cwd": "C:/path/to/empty/folder"`).
 
 ### 🔧 Manual Install (Install from source)  
 
@@ -145,6 +147,7 @@ Add the server to your
 ```
 
 ### Attach the debugger
+
 Use the `Python: Attach` configuration in your `launch.json` to attach to the running server. 
 Once VS Code picks up the server and starts it, navigate to it's output: 
 1. Open command palette (Ctrl+Shift+P) and run the command `MCP: List Servers`
@@ -152,15 +155,6 @@ Once VS Code picks up the server and starts it, navigate to it's output:
 3. Pick up the process id (PID) of the server from the output
 4. Run the `Python: Attach` configuration in your `launch.json` file, and paste the PID of the server in the prompt
 5. The debugger will attach to the server process, and you can start debugging
-
-
-## 🧪 Test the MCP Server
-
-1. Open GitHub Copilot in VS Code and [switch to Agent mode](https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode)
-2. You should see the Fabric RTI MCP Server in the list of tools
-3. Try a prompt that tells the agent to use the Eventhouse tools, such as "List my Kusto tables"
-4. The agent should be able to use the Fabric RTI MCP Server tools to complete your query
-
 
 ## 🔑 Authentication
 
@@ -174,6 +168,15 @@ The MCP Server seamlessly integrates with your host operating system's authentic
 1. **Interactive Browser** (`InteractiveBrowserCredential`) - Falls back to browser-based login if needed
 
 If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials.
+
+## 🧪 Test the MCP Server
+
+1. Make sure the MCP server has started: In VS Code, press Ctrl+Shift+P → MCP: List Servers → Choose the server you created → Start.
+2. Open GitHub Copilot in VS Code and [switch to Agent mode](https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode)
+3. You should see the Fabric RTI MCP Server in the list of tools
+4. Try a prompt that tells the agent to use the Eventhouse tools, such as "List my Kusto tables"
+5. The agent should be able to use the Fabric RTI MCP Server tools to complete your query
+
 
 ## 🛡️ Security Note
 
