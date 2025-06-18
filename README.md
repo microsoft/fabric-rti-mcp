@@ -61,7 +61,7 @@ The Fabric RTI MCP Server is available on [PyPI](https://pypi.org/project/micros
     1. Open the command palette (Ctrl+Shift+P) and run the command `MCP: Add Server`
     2. Select install from Pip
     3. When prompted, enter the package name `microsoft-fabric-rti-mcp`
-    4. Follow the prompts to install the package and add it to your settings.json file (see bellow)
+    4. Follow the prompts to install the package and add it to your settings.json file (see below)
 
 The process should end with the below settings in your `settings.json` file.
 
