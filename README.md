@@ -4,6 +4,9 @@
 A Model Context Protocol (MCP) server implementation for [Microsoft Fabric Real-Time Intelligence (RTI)](https://aka.ms/fabricrti). 
 This server enables AI agents to interact with Fabric RTI services by providing tools through the MCP interface, allowing for seamless data querying and analysis capabilities.
 
+> [!NOTE]  
+> This project is in Public Preview and implementation may significantly change prior to General Availability.
+
 ### 🔍 How It Works
 
 The Fabric RTI MCP Server creates a seamless integration between AI agents and Fabric RTI services through:
