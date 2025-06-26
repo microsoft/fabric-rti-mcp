@@ -1,4 +1,5 @@
 import inspect
+import os
 import uuid
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
@@ -23,6 +24,16 @@ class KustoConnectionWrapper(KustoConnection):
 
 
 class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
+    def __init__(self) -> None:
+        super().__init__()
+        default_cluster = os.getenv("KUSTO_SERVICE_URI")
+        default_db = os.getenv(
+            "KUSTO_SERVICE_DEFAULT_DB",
+            KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
+        )
+        if default_cluster:
+            add_kusto_cluster(default_cluster, default_db, "default cluster")
+
     def __missing__(self, key: str) -> KustoConnectionWrapper:
         client = KustoConnectionWrapper(key, DEFAULT_DB)
         self[key] = client
@@ -95,15 +106,16 @@ def kusto_get_clusters() -> List[Tuple[str, str]]:
     return [(uri, client.description) for uri, client in KUSTO_CONNECTION_CACHE.items()]
 
 
-def kusto_connect(cluster_uri: str, description: Optional[str] = None) -> None:
+def kusto_connect(cluster_uri: str, default_database: str, description: Optional[str] = None) -> None:
     """
     Connects to a Kusto cluster and adds it to the cache.
 
     :param cluster_uri: The URI of the Kusto cluster.
+    :param default_database: The default database to use for queries on this cluster.
     :param description: Optional description for the cluster. Cannot be used to retrieve the cluster,
                        but can be used to provide additional information about the cluster.
     """
-    add_kusto_cluster(cluster_uri, description)
+    add_kusto_cluster(cluster_uri, default_database=default_database, description=description)
 
 
 def kusto_query(

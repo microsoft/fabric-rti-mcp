@@ -15,9 +15,9 @@ from fabric_rti_mcp.kusto.kusto_service import (
 )
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_query_client")
+@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
 def test_execute_basic_query(
-    mock_get_query_client: Mock,
+    mock_get_kusto_connection: Mock,
     sample_cluster_uri: str,
     mock_kusto_response: KustoResponseDataSet,
 ) -> None:
@@ -25,7 +25,11 @@ def test_execute_basic_query(
     # Arrange
     mock_client = MagicMock()
     mock_client.execute.return_value = mock_kusto_response
-    mock_get_query_client.return_value = mock_client
+    
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
 
     query = "  TestTable | take 10  "  # Added whitespace to test stripping
     database = "test_db"
@@ -34,7 +38,7 @@ def test_execute_basic_query(
     result = kusto_query(query, sample_cluster_uri, database=database)
 
     # Assert
-    mock_get_query_client.assert_called_once_with(sample_cluster_uri)
+    mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
     mock_client.execute.assert_called_once()
 
     # Verify database and stripped query
@@ -55,7 +59,7 @@ def test_execute_basic_query(
     assert result[0]["TestColumn"] == "TestValue"
 
 
-def test_add_kusto_cluster_new_cluster():
+def test_add_kusto_cluster_new_cluster() -> None:
     """Test adding a new cluster to the cache."""
     cluster_uri = "https://test-cluster.kusto.windows.net"
     description = "Test cluster description"
@@ -64,7 +68,7 @@ def test_add_kusto_cluster_new_cluster():
     KUSTO_CONNECTION_CACHE.clear()
 
     # Act
-    add_kusto_cluster(cluster_uri, description)
+    add_kusto_cluster(cluster_uri, description=description)
 
     # Assert
     assert cluster_uri in KUSTO_CONNECTION_CACHE
@@ -73,7 +77,7 @@ def test_add_kusto_cluster_new_cluster():
     assert connection_wrapper.description == description
 
 
-def test_add_kusto_cluster_strips_trailing_slash():
+def test_add_kusto_cluster_strips_trailing_slash() -> None:
     """Test that trailing slashes are stripped from cluster URIs."""
     cluster_uri_with_slash = "https://test-cluster.kusto.windows.net/"
     cluster_uri_clean = "https://test-cluster.kusto.windows.net"
@@ -83,14 +87,14 @@ def test_add_kusto_cluster_strips_trailing_slash():
     KUSTO_CONNECTION_CACHE.clear()
 
     # Act
-    add_kusto_cluster(cluster_uri_with_slash, description)
+    add_kusto_cluster(cluster_uri_with_slash, description=description)
 
     # Assert
     assert cluster_uri_clean in KUSTO_CONNECTION_CACHE
     assert cluster_uri_with_slash not in KUSTO_CONNECTION_CACHE
 
 
-def test_add_kusto_cluster_strips_whitespace():
+def test_add_kusto_cluster_strips_whitespace() -> None:
     """Test that whitespace is stripped from cluster URIs."""
     cluster_uri_with_spaces = "  https://test-cluster.kusto.windows.net  "
     cluster_uri_clean = "https://test-cluster.kusto.windows.net"
@@ -100,14 +104,14 @@ def test_add_kusto_cluster_strips_whitespace():
     KUSTO_CONNECTION_CACHE.clear()
 
     # Act
-    add_kusto_cluster(cluster_uri_with_spaces, description)
+    add_kusto_cluster(cluster_uri_with_spaces, description=description)
 
     # Assert
     assert cluster_uri_clean in KUSTO_CONNECTION_CACHE
     assert cluster_uri_with_spaces not in KUSTO_CONNECTION_CACHE
 
 
-def test_add_kusto_cluster_existing_cluster():
+def test_add_kusto_cluster_existing_cluster() -> None:
     """Test that adding an existing cluster doesn't overwrite it."""
     cluster_uri = "https://test-cluster.kusto.windows.net"
     original_description = "Original description"
@@ -115,17 +119,17 @@ def test_add_kusto_cluster_existing_cluster():
 
     # Clear cache and add initial cluster
     KUSTO_CONNECTION_CACHE.clear()
-    add_kusto_cluster(cluster_uri, original_description)
+    add_kusto_cluster(cluster_uri, description=original_description)
 
     # Act - try to add same cluster with different description
-    add_kusto_cluster(cluster_uri, new_description)
+    add_kusto_cluster(cluster_uri, description=new_description)
 
     # Assert - original description should be preserved
     connection_wrapper = KUSTO_CONNECTION_CACHE[cluster_uri]
     assert connection_wrapper.description == original_description
 
 
-def test_add_kusto_cluster_no_description():
+def test_add_kusto_cluster_no_description() -> None:
     """Test adding a cluster without a description uses URI as description."""
     cluster_uri = "https://test-cluster.kusto.windows.net"
 
@@ -140,24 +144,26 @@ def test_add_kusto_cluster_no_description():
     assert connection_wrapper.description == cluster_uri
 
 
-def test_kusto_connect():
+def test_kusto_connect() -> None:
     """Test kusto_connect function wraps add_kusto_cluster correctly."""
     cluster_uri = "https://connect-test.kusto.windows.net"
     description = "Connect test cluster"
+    default_db = "TestDB"
 
     # Clear cache for clean test
     KUSTO_CONNECTION_CACHE.clear()
 
     # Act
-    kusto_connect(cluster_uri, description)
+    kusto_connect(cluster_uri, default_database=default_db, description=description)
 
     # Assert
     assert cluster_uri in KUSTO_CONNECTION_CACHE
     connection_wrapper = KUSTO_CONNECTION_CACHE[cluster_uri]
     assert connection_wrapper.description == description
+    assert connection_wrapper.default_database == default_db
 
 
-def test_kusto_get_clusters_empty_cache():
+def test_kusto_get_clusters_empty_cache() -> None:
     """Test getting clusters when cache is empty."""
     # Clear cache for clean test
     KUSTO_CONNECTION_CACHE.clear()
@@ -169,14 +175,14 @@ def test_kusto_get_clusters_empty_cache():
     assert clusters == []
 
 
-def test_kusto_get_clusters_single_cluster():
+def test_kusto_get_clusters_single_cluster() -> None:
     """Test getting clusters with one cluster in cache."""
     cluster_uri = "https://single-test.kusto.windows.net"
     description = "Single test cluster"
 
     # Clear cache and add one cluster
     KUSTO_CONNECTION_CACHE.clear()
-    add_kusto_cluster(cluster_uri, description)
+    add_kusto_cluster(cluster_uri, description=description)
 
     # Act
     clusters = kusto_get_clusters()
@@ -186,7 +192,7 @@ def test_kusto_get_clusters_single_cluster():
     assert clusters[0] == (cluster_uri, description)
 
 
-def test_kusto_get_clusters_multiple_clusters():
+def test_kusto_get_clusters_multiple_clusters() -> None:
     """Test getting clusters with multiple clusters in cache."""
     cluster1_uri = "https://cluster1.kusto.windows.net"
     cluster1_desc = "First cluster"
@@ -197,9 +203,9 @@ def test_kusto_get_clusters_multiple_clusters():
 
     # Clear cache and add multiple clusters
     KUSTO_CONNECTION_CACHE.clear()
-    add_kusto_cluster(cluster1_uri, cluster1_desc)
-    add_kusto_cluster(cluster2_uri, cluster2_desc)
-    add_kusto_cluster(cluster3_uri, cluster3_desc)
+    add_kusto_cluster(cluster1_uri, description=cluster1_desc)
+    add_kusto_cluster(cluster2_uri, description=cluster2_desc)
+    add_kusto_cluster(cluster3_uri, description=cluster3_desc)
 
     # Act
     clusters = kusto_get_clusters()
@@ -212,14 +218,14 @@ def test_kusto_get_clusters_multiple_clusters():
     assert cluster_dict[cluster3_uri] == cluster3_desc
 
 
-def test_kusto_get_clusters_returns_tuples():
+def test_kusto_get_clusters_returns_tuples() -> None:
     """Test that kusto_get_clusters returns list of tuples with correct structure."""
     cluster_uri = "https://tuple-test.kusto.windows.net"
     description = "Tuple test cluster"
 
     # Clear cache and add cluster
     KUSTO_CONNECTION_CACHE.clear()
-    add_kusto_cluster(cluster_uri, description)
+    add_kusto_cluster(cluster_uri, description=description)
 
     # Act
     clusters = kusto_get_clusters()
