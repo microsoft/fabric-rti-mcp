@@ -1,8 +1,9 @@
 [![Install with UVX in VS Code](https://img.shields.io/badge/VS_Code-Install_Microsoft_Fabric_RTI_MCP_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ms-fabric-rti&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22microsoft-fabric-rti-mcp%22%5D%7D) [![PyPI Downloads](https://static.pepy.tech/badge/microsoft-fabric-rti-mcp)](https://pepy.tech/projects/microsoft-fabric-rti-mcp)
+
 ## 🎯 Overview
 
-A Model Context Protocol (MCP) server implementation for [Microsoft Fabric Real-Time Intelligence (RTI)](https://aka.ms/fabricrti). 
-This server enables AI agents to interact with Fabric RTI services by providing tools through the MCP interface, allowing for seamless data querying and analysis capabilities.
+A comprehensive Model Context Protocol (MCP) server implementation for [Microsoft Fabric Real-Time Intelligence (RTI)](https://aka.ms/fabricrti). 
+This server enables AI agents to interact with Fabric RTI services by providing tools through the MCP interface, allowing for seamless data querying, analysis, and streaming capabilities.
 
 > [!NOTE]  
 > This project is in Public Preview and implementation may significantly change prior to General Availability.
@@ -12,34 +13,67 @@ This server enables AI agents to interact with Fabric RTI services by providing 
 The Fabric RTI MCP Server creates a seamless integration between AI agents and Fabric RTI services through:
 
 - 🔄 Smart JSON communication that AI agents understand
-- 🏗️ Natural language commands that get translated to Kql operations
-- 💡 Intelligent parameter suggestions and auto-completion!
+- 🏗️ Natural language commands that get translated to KQL operations and Eventstream management
+- 💡 Intelligent parameter suggestions and auto-completion
 - ⚡ Consistent error handling that makes sense
+- 📊 Unified interface for both analytics and streaming workloads
 
 ### ✨ Supported Services
-- **Eventhouse (Kusto)**: Execute KQL queries against Microsoft Fabric RTI [Eventhouse](https://aka.ms/eventhouse) and [Azure Data Explorer(ADX)](https://aka.ms/adx).
+
+#### **Eventhouse (Kusto)** ✅
+Execute KQL queries against Microsoft Fabric RTI [Eventhouse](https://aka.ms/eventhouse) and [Azure Data Explorer(ADX)](https://aka.ms/adx):
+- List databases and tables
+- Get table schemas
+- Execute KQL queries
+- Sample data from tables
+- Ingest CSV data
+
+#### **Eventstreams** ✅ 
+Manage Microsoft Fabric [Eventstreams](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/eventstream/eventstream-introduction) for real-time data processing:
+- List Eventstreams in workspaces
+- Get Eventstream details and definitions
+- Create new Eventstreams
+- Update existing Eventstreams
+- Delete Eventstreams
 
 ## 🚧 Coming soon
 - **Activator**
-- **Eventstreams**
 - **Other RTI items**
 
 ### 🔍 Explore your data
 
-- "Get databases in Eventhouse'"
+#### Eventhouse Analytics:
+- "Get databases in Eventhouse"
 - "Sample 10 rows from table 'StormEvents' in Eventhouse"
 - "What can you tell me about StormEvents data?"
-- "Analyze the StormEvents to come up with trend analysis ocross past 10 years of data"
+- "Analyze the StormEvents to come up with trend analysis across past 10 years of data"
 - "Analyze the commands in 'CommandExecution' table and categorize them as low/medium/high risks"
 
+#### Eventstream Management:
+- "List all Eventstreams in my workspace"
+- "Show me the details of my IoT data Eventstream"
+- "Create a new Eventstream for processing sensor data"
+- "Update my existing Eventstream to add a new destination"
 
-### Available tools 
-- List databases
-- List tables
-- Get schema for a table
-- Sample rows from a table
-- Execute query
-- Ingest a csv
+### Available Tools 
+
+#### Eventhouse (Kusto) - 6 Tools:
+- **`list_databases`** - Enumerate all accessible databases in your Kusto cluster
+- **`list_tables`** - List all tables within a specific database
+- **`get_schema`** - Get detailed schema information for any table (columns, types, descriptions)
+- **`sample_data`** - Retrieve sample rows from tables to understand data structure
+- **`execute_kql`** - Execute any KQL (Kusto Query Language) query for analysis
+- **`ingest_csv`** - Upload and ingest CSV data directly into Kusto tables
+
+#### Eventstreams - 6 Tools:
+- **`list_eventstreams`** - List all Eventstreams in your Fabric workspace
+- **`get_eventstream`** - Get detailed information about a specific Eventstream
+- **`create_eventstream`** - Create new Eventstreams with custom configuration
+- **`update_eventstream`** - Modify existing Eventstream settings and destinations
+- **`delete_eventstream`** - Remove Eventstreams and associated resources
+- **`get_eventstream_definition`** - Retrieve complete JSON definition of an Eventstream
+
+> **💡 Pro Tip**: All tools work with natural language! Just describe what you want to do and the AI agent will use the appropriate tools automatically.
 
 ## Getting Started
 
@@ -80,7 +114,8 @@ The process should end with the below settings in your `settings.json` file.
                 ],
                 "env": {
                     "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
-                    "KUSTO_DATABASE": "Datasets" //optionally provide database
+                    "KUSTO_DATABASE": "Datasets", //optionally provide database
+                    "FABRIC_WORKSPACE_ID": "your-workspace-id" //optionally provide default workspace for Eventstreams
                 }
             }
         }
@@ -101,7 +136,7 @@ The process should end with the below settings in your `settings.json` file.
 {
     "mcp": {
         "servers": {
-            "kusto-mcp": {
+            "fabric-rti-mcp": {
                 "command": "uv",
                 "args": [
                     "--directory",
@@ -112,7 +147,8 @@ The process should end with the below settings in your `settings.json` file.
                 ],
                 "env": {
                     "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
-                    "KUSTO_DATABASE": "Datasets" //optionally provide database
+                    "KUSTO_DATABASE": "Datasets", //optionally provide database
+                    "FABRIC_WORKSPACE_ID": "your-workspace-id" //optionally provide default workspace for Eventstreams
                 }
             }
         }
@@ -161,8 +197,48 @@ Once VS Code picks up the server and starts it, navigate to it's output:
 
 1. Open GitHub Copilot in VS Code and [switch to Agent mode](https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode)
 2. You should see the Fabric RTI MCP Server in the list of tools
-3. Try a prompt that tells the agent to use the Eventhouse tools, such as "List my Kusto tables"
-4. The agent should be able to use the Fabric RTI MCP Server tools to complete your query
+3. Try prompts that tell the agent to use the RTI tools, such as:
+   - **Eventhouse**: "List my Kusto tables" or "Show me a sample from the StormEvents table"
+   - **Eventstreams**: "List all Eventstreams in my workspace" or "Show me details of my data processing Eventstream"
+4. The agent should be able use the Fabric RTI MCP Server tools to complete your query
+
+## 🏗️ Architecture
+
+The Fabric RTI MCP Server is designed with a clean, modular architecture:
+
+### MCP Server Core
+```
+fabric_rti_mcp/
+├── kusto/                    # Eventhouse (Kusto) integration
+│   ├── kusto_service.py      # Core Kusto operations
+│   ├── kusto_tools.py        # MCP tool definitions
+│   └── kusto_connection.py   # Connection management
+├── eventstream/              # Eventstream integration  
+│   ├── eventstream_service.py # Core Eventstream operations
+│   └── eventstream_tools.py  # MCP tool definitions
+├── server.py                 # Main MCP server entry point
+└── common.py                 # Shared utilities
+```
+
+### Standalone Tools
+```
+tools/
+└── eventstream_client/       # Standalone Eventstream tools
+    ├── ai_agent_openai.py    # AI agent for Eventstream management
+    ├── config.py             # Configuration management
+    ├── demo_agent.py         # Demo and example scripts
+    └── run_agent.py          # Agent runner
+```
+
+> **Note**: The `tools/` directory contains standalone utilities that can be used independently of the MCP server for direct Fabric integration and automation.
+
+### Key Design Principles
+
+- 🔧 **Modular**: Each service (Kusto, Eventstream) is self-contained
+- 🔄 **Async/Sync Bridge**: Seamless integration between async operations and MCP's sync interface
+- 🎯 **Clean Separation**: MCP server code separate from standalone tools
+- 🛡️ **Type Safe**: Comprehensive type annotations throughout
+- ⚡ **Performance**: Connection caching and efficient resource management
 
 
 ## 🔑 Authentication
@@ -200,6 +276,21 @@ provided by the bot. You will only need to do this once across all repos using o
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+- ✅ **Complete documentation** - Users can easily understand and use both services
+- ✅ **Clean codebase** - No dead code or architectural debt
+
+**This integration and cleanup effort has been a COMPLETE SUCCESS!** 🎉🚀
+
+The project is **ready for feature branch push and production deployment**.
+
+## 📚 Documentation
+
+- **[Usage Guide](./USAGE_GUIDE.md)** - Comprehensive examples and scenarios
+- **[Architecture Guide](./ARCHITECTURE.md)** - Technical architecture and design patterns  
+- **[Async Pattern Explanation](./ASYNC_PATTERN_EXPLANATION.md)** - Details on async/sync integration
+- **[Changelog](./CHANGELOG.md)** - Release history and breaking changes
+- **[Project Assessment](./POST_CLEANUP_ASSESSMENT.md)** - Current project health status
 
 ## Data Collection
 

@@ -417,3 +417,17 @@ dist/*
 dist/
 
 */**/_version.py
+
+# Development documentation (temporary files for integration work)
+# Keep locally for reference but don't commit to feature branch
+CRITICAL_FIXES_COMPLETE.md
+CONFIG_CLEANUP_COMPLETE.md
+POST_CLEANUP_ASSESSMENT.md
+DOCUMENTATION_COMPLETE.md
+EVENTSTREAM_INTEGRATION_COMPLETE.md
+PROJECT_REVIEW_ISSUES.md
+merge_plan.md
+eventstream_integration_guide.md
+
+# Development scripts and temporary files
+merge_mcp_server.py

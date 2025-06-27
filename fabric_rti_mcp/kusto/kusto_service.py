@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional
 from azure.kusto.data import (
     ClientRequestProperties,
     KustoClient,
-    KustoConnectionStringBuilder,
 )
 
 from fabric_rti_mcp import __version__  # type: ignore
