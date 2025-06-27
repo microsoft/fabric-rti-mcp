@@ -21,7 +21,12 @@ class KustoConnectionCache(defaultdict[str, KustoConnection]):
 
 
 KUSTO_CONNECTION_CACHE: Dict[str, KustoConnection] = KustoConnectionCache()
-DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+
+
+def get_default_database_name() -> str:
+    """Get the default database name for Kusto"""
+    # Use a sensible default since DEFAULT_DATABASE_NAME might not be available
+    return "netDefaultDB"
 
 
 def get_kusto_connection(cluster_uri: str) -> KustoConnection:
@@ -46,7 +51,7 @@ def _execute(
     # Get the name of the caller function
     action = caller_frame.f_code.co_name  # type: ignore
 
-    database = database or DEFAULT_DB
+    database = database or get_default_database_name()
     # agents can send messy inputs
     database = database.strip()
     query = query.strip()
@@ -125,7 +130,7 @@ def kusto_get_entities_schema(
     """
     return _execute(
         ".show databases entities with (showObfuscatedStrings=true) "
-        f"| where DatabaseName == '{database or DEFAULT_DB}' "
+        f"| where DatabaseName == '{database or get_default_database_name()}' "
         "| project EntityName, EntityType, Folder, DocString",
         cluster_uri,
         database=database,

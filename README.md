@@ -195,12 +195,32 @@ Once VS Code picks up the server and starts it, navigate to it's output:
 
 ## 🧪 Test the MCP Server
 
+### Via GitHub Copilot
 1. Open GitHub Copilot in VS Code and [switch to Agent mode](https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode)
 2. You should see the Fabric RTI MCP Server in the list of tools
 3. Try prompts that tell the agent to use the RTI tools, such as:
    - **Eventhouse**: "List my Kusto tables" or "Show me a sample from the StormEvents table"
    - **Eventstreams**: "List all Eventstreams in my workspace" or "Show me details of my data processing Eventstream"
 4. The agent should be able use the Fabric RTI MCP Server tools to complete your query
+
+### Via VS Code Client Tool
+For direct testing and development, use the included VS Code client:
+
+```bash
+# Interactive mode with menu
+python eventstream_test/vscode_mcp_client.py
+
+# Natural language commands
+python eventstream_test/vscode_mcp_client.py "list eventstreams in workspace abc-123 with interactive auth"
+python eventstream_test/vscode_mcp_client.py "query cluster https://example.kusto.windows.net: MyTable | take 10"
+python eventstream_test/vscode_mcp_client.py "get fabric api base url"
+```
+
+The VS Code client includes:
+- 🔐 **Interactive authentication** - Browser-based Microsoft sign-in
+- 🗣️ **Natural language prompts** - English commands for MCP operations  
+- ⚙️ **API configuration** - Runtime control of Fabric API endpoints
+- 📊 **JSON output** - Formatted results for analysis
 
 ## 🏗️ Architecture
 
@@ -230,7 +250,17 @@ tools/
     └── run_agent.py          # Agent runner
 ```
 
-> **Note**: The `tools/` directory contains standalone utilities that can be used independently of the MCP server for direct Fabric integration and automation.
+### Testing & Client Tools
+```
+eventstream_test/             # Test utilities and examples
+├── test_api_config.py        # Test Fabric API configuration
+├── test_eventstream_client.py # Test Eventstream MCP client
+├── test_mcp_connection.py    # Test MCP server connection
+├── vscode_mcp_client.py      # VS Code MCP client with interactive auth
+└── vscode-mcp-client.ipynb   # Jupyter notebook examples
+```
+
+> **Note**: The `tools/` directory contains standalone utilities that can be used independently of the MCP server for direct Fabric integration and automation. The `eventstream_test/` directory contains testing utilities and client examples.
 
 ### Key Design Principles
 

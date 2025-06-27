@@ -16,6 +16,49 @@ from fabric_rti_mcp.common import logger
 FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
 DEFAULT_TIMEOUT = 30
 
+# Global variable to allow runtime configuration
+_current_api_base = FABRIC_API_BASE
+
+
+def get_fabric_api_base() -> str:
+    """Get the current Fabric API base URL."""
+    return _current_api_base
+
+
+def set_fabric_api_base(api_base_url: str) -> str:
+    """
+    Set a custom Fabric API base URL.
+    
+    :param api_base_url: The new API base URL (e.g., "https://custom.fabric.api.com/v1")
+    :return: The updated API base URL
+    """
+    global _current_api_base
+    
+    # Clean up the URL - remove trailing slash if present
+    api_base_url = api_base_url.rstrip('/')
+    
+    # Validate URL format
+    if not api_base_url.startswith('http'):
+        raise ValueError("API base URL must start with 'http' or 'https'")
+    
+    _current_api_base = api_base_url
+    logger.info(f"Fabric API base URL updated to: {_current_api_base}")
+    
+    return _current_api_base
+
+
+def reset_fabric_api_base() -> str:
+    """
+    Reset the Fabric API base URL to the default.
+    
+    :return: The default API base URL
+    """
+    global _current_api_base
+    _current_api_base = FABRIC_API_BASE
+    logger.info(f"Fabric API base URL reset to default: {_current_api_base}")
+    
+    return _current_api_base
+
 
 class EventstreamConnectionCache(defaultdict[str, Dict[str, Any]]):
     """Connection cache for Eventstream API clients."""
@@ -49,10 +92,9 @@ def _run_async_operation(coro: Coroutine[Any, Any, Any]) -> Any:
     """
     try:
         # Try to get the existing event loop
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
         # If we're already in an event loop, we need to run in a thread
         import concurrent.futures
-        import threading
         
         def run_in_thread() -> Any:
             # Create a new event loop for this thread
@@ -82,7 +124,7 @@ async def _execute_eventstream_operation(
     Base execution method for Eventstream operations.
     
     :param method: HTTP method (GET, POST, PUT, DELETE)
-    :param endpoint: API endpoint relative to FABRIC_API_BASE
+    :param endpoint: API endpoint relative to the configured API base
     :param authorization_token: Bearer token for authentication
     :param payload: Optional request payload
     :return: API response as dictionary
@@ -90,8 +132,8 @@ async def _execute_eventstream_operation(
     # Get client configuration
     client_config = get_eventstream_client_config(authorization_token)
     
-    # Build full URL
-    url = f"{FABRIC_API_BASE}{endpoint}"
+    # Build full URL using the configurable API base
+    url = f"{get_fabric_api_base()}{endpoint}"
     
     try:
         async with httpx.AsyncClient(timeout=client_config["timeout"]) as client:
