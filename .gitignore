@@ -431,3 +431,36 @@ eventstream_integration_guide.md
 
 # Development scripts and temporary files
 merge_mcp_server.py
+
+# Test files and development artifacts (added to ignore test/example files)
+test_*.py
+example_*.py
+*_example.json
+claude_config_example.json
+claude_desktop_config_example.json
+template_*.py
+run_agent.py
+demo_agent.py
+ai_agent_*.py
+intelligent_*.py
+*_service_new.py
+vscode_mcp_client.py
+ASYNC_PATTERN_EXPLANATION.md
+
+# Jupyter notebooks (development artifacts)
+*.ipynb
+vscode-mcp-client.ipynb
+
+# Test configuration files
+test_api_config*.py
+test_config*.py
+test_env*.py
+test_mcp*.py
+test_integration.py
+test_intelligent*.py
+test_simplified*.py
+test_new_auth.py
+test_eventstream_client.py
+
+# Development configuration files (AI/OpenAI integration artifacts)
+fabric_rti_mcp/eventstream/config.py
