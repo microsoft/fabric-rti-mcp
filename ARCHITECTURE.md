@@ -234,7 +234,7 @@ KUSTO_DATABASE=DatabaseName
 
 #### Eventstream Configuration
 ```env
-FABRIC_WORKSPACE_ID=12345678-1234-1234-1234-123456789012
+FABRIC_API_BASE_URL=https://api.fabric.microsoft.com/v1
 ```
 
 ### MCP Settings
@@ -248,7 +248,7 @@ FABRIC_WORKSPACE_ID=12345678-1234-1234-1234-123456789012
                 "env": {
                     "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/",
                     "KUSTO_DATABASE": "Datasets",
-                    "FABRIC_WORKSPACE_ID": "your-workspace-id"
+                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
                 }
             }
         }

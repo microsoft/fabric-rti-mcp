@@ -23,7 +23,7 @@ Add to your VS Code `settings.json`:
                 "env": {
                     "KUSTO_SERVICE_URI": "https://your-cluster.region.kusto.windows.net/",
                     "KUSTO_DATABASE": "YourDatabase",
-                    "FABRIC_WORKSPACE_ID": "your-workspace-id"
+                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
                 }
             }
         }
@@ -218,7 +218,8 @@ The AI agent understands natural language and can help with:
                 "args": ["microsoft-fabric-rti-mcp"],
                 "env": {
                     "KUSTO_SERVICE_URI": "https://prod-cluster.region.kusto.windows.net/",
-                    "KUSTO_DATABASE": "Production"
+                    "KUSTO_DATABASE": "Production",
+                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
                 }
             },
             "fabric-rti-dev": {
@@ -226,7 +227,8 @@ The AI agent understands natural language and can help with:
                 "args": ["microsoft-fabric-rti-mcp"],
                 "env": {
                     "KUSTO_SERVICE_URI": "https://dev-cluster.region.kusto.windows.net/",
-                    "KUSTO_DATABASE": "Development"
+                    "KUSTO_DATABASE": "Development",
+                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
                 }
             }
         }
@@ -239,12 +241,12 @@ The AI agent understands natural language and can help with:
 # Production
 export KUSTO_SERVICE_URI="https://prod.westus.kusto.windows.net/"
 export KUSTO_DATABASE="ProductionData"
-export FABRIC_WORKSPACE_ID="12345678-1234-1234-1234-123456789012"
+export FABRIC_API_BASE_URL="https://api.fabric.microsoft.com/v1"
 
 # Development  
 export KUSTO_SERVICE_URI="https://dev.westus.kusto.windows.net/"
 export KUSTO_DATABASE="TestData"
-export FABRIC_WORKSPACE_ID="87654321-4321-4321-4321-210987654321"
+export FABRIC_API_BASE_URL="https://api.fabric.microsoft.com/v1"
 ```
 
 ## Troubleshooting

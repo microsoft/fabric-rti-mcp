@@ -1,88 +1,52 @@
 """
 Eventstream service module for Microsoft Fabric RTI MCP
 Provides Microsoft Fabric Eventstream operations through MCP tools
+Uses Azure Identity for transparent authentication (consistent with Kusto module)
 """
 
 import asyncio
 import base64
 import json
+import os
 from typing import Any, Dict, List, Optional, Coroutine
-from collections import defaultdict
-import httpx
 
 from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.eventstream.eventstream_connection import EventstreamConnection
 
 # Microsoft Fabric API configuration
-FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
+DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
 DEFAULT_TIMEOUT = 30
-
-# Global variable to allow runtime configuration
-_current_api_base = FABRIC_API_BASE
 
 
 def get_fabric_api_base() -> str:
-    """Get the current Fabric API base URL."""
-    return _current_api_base
-
-
-def set_fabric_api_base(api_base_url: str) -> str:
     """
-    Set a custom Fabric API base URL.
-    
-    :param api_base_url: The new API base URL (e.g., "https://custom.fabric.api.com/v1")
-    :return: The updated API base URL
+    Get the Fabric API base URL from environment variable.
+    Falls back to default if not set.
     """
-    global _current_api_base
+    return os.environ.get("FABRIC_API_BASE_URL", DEFAULT_FABRIC_API_BASE)
+
+
+class EventstreamConnectionCache:
+    """Simple connection cache for Eventstream API clients using Azure Identity."""
+    def __init__(self):
+        self._connection: Optional[EventstreamConnection] = None
     
-    # Clean up the URL - remove trailing slash if present
-    api_base_url = api_base_url.rstrip('/')
-    
-    # Validate URL format
-    if not api_base_url.startswith('http'):
-        raise ValueError("API base URL must start with 'http' or 'https'")
-    
-    _current_api_base = api_base_url
-    logger.info(f"Fabric API base URL updated to: {_current_api_base}")
-    
-    return _current_api_base
+    def get_connection(self) -> EventstreamConnection:
+        """Get or create an Eventstream connection using the configured API base URL."""
+        if self._connection is None:
+            api_base = get_fabric_api_base()
+            self._connection = EventstreamConnection(api_base)
+            logger.info(f"Created Eventstream connection for API base: {api_base}")
+        
+        return self._connection
 
 
-def reset_fabric_api_base() -> str:
-    """
-    Reset the Fabric API base URL to the default.
-    
-    :return: The default API base URL
-    """
-    global _current_api_base
-    _current_api_base = FABRIC_API_BASE
-    logger.info(f"Fabric API base URL reset to default: {_current_api_base}")
-    
-    return _current_api_base
+EVENTSTREAM_CONNECTION_CACHE = EventstreamConnectionCache()
 
 
-class EventstreamConnectionCache(defaultdict[str, Dict[str, Any]]):
-    """Connection cache for Eventstream API clients."""
-    def __missing__(self, key: str) -> Dict[str, Any]:
-        # For eventstream, we use httpx AsyncClient with auth token
-        # The key will be the authorization token
-        client_config: Dict[str, Any] = {
-            "timeout": DEFAULT_TIMEOUT,
-            "headers": {"Authorization": key}
-        }
-        self[key] = client_config
-        return client_config
-
-
-EVENTSTREAM_CONNECTION_CACHE: Dict[str, Dict[str, Any]] = EventstreamConnectionCache()
-
-
-def get_eventstream_client_config(authorization_token: str) -> Dict[str, Any]:
-    """Get or create client configuration from cache."""
-    # Clean up the token since agents can send messy inputs
-    authorization_token = authorization_token.strip()
-    if not authorization_token.startswith("Bearer "):
-        authorization_token = f"Bearer {authorization_token}"
-    return EVENTSTREAM_CONNECTION_CACHE[authorization_token]
+def get_eventstream_connection() -> EventstreamConnection:
+    """Get or create an Eventstream connection using the configured API base URL."""
+    return EVENTSTREAM_CONNECTION_CACHE.get_connection()
 
 
 def _run_async_operation(coro: Coroutine[Any, Any, Any]) -> Any:
@@ -117,61 +81,25 @@ def _run_async_operation(coro: Coroutine[Any, Any, Any]) -> Any:
 async def _execute_eventstream_operation(
     method: str,
     endpoint: str,
-    authorization_token: str,
     payload: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Base execution method for Eventstream operations.
+    Base execution method for Eventstream operations using Azure Identity.
+    No longer requires explicit authorization token - handled transparently.
     
     :param method: HTTP method (GET, POST, PUT, DELETE)
     :param endpoint: API endpoint relative to the configured API base
-    :param authorization_token: Bearer token for authentication
     :param payload: Optional request payload
     :return: API response as dictionary
     """
-    # Get client configuration
-    client_config = get_eventstream_client_config(authorization_token)
-    
-    # Build full URL using the configurable API base
-    url = f"{get_fabric_api_base()}{endpoint}"
+    # Get connection with automatic Azure authentication
+    connection = get_eventstream_connection()
     
     try:
-        async with httpx.AsyncClient(timeout=client_config["timeout"]) as client:
-            headers = client_config["headers"].copy()
-            if payload:
-                headers["Content-Type"] = "application/json"
-            
-            # Execute request based on method
-            if method.upper() == "GET":
-                response = await client.get(url, headers=headers)
-            elif method.upper() == "POST":
-                response = await client.post(url, json=payload, headers=headers)
-            elif method.upper() == "PUT":
-                response = await client.put(url, json=payload, headers=headers)
-            elif method.upper() == "DELETE":
-                response = await client.delete(url, headers=headers)
-            else:
-                raise ValueError(f"Unsupported HTTP method: {method}")
-            
-            # Handle response
-            if response.status_code >= 400:
-                error_detail = response.text
-                logger.error(f"Eventstream API error {response.status_code}: {error_detail}")
-                return {
-                    "error": True,
-                    "status_code": response.status_code,
-                    "detail": error_detail
-                }
-            
-            # Return JSON response or success message
-            if response.status_code == 204:  # No content
-                return {"success": True, "message": "Operation completed successfully"}
-            
-            try:
-                return response.json()
-            except Exception:
-                return {"success": True, "message": response.text}
-                
+        # Make authenticated request
+        result = await connection.make_request(method, endpoint, payload, DEFAULT_TIMEOUT)
+        return result
+        
     except Exception as e:
         logger.error(f"Error executing Eventstream operation: {e}")
         return {
@@ -184,16 +112,15 @@ def eventstream_create(
     workspace_id: str,
     eventstream_name: str,
     definition: Dict[str, Any],
-    authorization_token: str,
     description: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Create an Eventstream item in Microsoft Fabric.
+    Authentication is handled transparently using Azure Identity.
     
     :param workspace_id: The workspace ID (UUID)
     :param eventstream_name: Name for the new eventstream
     :param definition: Eventstream definition with sources, destinations, operators, streams
-    :param authorization_token: Bearer token for authentication
     :param description: Optional description for the eventstream
     :return: Created eventstream details
     """
@@ -220,47 +147,45 @@ def eventstream_create(
     
     endpoint = f"/workspaces/{workspace_id}/items"
     
-    result = _run_async_operation(_execute_eventstream_operation("POST", endpoint, authorization_token, payload))
+    result = _run_async_operation(_execute_eventstream_operation("POST", endpoint, payload))
     return [result]
 
 
 def eventstream_get(
     workspace_id: str,
-    item_id: str,
-    authorization_token: str
+    item_id: str
 ) -> List[Dict[str, Any]]:
     """
     Get an Eventstream item by workspace and item ID.
+    Authentication is handled transparently using Azure Identity.
     
     :param workspace_id: The workspace ID (UUID)
     :param item_id: The eventstream item ID (UUID)
-    :param authorization_token: Bearer token for authentication
     :return: Eventstream item details
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
     
-    result = _run_async_operation(_execute_eventstream_operation("GET", endpoint, authorization_token))
+    result = _run_async_operation(_execute_eventstream_operation("GET", endpoint))
     return [result]
 
 
 def eventstream_list(
-    workspace_id: str,
-    authorization_token: str
+    workspace_id: str
 ) -> List[Dict[str, Any]]:
     """
     List all Eventstream items in a workspace.
+    Authentication is handled transparently using Azure Identity.
     
     :param workspace_id: The workspace ID (UUID)
-    :param authorization_token: Bearer token for authentication
     :return: List of eventstream items
     """
     endpoint = f"/workspaces/{workspace_id}/items"
     
-    result = _run_async_operation(_execute_eventstream_operation("GET", endpoint, authorization_token))
+    result = _run_async_operation(_execute_eventstream_operation("GET", endpoint))
     
     # Filter only Eventstream items if the result contains a list
     if isinstance(result, dict) and "value" in result and isinstance(result["value"], list):
-        eventstreams = [item for item in result["value"] if isinstance(item, dict) and item.get("type") == "Eventstream"]
+        eventstreams: List[Dict[str, Any]] = [item for item in result["value"] if isinstance(item, dict) and item.get("type") == "Eventstream"]
         return eventstreams
     elif isinstance(result, list):
         eventstreams = [item for item in result if isinstance(item, dict) and item.get("type") == "Eventstream"]
@@ -271,36 +196,34 @@ def eventstream_list(
 
 def eventstream_delete(
     workspace_id: str,
-    item_id: str,
-    authorization_token: str
+    item_id: str
 ) -> List[Dict[str, Any]]:
     """
     Delete an Eventstream item by workspace and item ID.
+    Authentication is handled transparently using Azure Identity.
     
     :param workspace_id: The workspace ID (UUID)
     :param item_id: The eventstream item ID (UUID)
-    :param authorization_token: Bearer token for authentication
     :return: Deletion confirmation
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
     
-    result = _run_async_operation(_execute_eventstream_operation("DELETE", endpoint, authorization_token))
+    result = _run_async_operation(_execute_eventstream_operation("DELETE", endpoint))
     return [result]
 
 
 def eventstream_update(
     workspace_id: str,
     item_id: str,
-    definition: Dict[str, Any],
-    authorization_token: str
+    definition: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
     """
     Update an Eventstream item by workspace and item ID.
+    Authentication is handled transparently using Azure Identity.
     
     :param workspace_id: The workspace ID (UUID)
     :param item_id: The eventstream item ID (UUID)
     :param definition: Updated eventstream definition
-    :param authorization_token: Bearer token for authentication
     :return: Updated eventstream details
     """
     # Prepare the eventstream definition as base64
@@ -321,26 +244,25 @@ def eventstream_update(
     
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
     
-    result = _run_async_operation(_execute_eventstream_operation("PUT", endpoint, authorization_token, payload))
+    result = _run_async_operation(_execute_eventstream_operation("PUT", endpoint, payload))
     return [result]
 
 
 def eventstream_get_definition(
     workspace_id: str,
-    item_id: str,
-    authorization_token: str
+    item_id: str
 ) -> List[Dict[str, Any]]:
     """
     Get the definition of an Eventstream item.
+    Authentication is handled transparently using Azure Identity.
     
     :param workspace_id: The workspace ID (UUID)
     :param item_id: The eventstream item ID (UUID)
-    :param authorization_token: Bearer token for authentication
     :return: Eventstream definition
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}/getDefinition"
     
-    result = _run_async_operation(_execute_eventstream_operation("POST", endpoint, authorization_token))
+    result = _run_async_operation(_execute_eventstream_operation("POST", endpoint))
     return [result]
 
 

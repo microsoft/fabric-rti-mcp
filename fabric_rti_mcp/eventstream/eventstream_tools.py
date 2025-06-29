@@ -12,22 +12,6 @@ from fabric_rti_mcp.eventstream import eventstream_service
 def register_tools(mcp: FastMCP) -> None:
     """Register all Eventstream tools with the MCP server."""
     
-    # Configuration tools (read-only, non-destructive)
-    mcp.add_tool(
-        eventstream_service.get_fabric_api_base,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    
-    mcp.add_tool(
-        eventstream_service.set_fabric_api_base,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
-    )
-    
-    mcp.add_tool(
-        eventstream_service.reset_fabric_api_base,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
-    )
-    
     # Read-only tools (queries, list operations)
     mcp.add_tool(
         eventstream_service.eventstream_list,

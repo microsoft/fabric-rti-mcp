@@ -115,7 +115,7 @@ The process should end with the below settings in your `settings.json` file.
                 "env": {
                     "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
                     "KUSTO_DATABASE": "Datasets", //optionally provide database
-                    "FABRIC_WORKSPACE_ID": "your-workspace-id" //optionally provide default workspace for Eventstreams
+                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1" //optionally provide Fabric API endpoint
                 }
             }
         }
@@ -148,7 +148,7 @@ The process should end with the below settings in your `settings.json` file.
                 "env": {
                     "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
                     "KUSTO_DATABASE": "Datasets", //optionally provide database
-                    "FABRIC_WORKSPACE_ID": "your-workspace-id" //optionally provide default workspace for Eventstreams
+                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1" //optionally provide Fabric API endpoint
                 }
             }
         }
