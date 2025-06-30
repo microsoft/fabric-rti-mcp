@@ -128,10 +128,10 @@ class ExtensionTestDiscovery:
         extensions_with_tests: List[str] = []
         extensions_without_tests: List[str] = []
         test_coverage: Dict[str, Dict[str, Any]] = {}
-        
+
         validation = {
             "extensions_with_tests": extensions_with_tests,
-            "extensions_without_tests": extensions_without_tests, 
+            "extensions_without_tests": extensions_without_tests,
             "test_coverage": test_coverage,
         }
 
@@ -362,10 +362,10 @@ class TestExtensionConfig:
         ],
     )
     def test_environment_variable_parsing(
-        self, 
-        env_vars: Dict[str, str], 
-        expected: Dict[str, Any], 
-        monkeypatch: MonkeyPatch
+        self,
+        env_vars: Dict[str, str],
+        expected: Dict[str, Any],
+        monkeypatch: MonkeyPatch,
     ) -> None:
         """Test parsing configuration from environment variables."""
         config = ExtensionConfig()

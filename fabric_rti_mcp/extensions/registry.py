@@ -40,9 +40,7 @@ class ExtensionRegistry:
             ValueError: If an extension with the same name is already registered
         """
         if extension.name in self._extensions:
-            raise ValueError(
-                f"Extension '{extension.name}' is already registered"
-            )
+            raise ValueError(f"Extension '{extension.name}' is already registered")
 
         logger.info(f"Registering extension: {extension.name} v{extension.version}")
 
