@@ -1,0 +1,12 @@
+{
+  "default_window_size": 20,
+  "volatility_threshold": 0.05,
+  "anomaly_threshold_multiplier": 2.5,
+  "enable_advanced_metrics": true,
+  "supported_symbols": ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"],
+  "reporting": {
+    "include_charts": false,
+    "max_records": 1000,
+    "default_period_days": 30
+  }
+}
