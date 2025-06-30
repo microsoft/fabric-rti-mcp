@@ -1,0 +1,22 @@
+{
+  "security_thresholds": {
+    "failed_login_threshold": 5,
+    "suspicious_activity_threshold": 100,
+    "performance_slow_threshold_ms": 5000
+  },
+  "ip_filtering": {
+    "exclude_private_ips": false,
+    "whitelist_ips": ["192.168.1.0/24", "10.0.0.0/8"],
+    "enable_geolocation": false
+  },
+  "monitoring_windows": {
+    "default_hours": 24,
+    "max_hours": 168,
+    "realtime_window_minutes": 15
+  },
+  "alerts": {
+    "enable_email_notifications": false,
+    "severity_levels": ["Critical", "High", "Medium", "Low"],
+    "auto_escalation": true
+  }
+}
