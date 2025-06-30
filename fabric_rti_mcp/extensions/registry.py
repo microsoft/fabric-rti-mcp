@@ -46,7 +46,8 @@ class ExtensionRegistry:
         
         # Initialize the extension with its configuration
         config = self._config.get_extension_config(extension.name)
-        extension.initialize(config)
+        if hasattr(extension, 'initialize'):
+            extension.initialize(config)
         
         self._extensions[extension.name] = extension
     
@@ -68,8 +69,8 @@ class ExtensionRegistry:
             extensions_pkg.__path__, 
             extensions_pkg.__name__ + "."
         ):
-            # Skip base modules and templates
-            if modname.endswith(('.base', '.registry', '.config', '.templates')):
+            # Skip base modules, templates, and test files
+            if modname.endswith(('.base', '.registry', '.config', '.templates')) or 'test_' in modname:
                 continue
                 
             try:
