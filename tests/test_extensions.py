@@ -5,7 +5,7 @@ Tests for the extension system base components and extension test discovery.
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional
 from unittest.mock import Mock
 
 import pytest
@@ -288,12 +288,13 @@ class TestExtensionRegistry:
         extension = MockExtension()
 
         # Mock the cleanup method to verify it's called
-        extension.cleanup = Mock()
+        cleanup_mock = Mock()
+        extension.cleanup = cleanup_mock
         registry.register(extension)
 
         registry.cleanup_all()
 
-        extension.cleanup.assert_called_once()
+        cleanup_mock.assert_called_once()
 
 
 class TestExtensionConfig:

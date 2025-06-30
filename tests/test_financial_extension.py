@@ -24,7 +24,7 @@ class TestFinancialAnalyticsExtension:
         assert "azure-kusto-data" in extension.get_dependencies()
 
     @patch("fabric_rti_mcp.kusto.kusto_service._execute")
-    def test_register_tools(self, mock_execute) -> None:
+    def test_register_tools(self, mock_execute: Mock) -> None:
         """Test that financial tools are registered correctly."""
         extension = FinancialAnalyticsExtension()
         mock_mcp = Mock(spec=FastMCP)

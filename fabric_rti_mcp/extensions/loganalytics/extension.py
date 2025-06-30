@@ -19,7 +19,7 @@ class LogAnalyticsExtension(ExtensionBase):
     Extension providing log analytics tools and KQL templates.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.service = LogAnalyticsService()
         self.templates = LogAnalyticsKQLTemplates()
 

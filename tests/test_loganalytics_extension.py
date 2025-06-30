@@ -24,7 +24,7 @@ class TestLogAnalyticsExtension:
         assert "azure-kusto-data" in extension.get_dependencies()
 
     @patch("fabric_rti_mcp.kusto.kusto_service._execute")
-    def test_register_tools(self, mock_execute) -> None:
+    def test_register_tools(self, mock_execute: Mock) -> None:
         """Test that log analytics tools are registered correctly."""
         extension = LogAnalyticsExtension()
         mock_mcp = Mock(spec=FastMCP)

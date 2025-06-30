@@ -19,7 +19,7 @@ class FinancialAnalyticsExtension(ExtensionBase):
     Extension providing financial analytics tools and KQL templates.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.service = FinancialAnalyticsService()
         self.templates = FinancialKQLTemplates()
 
