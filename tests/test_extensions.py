@@ -288,7 +288,7 @@ class TestExtensionRegistry:
         extension = MockExtension()
 
         # Mock the cleanup method to verify it's called
-        with patch.object(extension, 'cleanup') as cleanup_mock:
+        with patch.object(extension, "cleanup") as cleanup_mock:
             registry.register(extension)
             registry.cleanup_all()
             cleanup_mock.assert_called_once()
