@@ -9,6 +9,6 @@ from .base import ExtensionBase
 from .registry import ExtensionRegistry
 
 __all__ = [
-    "ExtensionBase", 
+    "ExtensionBase",
     "ExtensionRegistry",
 ]

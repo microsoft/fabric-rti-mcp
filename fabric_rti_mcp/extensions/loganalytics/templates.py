@@ -7,7 +7,7 @@ class LogAnalyticsKQLTemplates:
     """
     Collection of KQL query templates for log analytics.
     """
-    
+
     def get_failed_logins_query(
         self,
         table_name: str,
@@ -15,11 +15,11 @@ class LogAnalyticsKQLTemplates:
         ip_column: str,
         timestamp_column: str,
         status_column: str,
-        hours: int
+        hours: int,
     ) -> str:
         """
         Generate KQL query for analyzing failed login attempts.
-        
+
         Args:
             table_name: Name of the log table
             user_column: Column containing usernames
@@ -27,7 +27,7 @@ class LogAnalyticsKQLTemplates:
             timestamp_column: Column containing timestamps
             status_column: Column containing login status
             hours: Number of hours to analyze
-            
+
         Returns:
             str: KQL query for failed login analysis
         """
@@ -35,7 +35,7 @@ class LogAnalyticsKQLTemplates:
 {table_name}
 | where {timestamp_column} >= ago({hours}h)
 | where {status_column} has_any ("failed", "failure", "error", "denied", "401", "403")
-| summarize 
+| summarize
     FailedAttempts = count(),
     UniqueUsers = dcount({user_column}),
     FirstFailure = min({timestamp_column}),
@@ -43,15 +43,15 @@ class LogAnalyticsKQLTemplates:
     Users = make_set({user_column}, 10)
     by {ip_column}
 | where FailedAttempts >= 3
-| extend 
+| extend
     AttackDuration = LastFailure - FirstFailure,
     RiskScore = case(
         FailedAttempts >= 50, "Critical",
-        FailedAttempts >= 20, "High", 
+        FailedAttempts >= 20, "High",
         FailedAttempts >= 10, "Medium",
         "Low"
     )
-| project 
+| project
     IP = {ip_column},
     FailedAttempts,
     UniqueUsers,
@@ -62,7 +62,7 @@ class LogAnalyticsKQLTemplates:
     Users
 | order by FailedAttempts desc
 """
-    
+
     def get_suspicious_ips_query(
         self,
         table_name: str,
@@ -70,11 +70,11 @@ class LogAnalyticsKQLTemplates:
         timestamp_column: str,
         activity_column: str,
         threshold: int,
-        hours: int
+        hours: int,
     ) -> str:
         """
         Generate KQL query for detecting suspicious IP addresses.
-        
+
         Args:
             table_name: Name of the log table
             ip_column: Column containing IP addresses
@@ -82,14 +82,14 @@ class LogAnalyticsKQLTemplates:
             activity_column: Column containing activity type
             threshold: Minimum number of activities to be considered suspicious
             hours: Number of hours to analyze
-            
+
         Returns:
             str: KQL query for suspicious IP detection
         """
         return f"""
 {table_name}
 | where {timestamp_column} >= ago({hours}h)
-| summarize 
+| summarize
     ActivityCount = count(),
     UniqueActivities = dcount({activity_column}),
     Activities = make_set({activity_column}, 20),
@@ -98,7 +98,7 @@ class LogAnalyticsKQLTemplates:
     RequestsPerHour = count() / {hours}
     by {ip_column}
 | where ActivityCount >= {threshold}
-| extend 
+| extend
     SuspicionLevel = case(
         RequestsPerHour >= 1000, "Very High",
         RequestsPerHour >= 500, "High",
@@ -106,7 +106,7 @@ class LogAnalyticsKQLTemplates:
         "Low"
     ),
     ActivitySpan = LastSeen - FirstSeen
-| project 
+| project
     IP = {ip_column},
     ActivityCount,
     RequestsPerHour,
@@ -118,25 +118,25 @@ class LogAnalyticsKQLTemplates:
     Activities
 | order by RequestsPerHour desc
 """
-    
+
     def get_error_patterns_query(
         self,
         table_name: str,
         error_column: str,
         timestamp_column: str,
         service_column: str,
-        hours: int
+        hours: int,
     ) -> str:
         """
         Generate KQL query for analyzing error patterns.
-        
+
         Args:
             table_name: Name of the log table
             error_column: Column containing error messages
             timestamp_column: Column containing timestamps
             service_column: Column containing service names
             hours: Number of hours to analyze
-            
+
         Returns:
             str: KQL query for error pattern analysis
         """
@@ -152,7 +152,7 @@ class LogAnalyticsKQLTemplates:
     {error_column} has_any ("null", "nullpointer", "reference"), "NullReference",
     "Other"
 )
-| summarize 
+| summarize
     ErrorCount = count(),
     ErrorRate = count() / ({hours} * 60),  // Errors per minute
     UniqueErrors = dcount({error_column}),
@@ -160,14 +160,14 @@ class LogAnalyticsKQLTemplates:
     LastOccurrence = max({timestamp_column}),
     SampleErrors = take_any({error_column}, 3)
     by {service_column}, ErrorType
-| extend 
+| extend
     Severity = case(
         ErrorRate >= 10, "Critical",
         ErrorRate >= 5, "High",
-        ErrorRate >= 1, "Medium", 
+        ErrorRate >= 1, "Medium",
         "Low"
     )
-| project 
+| project
     Service = {service_column},
     ErrorType,
     ErrorCount,
@@ -179,25 +179,25 @@ class LogAnalyticsKQLTemplates:
     SampleErrors
 | order by ErrorRate desc
 """
-    
+
     def get_performance_metrics_query(
         self,
         table_name: str,
         response_time_column: str,
         timestamp_column: str,
         endpoint_column: str,
-        hours: int
+        hours: int,
     ) -> str:
         """
         Generate KQL query for performance monitoring.
-        
+
         Args:
             table_name: Name of the log table
             response_time_column: Column containing response times
             timestamp_column: Column containing timestamps
             endpoint_column: Column containing API endpoints
             hours: Number of hours to analyze
-            
+
         Returns:
             str: KQL query for performance monitoring
         """
@@ -205,7 +205,7 @@ class LogAnalyticsKQLTemplates:
 {table_name}
 | where {timestamp_column} >= ago({hours}h)
 | where isnotnull({response_time_column})
-| summarize 
+| summarize
     RequestCount = count(),
     AvgResponseTime = avg({response_time_column}),
     MedianResponseTime = percentile({response_time_column}, 50),
@@ -215,7 +215,7 @@ class LogAnalyticsKQLTemplates:
     SlowRequests = countif({response_time_column} > 5000),  // > 5 seconds
     RequestsPerMinute = count() / ({hours} * 60)
     by {endpoint_column}
-| extend 
+| extend
     SlowRequestPercent = (SlowRequests * 100.0) / RequestCount,
     PerformanceRating = case(
         AvgResponseTime <= 100, "Excellent",
@@ -223,7 +223,7 @@ class LogAnalyticsKQLTemplates:
         AvgResponseTime <= 2000, "Fair",
         "Poor"
     )
-| project 
+| project
     Endpoint = {endpoint_column},
     RequestCount,
     RequestsPerMinute,
@@ -237,7 +237,7 @@ class LogAnalyticsKQLTemplates:
     PerformanceRating
 | order by AvgResponseTime desc
 """
-    
+
     def get_security_summary_query(
         self,
         table_name: str,
@@ -245,11 +245,11 @@ class LogAnalyticsKQLTemplates:
         ip_column: str,
         action_column: str,
         timestamp_column: str,
-        hours: int
+        hours: int,
     ) -> str:
         """
         Generate KQL query for security summary report.
-        
+
         Args:
             table_name: Name of the log table
             user_column: Column containing usernames
@@ -257,7 +257,7 @@ class LogAnalyticsKQLTemplates:
             action_column: Column containing actions/activities
             timestamp_column: Column containing timestamps
             hours: Number of hours to analyze
-            
+
         Returns:
             str: KQL query for security summary
         """
@@ -267,7 +267,7 @@ let suspiciousActions = dynamic(["login_failed", "access_denied", "permission_er
 let summary = {table_name}
 | where {timestamp_column} >= ago(timeRange)
 | extend IsSuspicious = {action_column} has_any (suspiciousActions)
-| summarize 
+| summarize
     TotalEvents = count(),
     SuspiciousEvents = countif(IsSuspicious),
     UniqueUsers = dcount({user_column}),
@@ -298,6 +298,7 @@ summary
     topActiveUsers | extend ReportType = "TopActiveUsers" | project ReportType, User = {user_column}, ActivityCount
 )
 | union (
-    actionDistribution | extend ReportType = "ActionDistribution" | project ReportType, Action = {action_column}, ActionCount
+    actionDistribution | extend ReportType = "ActionDistribution"
+    | project ReportType, Action = {action_column}, ActionCount
 )
 """

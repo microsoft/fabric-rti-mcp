@@ -9,6 +9,7 @@ from mcp.types import ToolAnnotations
 
 from fabric_rti_mcp.extensions.base import ExtensionBase
 from fabric_rti_mcp.kusto import kusto_service
+
 from .services import FinancialAnalyticsService
 from .templates import FinancialKQLTemplates
 
@@ -17,44 +18,42 @@ class FinancialAnalyticsExtension(ExtensionBase):
     """
     Extension providing financial analytics tools and KQL templates.
     """
-    
+
     def __init__(self):
         self.service = FinancialAnalyticsService()
         self.templates = FinancialKQLTemplates()
-    
+
     @property
     def name(self) -> str:
         return "financial-analytics"
-    
+
     @property
     def version(self) -> str:
         return "1.0.0"
-    
+
     @property
     def description(self) -> str:
         return "Financial analytics tools and KQL templates for financial data analysis"
-    
+
     def get_dependencies(self) -> List[str]:
         return ["azure-kusto-data", "pandas", "numpy"]
-    
+
     def register_tools(self, mcp: FastMCP) -> None:
         """Register all financial analytics tools."""
-        
+
         # Moving averages
-        @mcp.tool(
-            annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False)
-        )
+        @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
         def calculate_moving_average(
             table_name: str,
             value_column: str,
             time_column: str,
             window_size: int,
             cluster_uri: str,
-            database: Optional[str] = None
+            database: Optional[str] = None,
         ) -> List[Dict[str, Any]]:
             """
             Calculate moving average for financial data.
-            
+
             Args:
                 table_name: Name of the table containing financial data
                 value_column: Column containing the values to average
@@ -62,7 +61,7 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 window_size: Number of periods for the moving average
                 cluster_uri: Kusto cluster URI
                 database: Optional database name
-                
+
             Returns:
                 List[Dict[str, Any]]: Results with moving averages
             """
@@ -70,10 +69,8 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 table_name, value_column, time_column, window_size
             )
             return kusto_service._execute(query, cluster_uri, database=database)
-        
-        @mcp.tool(
-            annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False)
-        )
+
+        @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
         def analyze_financial_trends(
             table_name: str,
             price_column: str,
@@ -81,11 +78,11 @@ class FinancialAnalyticsExtension(ExtensionBase):
             symbol_column: str,
             days: int,
             cluster_uri: str,
-            database: Optional[str] = None
+            database: Optional[str] = None,
         ) -> List[Dict[str, Any]]:
             """
             Analyze financial trends over a specified time period.
-            
+
             Args:
                 table_name: Name of the table containing financial data
                 price_column: Column containing price data
@@ -94,7 +91,7 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 days: Number of days to analyze
                 cluster_uri: Kusto cluster URI
                 database: Optional database name
-                
+
             Returns:
                 List[Dict[str, Any]]: Trend analysis results
             """
@@ -102,10 +99,8 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 table_name, price_column, time_column, symbol_column, days
             )
             return kusto_service._execute(query, cluster_uri, database=database)
-        
-        @mcp.tool(
-            annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False)
-        )
+
+        @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
         def calculate_volatility(
             table_name: str,
             price_column: str,
@@ -113,11 +108,11 @@ class FinancialAnalyticsExtension(ExtensionBase):
             symbol_column: str,
             period_days: int,
             cluster_uri: str,
-            database: Optional[str] = None
+            database: Optional[str] = None,
         ) -> List[Dict[str, Any]]:
             """
             Calculate volatility for financial instruments.
-            
+
             Args:
                 table_name: Name of the table containing financial data
                 price_column: Column containing price data
@@ -126,7 +121,7 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 period_days: Number of days for volatility calculation
                 cluster_uri: Kusto cluster URI
                 database: Optional database name
-                
+
             Returns:
                 List[Dict[str, Any]]: Volatility calculations
             """
@@ -134,10 +129,8 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 table_name, price_column, time_column, symbol_column, period_days
             )
             return kusto_service._execute(query, cluster_uri, database=database)
-        
-        @mcp.tool(
-            annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False)
-        )
+
+        @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
         def generate_financial_report(
             table_name: str,
             price_column: str,
@@ -147,11 +140,11 @@ class FinancialAnalyticsExtension(ExtensionBase):
             start_date: str,
             end_date: str,
             cluster_uri: str,
-            database: Optional[str] = None
+            database: Optional[str] = None,
         ) -> List[Dict[str, Any]]:
             """
             Generate a comprehensive financial report.
-            
+
             Args:
                 table_name: Name of the table containing financial data
                 price_column: Column containing price data
@@ -162,19 +155,22 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 end_date: End date for the report (ISO format)
                 cluster_uri: Kusto cluster URI
                 database: Optional database name
-                
+
             Returns:
                 List[Dict[str, Any]]: Comprehensive financial report
             """
             query = self.templates.get_financial_report_query(
-                table_name, price_column, volume_column, time_column, 
-                symbol_column, start_date, end_date
+                table_name,
+                price_column,
+                volume_column,
+                time_column,
+                symbol_column,
+                start_date,
+                end_date,
             )
             return kusto_service._execute(query, cluster_uri, database=database)
-        
-        @mcp.tool(
-            annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False)
-        )
+
+        @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
         def detect_price_anomalies(
             table_name: str,
             price_column: str,
@@ -182,11 +178,11 @@ class FinancialAnalyticsExtension(ExtensionBase):
             symbol_column: str,
             threshold_multiplier: float,
             cluster_uri: str,
-            database: Optional[str] = None
+            database: Optional[str] = None,
         ) -> List[Dict[str, Any]]:
             """
             Detect price anomalies using statistical methods.
-            
+
             Args:
                 table_name: Name of the table containing financial data
                 price_column: Column containing price data
@@ -195,19 +191,23 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 threshold_multiplier: Multiplier for standard deviation threshold
                 cluster_uri: Kusto cluster URI
                 database: Optional database name
-                
+
             Returns:
                 List[Dict[str, Any]]: Detected anomalies
             """
             query = self.templates.get_anomaly_detection_query(
-                table_name, price_column, time_column, symbol_column, threshold_multiplier
+                table_name,
+                price_column,
+                time_column,
+                symbol_column,
+                threshold_multiplier,
             )
             return kusto_service._execute(query, cluster_uri, database=database)
-    
+
     def get_configuration_schema(self) -> Optional[Dict[str, Any]]:
         """
         Get configuration schema for the financial analytics extension.
-        
+
         Returns:
             Dict containing JSON schema for configuration
         """
@@ -217,22 +217,22 @@ class FinancialAnalyticsExtension(ExtensionBase):
                 "market_data_source": {
                     "type": "string",
                     "description": "Source for market data (e.g., 'bloomberg', 'yahoo', 'alpha_vantage')",
-                    "default": "yahoo"
+                    "default": "yahoo",
                 },
                 "default_currency": {
                     "type": "string",
                     "description": "Default currency for calculations",
-                    "default": "USD"
+                    "default": "USD",
                 },
                 "risk_free_rate": {
                     "type": "number",
                     "description": "Default risk-free rate for calculations",
-                    "default": 0.02
+                    "default": 0.02,
                 },
                 "cache_duration": {
                     "type": "integer",
                     "description": "Cache duration in seconds for market data",
-                    "default": 3600
-                }
-            }
+                    "default": 3600,
+                },
+            },
         }
