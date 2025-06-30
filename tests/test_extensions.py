@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
@@ -288,13 +288,10 @@ class TestExtensionRegistry:
         extension = MockExtension()
 
         # Mock the cleanup method to verify it's called
-        cleanup_mock = Mock()
-        extension.cleanup = cleanup_mock
-        registry.register(extension)
-
-        registry.cleanup_all()
-
-        cleanup_mock.assert_called_once()
+        with patch.object(extension, 'cleanup') as cleanup_mock:
+            registry.register(extension)
+            registry.cleanup_all()
+            cleanup_mock.assert_called_once()
 
 
 class TestExtensionConfig:
