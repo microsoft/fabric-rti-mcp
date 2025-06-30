@@ -14,7 +14,7 @@ from fabric_rti_mcp.extensions.loganalytics.templates import LogAnalyticsKQLTemp
 class TestLogAnalyticsExtension:
     """Test cases for Log Analytics Extension."""
 
-    def test_extension_properties(self):
+    def test_extension_properties(self) -> None:
         """Test log analytics extension properties."""
         extension = LogAnalyticsExtension()
 
@@ -24,7 +24,7 @@ class TestLogAnalyticsExtension:
         assert "azure-kusto-data" in extension.get_dependencies()
 
     @patch("fabric_rti_mcp.kusto.kusto_service._execute")
-    def test_register_tools(self, mock_execute):
+    def test_register_tools(self, mock_execute) -> None:
         """Test that log analytics tools are registered correctly."""
         extension = LogAnalyticsExtension()
         mock_mcp = Mock(spec=FastMCP)
@@ -42,7 +42,7 @@ class TestLogAnalyticsExtension:
 class TestLogAnalyticsService:
     """Test cases for Log Analytics Service."""
 
-    def test_extract_ip_addresses(self):
+    def test_extract_ip_addresses(self) -> None:
         """Test IP address extraction from log text."""
         service = LogAnalyticsService()
         log_text = "Connection from 192.168.1.1 and 10.0.0.1 failed. Invalid IP: 999.999.999.999"
@@ -53,7 +53,7 @@ class TestLogAnalyticsService:
         assert "10.0.0.1" in ips
         assert "999.999.999.999" not in ips  # Invalid IP should be filtered out
 
-    def test_detect_attack_patterns(self):
+    def test_detect_attack_patterns(self) -> None:
         """Test attack pattern detection."""
         service = LogAnalyticsService()
 
@@ -74,7 +74,7 @@ class TestLogAnalyticsService:
         patterns = service.detect_attack_patterns(normal_log)
         assert len(patterns) == 0
 
-    def test_classify_error_severity(self):
+    def test_classify_error_severity(self) -> None:
         """Test error severity classification."""
         service = LogAnalyticsService()
 
@@ -86,7 +86,7 @@ class TestLogAnalyticsService:
         )
         assert service.classify_error_severity("Info: user logged in") == "Low"
 
-    def test_calculate_error_rate(self):
+    def test_calculate_error_rate(self) -> None:
         """Test error rate calculation."""
         service = LogAnalyticsService()
 
@@ -94,7 +94,7 @@ class TestLogAnalyticsService:
         assert service.calculate_error_rate(0, 0) == 0.0
         assert service.calculate_error_rate(1000, 25) == 2.5
 
-    def test_is_private_ip(self):
+    def test_is_private_ip(self) -> None:
         """Test private IP address detection."""
         service = LogAnalyticsService()
 
@@ -107,7 +107,7 @@ class TestLogAnalyticsService:
 class TestLogAnalyticsKQLTemplates:
     """Test cases for Log Analytics KQL Templates."""
 
-    def test_get_failed_logins_query(self):
+    def test_get_failed_logins_query(self) -> None:
         """Test failed logins KQL query generation."""
         templates = LogAnalyticsKQLTemplates()
 
@@ -122,7 +122,7 @@ class TestLogAnalyticsKQLTemplates:
         assert "FailedAttempts" in query
         assert "RiskScore" in query
 
-    def test_get_suspicious_ips_query(self):
+    def test_get_suspicious_ips_query(self) -> None:
         """Test suspicious IPs KQL query generation."""
         templates = LogAnalyticsKQLTemplates()
 
@@ -137,7 +137,7 @@ class TestLogAnalyticsKQLTemplates:
         assert "ActivityCount" in query
         assert "SuspicionLevel" in query
 
-    def test_get_error_patterns_query(self):
+    def test_get_error_patterns_query(self) -> None:
         """Test error patterns KQL query generation."""
         templates = LogAnalyticsKQLTemplates()
 
@@ -152,7 +152,7 @@ class TestLogAnalyticsKQLTemplates:
         assert "ErrorType" in query
         assert "Severity" in query
 
-    def test_get_performance_metrics_query(self):
+    def test_get_performance_metrics_query(self) -> None:
         """Test performance metrics KQL query generation."""
         templates = LogAnalyticsKQLTemplates()
 
@@ -167,7 +167,7 @@ class TestLogAnalyticsKQLTemplates:
         assert "AvgResponseTime" in query
         assert "P95ResponseTime" in query
 
-    def test_get_security_summary_query(self):
+    def test_get_security_summary_query(self) -> None:
         """Test security summary KQL query generation."""
         templates = LogAnalyticsKQLTemplates()
 

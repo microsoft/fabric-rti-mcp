@@ -4,10 +4,12 @@ Tests for the extension system base components and extension test discovery.
 
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, cast
 from unittest.mock import Mock
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 from mcp.server.fastmcp import FastMCP
 
 from fabric_rti_mcp.extensions.base import ExtensionBase
@@ -123,10 +125,14 @@ class ExtensionTestDiscovery:
         Returns:
             Dict containing validation results
         """
+        extensions_with_tests: List[str] = []
+        extensions_without_tests: List[str] = []
+        test_coverage: Dict[str, Dict[str, Any]] = {}
+        
         validation = {
-            "extensions_with_tests": [],
-            "extensions_without_tests": [],
-            "test_coverage": {},
+            "extensions_with_tests": extensions_with_tests,
+            "extensions_without_tests": extensions_without_tests, 
+            "test_coverage": test_coverage,
         }
 
         # Get all extensions
@@ -139,15 +145,15 @@ class ExtensionTestDiscovery:
 
         for ext_name in extensions:
             if ext_name in extension_tests:
-                validation["extensions_with_tests"].append(ext_name)
-                validation["test_coverage"][ext_name] = {
+                extensions_with_tests.append(ext_name)
+                test_coverage[ext_name] = {
                     "has_tests": True,
                     "test_files": extension_tests[ext_name],
                     "test_count": len(extension_tests[ext_name]),
                 }
             else:
-                validation["extensions_without_tests"].append(ext_name)
-                validation["test_coverage"][ext_name] = {
+                extensions_without_tests.append(ext_name)
+                test_coverage[ext_name] = {
                     "has_tests": False,
                     "test_files": [],
                     "test_count": 0,
@@ -156,8 +162,8 @@ class ExtensionTestDiscovery:
         return validation
 
 
-# Test implementation of ExtensionBase for testing
-class TestExtension(ExtensionBase):
+# Mock implementation of ExtensionBase for testing
+class MockExtension(ExtensionBase):
     def __init__(self, name: str = "test-extension", version: str = "1.0.0"):
         self._name = name
         self._version = version
@@ -190,18 +196,18 @@ class TestExtension(ExtensionBase):
 class TestExtensionBase:
     """Test cases for ExtensionBase abstract class."""
 
-    def test_extension_properties(self):
+    def test_extension_properties(self) -> None:
         """Test that extension properties are accessible."""
-        extension = TestExtension()
+        extension = MockExtension()
 
         assert extension.name == "test-extension"
         assert extension.version == "1.0.0"
         assert extension.description == "Test extension for unit testing"
         assert extension.get_dependencies() == ["test-dependency"]
 
-    def test_extension_default_methods(self):
+    def test_extension_default_methods(self) -> None:
         """Test default implementations of optional methods."""
-        extension = TestExtension()
+        extension = MockExtension()
 
         # Test default implementations
         assert extension.get_configuration_schema() is None
@@ -210,9 +216,9 @@ class TestExtensionBase:
         extension.initialize()
         extension.cleanup()
 
-    def test_extension_initialization_with_config(self):
+    def test_extension_initialization_with_config(self) -> None:
         """Test extension initialization with configuration."""
-        extension = TestExtension()
+        extension = MockExtension()
         config = {"test_setting": "test_value"}
 
         # Should not raise exception
@@ -222,38 +228,38 @@ class TestExtensionBase:
 class TestExtensionRegistry:
     """Test cases for ExtensionRegistry."""
 
-    def test_registry_initialization(self):
+    def test_registry_initialization(self) -> None:
         """Test registry initializes correctly."""
         registry = ExtensionRegistry()
 
         assert len(registry.list_extensions()) == 0
         assert isinstance(registry.get_extension_info(), dict)
 
-    def test_register_extension(self):
+    def test_register_extension(self) -> None:
         """Test registering an extension."""
         registry = ExtensionRegistry()
-        extension = TestExtension()
+        extension = MockExtension()
 
         registry.register(extension)
 
         assert "test-extension" in registry.list_extensions()
         assert registry.get_extension("test-extension") is extension
 
-    def test_register_duplicate_extension_raises_error(self):
+    def test_register_duplicate_extension_raises_error(self) -> None:
         """Test that registering duplicate extension raises ValueError."""
         registry = ExtensionRegistry()
-        extension1 = TestExtension()
-        extension2 = TestExtension()  # Same name
+        extension1 = MockExtension()
+        extension2 = MockExtension()  # Same name
 
         registry.register(extension1)
 
         with pytest.raises(ValueError, match="already registered"):
             registry.register(extension2)
 
-    def test_register_tools_with_mcp(self):
+    def test_register_tools_with_mcp(self) -> None:
         """Test registering extension tools with MCP server."""
         registry = ExtensionRegistry()
-        extension = TestExtension()
+        extension = MockExtension()
         registry.register(extension)
 
         mock_mcp = Mock(spec=FastMCP)
@@ -261,10 +267,10 @@ class TestExtensionRegistry:
 
         assert extension.tools_registered is True
 
-    def test_get_extension_info(self):
+    def test_get_extension_info(self) -> None:
         """Test getting extension information."""
         registry = ExtensionRegistry()
-        extension = TestExtension()
+        extension = MockExtension()
         registry.register(extension)
 
         info = registry.get_extension_info()
@@ -276,10 +282,10 @@ class TestExtensionRegistry:
         )
         assert info["test-extension"]["dependencies"] == ["test-dependency"]
 
-    def test_cleanup_all_extensions(self):
+    def test_cleanup_all_extensions(self) -> None:
         """Test cleanup of all registered extensions."""
         registry = ExtensionRegistry()
-        extension = TestExtension()
+        extension = MockExtension()
 
         # Mock the cleanup method to verify it's called
         extension.cleanup = Mock()
@@ -293,7 +299,7 @@ class TestExtensionRegistry:
 class TestExtensionConfig:
     """Test cases for ExtensionConfig."""
 
-    def test_config_initialization(self, tmp_path):
+    def test_config_initialization(self, tmp_path: Path) -> None:
         """Test config initialization with custom directory."""
         config_dir = str(tmp_path / "test_configs")
         config = ExtensionConfig(config_dir)
@@ -302,7 +308,7 @@ class TestExtensionConfig:
         # Directory should be created
         assert (tmp_path / "test_configs").exists()
 
-    def test_get_extension_config_none_when_not_found(self):
+    def test_get_extension_config_none_when_not_found(self) -> None:
         """Test that None is returned when no config is found."""
         config = ExtensionConfig()
 
@@ -310,7 +316,7 @@ class TestExtensionConfig:
 
         assert result is None
 
-    def test_save_and_load_config(self, tmp_path):
+    def test_save_and_load_config(self, tmp_path: Path) -> None:
         """Test saving and loading extension configuration."""
         config_dir = str(tmp_path / "test_configs")
         config = ExtensionConfig(config_dir)
@@ -329,7 +335,7 @@ class TestExtensionConfig:
 
         assert loaded_config == test_config
 
-    def test_list_configured_extensions(self, tmp_path):
+    def test_list_configured_extensions(self, tmp_path: Path) -> None:
         """Test listing configured extensions."""
         config_dir = str(tmp_path / "test_configs")
         config = ExtensionConfig(config_dir)
@@ -355,7 +361,12 @@ class TestExtensionConfig:
             ({"FABRIC_RTI_OTHER_SETTING": "value"}, {}),  # Wrong prefix
         ],
     )
-    def test_environment_variable_parsing(self, env_vars, expected, monkeypatch):
+    def test_environment_variable_parsing(
+        self, 
+        env_vars: Dict[str, str], 
+        expected: Dict[str, Any], 
+        monkeypatch: MonkeyPatch
+    ) -> None:
         """Test parsing configuration from environment variables."""
         config = ExtensionConfig()
 

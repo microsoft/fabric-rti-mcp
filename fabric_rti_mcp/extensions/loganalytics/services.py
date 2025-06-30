@@ -12,7 +12,7 @@ class LogAnalyticsService:
     Service class for log analytics operations.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.common_attack_patterns = [
             r"(?i)(sql injection|script injection|xss|csrf)",
             r"(?i)(union select|drop table|exec|execute)",

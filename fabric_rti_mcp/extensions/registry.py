@@ -25,7 +25,7 @@ class ExtensionRegistry:
     directory and provides methods for registering and managing them.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._extensions: Dict[str, ExtensionBase] = {}
         self._config = ExtensionConfig()
 
@@ -40,10 +40,9 @@ class ExtensionRegistry:
             ValueError: If an extension with the same name is already registered
         """
         if extension.name in self._extensions:
-            logger.warning(
-                f"Extension '{extension.name}' is already registered, skipping"
+            raise ValueError(
+                f"Extension '{extension.name}' is already registered"
             )
-            return
 
         logger.info(f"Registering extension: {extension.name} v{extension.version}")
 

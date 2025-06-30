@@ -11,7 +11,7 @@ class FinancialAnalyticsService:
     Service class for financial analytics operations.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def validate_financial_data(self, data: List[Dict[str, Any]]) -> bool:

@@ -14,7 +14,7 @@ from fabric_rti_mcp.extensions.financial.templates import FinancialKQLTemplates
 class TestFinancialAnalyticsExtension:
     """Test cases for Financial Analytics Extension."""
 
-    def test_extension_properties(self):
+    def test_extension_properties(self) -> None:
         """Test financial extension properties."""
         extension = FinancialAnalyticsExtension()
 
@@ -24,7 +24,7 @@ class TestFinancialAnalyticsExtension:
         assert "azure-kusto-data" in extension.get_dependencies()
 
     @patch("fabric_rti_mcp.kusto.kusto_service._execute")
-    def test_register_tools(self, mock_execute):
+    def test_register_tools(self, mock_execute) -> None:
         """Test that financial tools are registered correctly."""
         extension = FinancialAnalyticsExtension()
         mock_mcp = Mock(spec=FastMCP)
@@ -42,7 +42,7 @@ class TestFinancialAnalyticsExtension:
 class TestFinancialAnalyticsService:
     """Test cases for Financial Analytics Service."""
 
-    def test_validate_financial_data_valid(self):
+    def test_validate_financial_data_valid(self) -> None:
         """Test validation of valid financial data."""
         service = FinancialAnalyticsService()
         valid_data = [
@@ -52,7 +52,7 @@ class TestFinancialAnalyticsService:
 
         assert service.validate_financial_data(valid_data) is True
 
-    def test_validate_financial_data_invalid(self):
+    def test_validate_financial_data_invalid(self) -> None:
         """Test validation of invalid financial data."""
         service = FinancialAnalyticsService()
 
@@ -63,7 +63,7 @@ class TestFinancialAnalyticsService:
         invalid_data = [{"price": 100.0, "symbol": "AAPL"}]  # Missing timestamp
         assert service.validate_financial_data(invalid_data) is False
 
-    def test_calculate_returns(self):
+    def test_calculate_returns(self) -> None:
         """Test returns calculation."""
         service = FinancialAnalyticsService()
         prices = [100.0, 105.0, 102.0, 108.0]
@@ -74,14 +74,14 @@ class TestFinancialAnalyticsService:
         assert len(returns) == 3
         assert abs(returns[0] - 0.05) < 0.001
 
-    def test_calculate_returns_insufficient_data(self):
+    def test_calculate_returns_insufficient_data(self) -> None:
         """Test returns calculation with insufficient data."""
         service = FinancialAnalyticsService()
 
         assert service.calculate_returns([]) == []
         assert service.calculate_returns([100.0]) == []
 
-    def test_format_financial_report(self):
+    def test_format_financial_report(self) -> None:
         """Test financial report formatting."""
         service = FinancialAnalyticsService()
         data = {"symbol": "AAPL", "price": 150.0, "volume": 1000000}
@@ -95,7 +95,7 @@ class TestFinancialAnalyticsService:
 class TestFinancialKQLTemplates:
     """Test cases for Financial KQL Templates."""
 
-    def test_get_moving_average_query(self):
+    def test_get_moving_average_query(self) -> None:
         """Test moving average KQL query generation."""
         templates = FinancialKQLTemplates()
 
@@ -109,7 +109,7 @@ class TestFinancialKQLTemplates:
         assert "MovingAverage" in query
         assert "series_fir" in query
 
-    def test_get_trend_analysis_query(self):
+    def test_get_trend_analysis_query(self) -> None:
         """Test trend analysis KQL query generation."""
         templates = FinancialKQLTemplates()
 
@@ -125,7 +125,7 @@ class TestFinancialKQLTemplates:
         assert "TotalReturn" in query
         assert "TrendDirection" in query
 
-    def test_get_volatility_query(self):
+    def test_get_volatility_query(self) -> None:
         """Test volatility calculation KQL query generation."""
         templates = FinancialKQLTemplates()
 
@@ -139,7 +139,7 @@ class TestFinancialKQLTemplates:
         assert "DailyReturn" in query
         assert "sqrt(252)" in query
 
-    def test_get_financial_report_query(self):
+    def test_get_financial_report_query(self) -> None:
         """Test financial report KQL query generation."""
         templates = FinancialKQLTemplates()
 
@@ -161,7 +161,7 @@ class TestFinancialKQLTemplates:
         assert "OpenPrice" in query
         assert "ClosePrice" in query
 
-    def test_get_anomaly_detection_query(self):
+    def test_get_anomaly_detection_query(self) -> None:
         """Test anomaly detection KQL query generation."""
         templates = FinancialKQLTemplates()
 
