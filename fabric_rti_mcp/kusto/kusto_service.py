@@ -106,7 +106,9 @@ def kusto_get_clusters() -> List[Tuple[str, str]]:
     return [(uri, client.description) for uri, client in KUSTO_CONNECTION_CACHE.items()]
 
 
-def kusto_connect(cluster_uri: str, default_database: str, description: Optional[str] = None) -> None:
+def kusto_connect(
+    cluster_uri: str, default_database: str, description: Optional[str] = None
+) -> None:
     """
     Connects to a Kusto cluster and adds it to the cache.
 
@@ -115,7 +117,9 @@ def kusto_connect(cluster_uri: str, default_database: str, description: Optional
     :param description: Optional description for the cluster. Cannot be used to retrieve the cluster,
                        but can be used to provide additional information about the cluster.
     """
-    add_kusto_cluster(cluster_uri, default_database=default_database, description=description)
+    add_kusto_cluster(
+        cluster_uri, default_database=default_database, description=description
+    )
 
 
 def kusto_query(
