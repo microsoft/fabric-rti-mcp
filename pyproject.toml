@@ -21,7 +21,9 @@ dependencies = [
     "fastmcp~=2.5.0",
     "azure-kusto-data~=5.0.0",
     "azure-identity",
-    "azure-kusto-ingest~=5.0.0"
+    "azure-kusto-ingest~=5.0.0",
+    "openai>=1.0.0",
+    "requests>=2.25.0"
 ]
 
 [project.optional-dependencies]

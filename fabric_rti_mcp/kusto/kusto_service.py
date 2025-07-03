@@ -39,7 +39,6 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
         self[key] = client
         return client
 
-
 KUSTO_CONNECTION_CACHE: Dict[str, KustoConnectionWrapper] = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 
