@@ -35,6 +35,11 @@ def register_tools(mcp: FastMCP) -> None:
     )
     
     mcp.add_tool(
+        eventstream_service.eventstream_create_simple,
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
+    )
+    
+    mcp.add_tool(
         eventstream_service.eventstream_update,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )

@@ -464,3 +464,6 @@ test_eventstream_client.py
 
 # Development configuration files (AI/OpenAI integration artifacts)
 fabric_rti_mcp/eventstream/config.py
+
+# Design documents (development planning artifacts)
+EVENTSTREAM_BUILDER_DESIGN.md
