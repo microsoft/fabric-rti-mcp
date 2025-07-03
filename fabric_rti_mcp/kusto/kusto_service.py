@@ -1,11 +1,12 @@
 import inspect
+import os
 import uuid
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from azure.kusto.data import (
     ClientRequestProperties,
-    KustoClient,
+    KustoConnectionStringBuilder,
 )
 
 from fabric_rti_mcp import __version__  # type: ignore
@@ -13,32 +14,57 @@ from fabric_rti_mcp.kusto.kusto_connection import KustoConnection
 from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
 
 
-class KustoConnectionCache(defaultdict[str, KustoConnection]):
-    def __missing__(self, key: str) -> KustoConnection:
-        client = KustoConnection(key)
+class KustoConnectionWrapper(KustoConnection):
+    def __init__(
+        self, cluster_uri: str, default_database: str, description: Optional[str] = None
+    ):
+        super().__init__(cluster_uri)
+        self.default_database = default_database
+        self.description = description or cluster_uri
+
+
+class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
+    def __init__(self) -> None:
+        super().__init__()
+        default_cluster = os.getenv("KUSTO_SERVICE_URI")
+        default_db = os.getenv(
+            "KUSTO_SERVICE_DEFAULT_DB",
+            KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
+        )
+        if default_cluster:
+            add_kusto_cluster(default_cluster, default_db, "default cluster")
+
+    def __missing__(self, key: str) -> KustoConnectionWrapper:
+        client = KustoConnectionWrapper(key, DEFAULT_DB)
         self[key] = client
         return client
 
-
-KUSTO_CONNECTION_CACHE: Dict[str, KustoConnection] = KustoConnectionCache()
-
-
-def get_default_database_name() -> str:
-    """Get the default database name for Kusto"""
-    # Use a sensible default since DEFAULT_DATABASE_NAME might not be available
-    return "netDefaultDB"
+KUSTO_CONNECTION_CACHE: Dict[str, KustoConnectionWrapper] = KustoConnectionCache()
+DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 
 
-def get_kusto_connection(cluster_uri: str) -> KustoConnection:
+def add_kusto_cluster(
+    cluster_uri: str,
+    default_database: Optional[str] = None,
+    description: Optional[str] = None,
+) -> None:
+    cluster_uri = cluster_uri.strip()
+    if cluster_uri.endswith("/"):
+        cluster_uri = cluster_uri[:-1]
+
+    if cluster_uri in KUSTO_CONNECTION_CACHE:
+        return
+    KUSTO_CONNECTION_CACHE[cluster_uri] = KustoConnectionWrapper(
+        cluster_uri, default_database or DEFAULT_DB, description
+    )
+
+
+def get_kusto_connection(cluster_uri: str) -> KustoConnectionWrapper:
     # clean uo the cluster URI since agents can send messy inputs
     cluster_uri = cluster_uri.strip()
     if cluster_uri.endswith("/"):
         cluster_uri = cluster_uri[:-1]
     return KUSTO_CONNECTION_CACHE[cluster_uri]
-
-
-def get_kusto_query_client(cluster_uri: str) -> KustoClient:
-    return get_kusto_connection(cluster_uri).query_client
 
 
 def _execute(
@@ -51,12 +77,15 @@ def _execute(
     # Get the name of the caller function
     action = caller_frame.f_code.co_name  # type: ignore
 
-    database = database or get_default_database_name()
+    connection = get_kusto_connection(cluster_uri)
+    client = connection.query_client
+
     # agents can send messy inputs
-    database = database.strip()
     query = query.strip()
 
-    client = get_kusto_query_client(cluster_uri)
+    database = database or connection.default_database
+    database = database.strip()
+
     crp: ClientRequestProperties = ClientRequestProperties()
     crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
@@ -64,6 +93,32 @@ def _execute(
         crp.set_option("request_readonly", True)
     result_set = client.execute(database, query, crp)
     return format_results(result_set)
+
+
+def kusto_get_clusters() -> List[Tuple[str, str]]:
+    """
+    Retrieves a list of all Kusto clusters in the cache.
+
+    :return: List of tuples containing cluster URI and description. When selecting a cluster,
+             the URI must be used, the description is used only for additional information.
+    """
+    return [(uri, client.description) for uri, client in KUSTO_CONNECTION_CACHE.items()]
+
+
+def kusto_connect(
+    cluster_uri: str, default_database: str, description: Optional[str] = None
+) -> None:
+    """
+    Connects to a Kusto cluster and adds it to the cache.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param default_database: The default database to use for queries on this cluster.
+    :param description: Optional description for the cluster. Cannot be used to retrieve the cluster,
+                       but can be used to provide additional information about the cluster.
+    """
+    add_kusto_cluster(
+        cluster_uri, default_database=default_database, description=description
+    )
 
 
 def kusto_query(
@@ -130,7 +185,7 @@ def kusto_get_entities_schema(
     """
     return _execute(
         ".show databases entities with (showObfuscatedStrings=true) "
-        f"| where DatabaseName == '{database or get_default_database_name()}' "
+        f"| where DatabaseName == '{database or DEFAULT_DB}' "
         "| project EntityName, EntityType, Folder, DocString",
         cluster_uri,
         database=database,
