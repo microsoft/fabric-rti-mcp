@@ -65,3 +65,8 @@ exclude = ['scripts/build_executables.py', 'setup_dist.py', 'fabric_rti_mcp/_ver
 
 [tool.setuptools_scm]
 write_to = "fabric_rti_mcp/_version.py"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]

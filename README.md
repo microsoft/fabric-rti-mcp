@@ -120,7 +120,46 @@ The process should end with the below settings in your `settings.json` file.
 }
 ```
 
-## 🐛 Debugging the MCP Server locally
+## � Environment Variables Configuration
+
+The MCP server supports multiple Kusto clusters through environment variables. You can configure one or more clusters using the following pattern:
+
+### Primary Cluster (no suffix)
+- `KUSTO_SERVICE_URI`: The URI of the primary Kusto cluster
+- `KUSTO_DATABASE`: The default database for the primary cluster (optional)
+- `KUSTO_DESCRIPTION`: Description for the primary cluster (optional)
+
+### Additional Clusters (with numeric suffixes)
+For secondary clusters, use numbered suffixes starting with `__1`:
+- `KUSTO_SERVICE_URI__1`: The URI of the secondary Kusto cluster
+- `KUSTO_DATABASE__1`: The default database for the secondary cluster (optional)
+- `KUSTO_DESCRIPTION__1`: Description for the secondary cluster (optional)
+
+Continue the pattern for additional clusters:
+- `KUSTO_SERVICE_URI__2`, `KUSTO_DATABASE__2`, `KUSTO_DESCRIPTION__2`
+- `KUSTO_SERVICE_URI__3`, `KUSTO_DATABASE__3`, `KUSTO_DESCRIPTION__3`
+- And so on...
+
+### Example Configuration
+```json
+{
+    "env": {
+        "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/",
+        "KUSTO_DATABASE": "Datasets",
+        "KUSTO_DESCRIPTION": "Production cluster",
+        "KUSTO_SERVICE_URI__1": "https://test.kusto.windows.net/",
+        "KUSTO_DATABASE__1": "TestDB",
+        "KUSTO_DESCRIPTION__1": "Test cluster",
+        "KUSTO_SERVICE_URI__2": "https://dev.kusto.windows.net/",
+        "KUSTO_DATABASE__2": "DevDB",
+        "KUSTO_DESCRIPTION__2": "Development cluster"
+    }
+}
+```
+
+**Note:** The server will automatically load all configured clusters at startup. You can view all available clusters using the `kusto_get_clusters` tool.
+
+## �🐛 Debugging the MCP Server locally
 Assuming you have python installed and the repo cloned:
 
 ### Install locally
