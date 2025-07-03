@@ -120,7 +120,7 @@ The process should end with the below settings in your `settings.json` file.
 }
 ```
 
-## � Environment Variables Configuration
+## Environment Variables Configuration
 
 The MCP server supports multiple Kusto clusters through environment variables. You can configure one or more clusters using the following pattern:
 
@@ -159,7 +159,7 @@ Continue the pattern for additional clusters:
 
 **Note:** The server will automatically load all configured clusters at startup. You can view all available clusters using the `kusto_get_clusters` tool.
 
-## �🐛 Debugging the MCP Server locally
+## �� Debugging the MCP Server locally
 Assuming you have python installed and the repo cloned:
 
 ### Install locally
