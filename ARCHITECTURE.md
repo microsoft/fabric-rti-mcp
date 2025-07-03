@@ -18,17 +18,17 @@ The Fabric RTI MCP Server provides a unified interface for Microsoft Fabric Real
 ├─────────────────┬───────────────────────────────────────────┤
 │                 │                                           │
 │  ┌──────────────▼────────────┐    ┌─────────────────────────▼┐ │
-│  │     Kusto Service         │    │   Eventstream Service   │ │
+│  │     Eventhouse Service    │    │   Eventstream Service    │ │
 │  │   (kusto_service.py)      │    │ (eventstream_service.py) │ │
-│  │                           │    │                         │ │
-│  │ • Database queries        │    │ • Stream management     │ │
-│  │ • KQL execution           │    │ • CRUD operations       │ │
-│  │ • Schema introspection    │    │ • Workspace integration │ │
-│  │ • Data ingestion          │    │ • Configuration mgmt    │ │
+│  │                           │    │                          │ │
+│  │ • Database queries        │    │ • Stream management      │ │
+│  │ • KQL execution           │    │ • CRUD operations        │ │
+│  │ • Schema introspection    │    │ • Workspace integration  │ │
+│  │ • Data ingestion          │    │ • Configuration mgmt     │ │
 │  └───────────┬───────────────┘    └─────────────────────────┬┘ │
-│              │                                              │   │
+│              │                                              │  │
 │  ┌───────────▼───────────────┐    ┌─────────────────────────▼┐ │
-│  │     Kusto Tools           │    │   Eventstream Tools     │ │
+│  │     Eventhouse Tools      │    │   Eventstream Tools     │ │
 │  │   (kusto_tools.py)        │    │ (eventstream_tools.py)  │ │
 │  │                           │    │                         │ │
 │  │ • list_databases          │    │ • list_eventstreams     │ │
@@ -41,7 +41,7 @@ The Fabric RTI MCP Server provides a unified interface for Microsoft Fabric Real
 └─────────────────────────────────────────────────────────────┘
                   │
 ┌─────────────────▼───────────────────────────────────────────┐
-│              Azure Services                                  │
+│              Azure Services                                 │
 │                                                             │
 │  ┌─────────────────────────┐    ┌─────────────────────────┐ │
 │  │    Fabric Eventhouse    │    │   Fabric Eventstreams   │ │
