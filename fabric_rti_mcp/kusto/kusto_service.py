@@ -298,6 +298,500 @@ def kusto_ingest_inline_into_table(
         database=database,
     )
 
+def kusto_list_graph_models(
+    cluster_uri: str, 
+    database: Optional[str] = None, 
+    show_all: bool = False,
+    show_details: bool = False
+) -> List[Dict[str, Any]]:
+    """
+    Lists all graph models in the database. By default, shows only the latest version of each model.
+    If no database is provided, uses the default database.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param show_all: If True, shows all versions of every graph model. If False, shows only the latest version.
+    :param show_details: If True, returns detailed information including model definition and metadata.
+    :return: List of dictionaries containing graph model information.
+    """
+    command = ".show graph_models"
+    
+    if show_details:
+        command += " details"
+    
+    if show_all:
+        if show_details:
+            command += " with (showAll = true)"
+        else:
+            command += " with (showAll = true)"
+    
+    return _execute(command, cluster_uri, database=database)
+
+
+def kusto_get_graph_model(
+    graph_model_name: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    model_id: Optional[str] = None,
+    show_details: bool = False
+) -> List[Dict[str, Any]]:
+    """
+    Shows the details of a specific graph model, including its versions.
+    If no database is provided, uses the default database.
+
+    :param graph_model_name: The name of the graph model to show.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param model_id: Optional specific version identifier (GUID) of the graph model. Use '*' to show all versions.
+    :param show_details: If True, returns detailed information including model definition and metadata.
+    :return: List of dictionaries containing graph model information.
+    """
+    command = f".show graph_model {graph_model_name}"
+    
+    if show_details:
+        command += " details"
+    elif model_id:
+        command += f" with (id = \"{model_id}\")"
+    
+    return _execute(command, cluster_uri, database=database)
+
+
+def kusto_sample_graph_nodes(
+    graph_name: str,
+    cluster_uri: str,
+    sample_size: int = 50,
+    database: Optional[str] = None,
+    snapshot_name: Optional[str] = None,
+    transient: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    Retrieves a random sample of nodes from the specified graph.
+    If no database is provided, uses the default database.
+
+    :param graph_name: Name of the graph to sample nodes from.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param sample_size: Number of nodes to sample. Defaults to 50.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param snapshot_name: Optional snapshot name to use. If not provided, uses the latest snapshot.
+    :param transient: If True, creates a transient graph from the model. If False, uses snapshots.
+    :return: List of dictionaries containing sampled node records.
+    """
+    # Build the graph function call
+    if transient:
+        graph_func = f'graph("{graph_name}", true)'
+    elif snapshot_name:
+        graph_func = f'graph("{graph_name}", "{snapshot_name}")'
+    else:
+        graph_func = f'graph("{graph_name}")'
+    
+    # Build the complete query
+    query = f"{graph_func} | graph-to-table nodes | sample {sample_size}"
+    
+    return _execute(query, cluster_uri, database=database)
+
+
+def kusto_sample_graph_edges(
+    graph_name: str,
+    cluster_uri: str,
+    sample_size: int = 50,
+    database: Optional[str] = None,
+    snapshot_name: Optional[str] = None,
+    transient: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    Retrieves a random sample of edges from the specified graph.
+    If no database is provided, uses the default database.
+
+    :param graph_name: Name of the graph to sample edges from.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param sample_size: Number of edges to sample. Defaults to 50.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param snapshot_name: Optional snapshot name to use. If not provided, uses the latest snapshot.
+    :param transient: If True, creates a transient graph from the model. If False, uses snapshots.
+    :return: List of dictionaries containing sampled edge records.
+    """
+    # Build the graph function call
+    if transient:
+        graph_func = f'graph("{graph_name}", true)'
+    elif snapshot_name:
+        graph_func = f'graph("{graph_name}", "{snapshot_name}")'
+    else:
+        graph_func = f'graph("{graph_name}")'
+    
+    # Build the complete query
+    query = f"{graph_func} | graph-to-table edges | sample {sample_size}"
+    
+    return _execute(query, cluster_uri, database=database)
+
+
+def kusto_sample_graph_nodes_and_edges(
+    graph_name: str,
+    cluster_uri: str,
+    nodes_sample_size: int = 50,
+    edges_sample_size: int = 50,
+    database: Optional[str] = None,
+    snapshot_name: Optional[str] = None,
+    transient: bool = False,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Retrieves random samples of both nodes and edges from the specified graph.
+    If no database is provided, uses the default database.
+
+    :param graph_name: Name of the graph to sample from.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param nodes_sample_size: Number of nodes to sample. Defaults to 50.
+    :param edges_sample_size: Number of edges to sample. Defaults to 50.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param snapshot_name: Optional snapshot name to use. If not provided, uses the latest snapshot.
+    :param transient: If True, creates a transient graph from the model. If False, uses snapshots.
+    :return: Dictionary with 'nodes' and 'edges' keys containing sampled records.
+    """
+    # Sample nodes
+    nodes_result = kusto_sample_graph_nodes(
+        graph_name=graph_name,
+        cluster_uri=cluster_uri,
+        sample_size=nodes_sample_size,
+        database=database,
+        snapshot_name=snapshot_name,
+        transient=transient,
+    )
+    
+    # Sample edges
+    edges_result = kusto_sample_graph_edges(
+        graph_name=graph_name,
+        cluster_uri=cluster_uri,
+        sample_size=edges_sample_size,
+        database=database,
+        snapshot_name=snapshot_name,
+        transient=transient,
+    )
+    
+    return {
+        "nodes": nodes_result,
+        "edges": edges_result,
+    }
+
+
+def kusto_show_graph_snapshots(
+    cluster_uri: str,
+    database: Optional[str] = None,
+    graph_model_name: Optional[str] = None,
+    show_all: bool = False
+) -> List[Dict[str, Any]]:
+    """
+    Lists all graph snapshots for a specific graph model or for all graph models.
+    If no database is provided, uses the default database.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param graph_model_name: Optional graph model name to filter snapshots. If not provided, shows snapshots for all models.
+    :param show_all: If True, shows all snapshots. If False, shows only the latest snapshots.
+    :return: List of dictionaries containing graph snapshot information.
+    """
+    if graph_model_name:
+        command = f".show graph_snapshots {graph_model_name}"
+    else:
+        command = ".show graph_snapshots *"
+    
+    if show_all:
+        command += " with (showAll = true)"
+    
+    return _execute(command, cluster_uri, database=database)
+
+
+def kusto_show_graph_snapshot(
+    graph_model_name: str,
+    snapshot_name: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    show_details: bool = False
+) -> List[Dict[str, Any]]:
+    """
+    Shows detailed information about a specific graph snapshot.
+    If no database is provided, uses the default database.
+
+    :param graph_model_name: The name of the graph model that the snapshot belongs to.
+    :param snapshot_name: The name of the graph snapshot to show.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param show_details: If True, returns detailed information including node count, edge count, and retention policy.
+    :return: List of dictionaries containing graph snapshot information.
+    """
+    command = f".show graph_snapshot {graph_model_name}.{snapshot_name}"
+    
+    if show_details:
+        command += " details"
+    
+    return _execute(command, cluster_uri, database=database)
+
+
+def kusto_check_graph_snapshots_exist(
+    graph_model_name: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+) -> bool:
+    """
+    Checks if any snapshots exist for the specified graph model.
+    
+    :param graph_model_name: The name of the graph model to check.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :return: True if snapshots exist, False otherwise.
+    """
+    try:
+        snapshots = kusto_show_graph_snapshots(
+            cluster_uri=cluster_uri,
+            database=database,
+            graph_model_name=graph_model_name
+        )
+        return len(snapshots) > 0
+    except Exception:
+        # If we can't check snapshots, assume they don't exist and use transient
+        return False
+
+
+def kusto_sample_graph_nodes_smart(
+    graph_name: str,
+    cluster_uri: str,
+    sample_size: int = 50,
+    database: Optional[str] = None,
+    snapshot_name: Optional[str] = None,
+    prefer_snapshots: bool = True,
+) -> List[Dict[str, Any]]:
+    """
+    Intelligently retrieves a random sample of nodes from the specified graph.
+    Automatically uses snapshots if they exist, otherwise falls back to transient graphs.
+    If no database is provided, uses the default database.
+
+    :param graph_name: Name of the graph to sample nodes from.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param sample_size: Number of nodes to sample. Defaults to 50.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param snapshot_name: Optional specific snapshot name to use. If provided, will use this snapshot.
+    :param prefer_snapshots: If True, prefers snapshots over transient graphs when snapshots exist.
+    :return: List of dictionaries containing sampled node records.
+    """
+    # If a specific snapshot is requested, use it
+    if snapshot_name:
+        return kusto_sample_graph_nodes(
+            graph_name=graph_name,
+            cluster_uri=cluster_uri,
+            sample_size=sample_size,
+            database=database,
+            snapshot_name=snapshot_name,
+            transient=False,
+        )
+    
+    # Check if snapshots exist for the model
+    if prefer_snapshots and kusto_check_graph_snapshots_exist(graph_name, cluster_uri, database):
+        # Use snapshots (latest)
+        return kusto_sample_graph_nodes(
+            graph_name=graph_name,
+            cluster_uri=cluster_uri,
+            sample_size=sample_size,
+            database=database,
+            snapshot_name=None,
+            transient=False,
+        )
+    else:
+        # Use transient graph
+        return kusto_sample_graph_nodes(
+            graph_name=graph_name,
+            cluster_uri=cluster_uri,
+            sample_size=sample_size,
+            database=database,
+            snapshot_name=None,
+            transient=True,
+        )
+
+
+def kusto_sample_graph_edges_smart(
+    graph_name: str,
+    cluster_uri: str,
+    sample_size: int = 50,
+    database: Optional[str] = None,
+    snapshot_name: Optional[str] = None,
+    prefer_snapshots: bool = True,
+) -> List[Dict[str, Any]]:
+    """
+    Intelligently retrieves a random sample of edges from the specified graph.
+    Automatically uses snapshots if they exist, otherwise falls back to transient graphs.
+    If no database is provided, uses the default database.
+
+    :param graph_name: Name of the graph to sample edges from.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param sample_size: Number of edges to sample. Defaults to 50.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param snapshot_name: Optional specific snapshot name to use. If provided, will use this snapshot.
+    :param prefer_snapshots: If True, prefers snapshots over transient graphs when snapshots exist.
+    :return: List of dictionaries containing sampled edge records.
+    """
+    # If a specific snapshot is requested, use it
+    if snapshot_name:
+        return kusto_sample_graph_edges(
+            graph_name=graph_name,
+            cluster_uri=cluster_uri,
+            sample_size=sample_size,
+            database=database,
+            snapshot_name=snapshot_name,
+            transient=False,
+        )
+    
+    # Check if snapshots exist for the model
+    if prefer_snapshots and kusto_check_graph_snapshots_exist(graph_name, cluster_uri, database):
+        # Use snapshots (latest)
+        return kusto_sample_graph_edges(
+            graph_name=graph_name,
+            cluster_uri=cluster_uri,
+            sample_size=sample_size,
+            database=database,
+            snapshot_name=None,
+            transient=False,
+        )
+    else:
+        # Use transient graph
+        return kusto_sample_graph_edges(
+            graph_name=graph_name,
+            cluster_uri=cluster_uri,
+            sample_size=sample_size,
+            database=database,
+            snapshot_name=None,
+            transient=True,
+        )
+
+def kusto_query_graph_smart(
+    graph_name: str,
+    query_suffix: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    snapshot_name: Optional[str] = None,
+    prefer_snapshots: bool = True,
+) -> List[Dict[str, Any]]:
+    """
+    Intelligently executes a graph query using snapshots if they exist, otherwise falls back to transient graphs.
+    If no database is provided, uses the default database.
+
+    :param graph_name: Name of the graph to query.
+    :param query_suffix: The KQL query to execute after the graph() function (e.g., "| graph-match (house)-[relationship]->(character) where labels(house) has 'House' and labels(character) has 'Character' project house.name, character.name | limit 10").
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param snapshot_name: Optional specific snapshot name to use. If provided, will use this snapshot.
+    :param prefer_snapshots: If True, prefers snapshots over transient graphs when snapshots exist.
+    :return: List of dictionaries containing query results.
+    
+    Examples:
+    
+    # Wrong pattern (don't use labels in node patterns):
+    # "(house:House)-[relationship]->(character:Character)"
+    
+    # Correct pattern (use labels() function in where clause):
+    # "(house)-[relationship]->(character)" with where_clause "labels(house) has 'House' and labels(character) has 'Character'"
+    
+    # Simple example usage:
+    kusto_query_graph_smart(
+        "MyGraph", 
+        "| graph-match (house)-[relationship]->(character) where labels(house) has 'House' and labels(character) has 'Character' project house.name, character.name | limit 10",
+        cluster_uri
+    )
+    """
+    # Build the graph function call
+    if snapshot_name:
+        # Use specific snapshot
+        graph_func = f'graph("{graph_name}", "{snapshot_name}")'
+    elif prefer_snapshots and kusto_check_graph_snapshots_exist(graph_name, cluster_uri, database):
+        # Use latest snapshot
+        graph_func = f'graph("{graph_name}")'
+    else:
+        # Use transient graph
+        graph_func = f'graph("{graph_name}", true)'
+    
+    # Build the complete query
+    query = f"{graph_func} {query_suffix}"
+    
+    return _execute(query, cluster_uri, database=database)
+
+
+def kusto_graph_match(
+    graph_name: str,
+    pattern: str,
+    cluster_uri: str,
+    project_clause: str,
+    database: Optional[str] = None,
+    snapshot_name: Optional[str] = None,
+    transient: bool = False,
+    where_clause: Optional[str] = None,
+    cycles: Optional[str] = None,
+    take: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Executes a graph-match query on the specified graph to find patterns in nodes and edges.
+    This function enables pattern matching in graph data, including filtering by labels and using
+    graph functions like all(), any(), labels(), etc.
+
+    :param graph_name: Name of the graph to query.
+    :param pattern: Graph pattern to match (e.g., "(user)-[permission]->(resource)")
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param project_clause: PROJECT clause for output formatting (without the 'project' keyword).
+    :param database: Optional database name. If not provided, uses the default database.
+    :param snapshot_name: Optional snapshot name to use. If not provided, uses the latest snapshot.
+    :param transient: If True, creates a transient graph from the model. If False, uses snapshots.
+    :param where_clause: Optional WHERE clause for filtering matches (without the 'where' keyword).
+    :param cycles: Optional cycle handling parameter (currently not used in graph-match syntax).
+    :param take: Optional number of results to return (uses 'take' operator).
+    :return: List of dictionaries containing matched patterns.
+    
+    Examples:
+    
+    # Basic pattern matching
+    kusto_graph_match("SecurityGraph", "(user)-[permission]->(resource)", 
+                     cluster_uri, "user.name, resource.name")
+    
+    # With WHERE clause
+    kusto_graph_match("SecurityGraph", "(alice)<-[reports*1..5]-(employee)", 
+                     cluster_uri, "employee = employee.name, age = employee.age",
+                     where_clause='alice.name == "Alice" and employee.age < 30')
+    
+    # Complex pattern with variable length edges
+    kusto_graph_match("NetworkGraph", "(source)-[path*1..5]->(destination)", 
+                     cluster_uri, "source.name, destination.name, path_length = array_length(path)",
+                     where_clause='all(path, bandwidth > 100)')
+    
+    # Using graph functions
+    kusto_graph_match("SecurityGraph", "(user)-[access*1..3]->(resource)", 
+                     cluster_uri, "user.name, resource.name, path_length = array_length(access)",
+                     where_clause='labels(user) has "Employee"')
+    """
+    # Build the graph function call
+    if transient:
+        graph_func = f'graph("{graph_name}", true)'
+    elif snapshot_name:
+        graph_func = f'graph("{graph_name}", "{snapshot_name}")'
+    else:
+        graph_func = f'graph("{graph_name}")'
+    
+    # Build the graph-match query components
+    graph_match_parts = ["| graph-match", pattern]
+    
+    # Add optional WHERE clause (part of graph-match, no pipe)
+    if where_clause:
+        graph_match_parts.append(f"where {where_clause}")
+    
+    # Add mandatory PROJECT clause (part of graph-match, no pipe) - comes after WHERE
+    graph_match_parts.append(f"project {project_clause}")
+    
+    # Combine graph function with graph-match (join with newlines and spaces for readability)
+    graph_match_query = "\n   ".join(graph_match_parts)
+    query_parts = [graph_func, graph_match_query]
+    
+    # Add optional TAKE (this goes after graph-match with pipe)
+    if take:
+        query_parts.append(f"| take {take}")
+    
+    query = " ".join(query_parts)
+    
+    return _execute(query, cluster_uri, database=database)
+
+
 
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME

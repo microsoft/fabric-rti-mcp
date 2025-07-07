@@ -53,3 +53,47 @@ def register_tools(mcp: FastMCP) -> None:
         kusto_service.kusto_ingest_inline_into_table,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
     )
+    mcp.add_tool(
+        kusto_service.kusto_list_graph_models,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_get_graph_model,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_sample_graph_nodes,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_sample_graph_edges,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_sample_graph_nodes_and_edges,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_show_graph_snapshots,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_show_graph_snapshot,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_sample_graph_nodes_smart,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_sample_graph_edges_smart,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_query_graph_smart,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_graph_match,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
