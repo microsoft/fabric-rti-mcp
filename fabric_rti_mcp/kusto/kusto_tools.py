@@ -62,18 +62,6 @@ def register_tools(mcp: FastMCP) -> None:
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(
-        kusto_service.kusto_sample_graph_nodes,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_sample_graph_edges,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_sample_graph_nodes_and_edges,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
         kusto_service.kusto_show_graph_snapshots,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
