@@ -672,7 +672,7 @@ def kusto_query_graph_smart(
     If no database is provided, uses the default database.
 
     :param graph_name: Name of the graph to query.
-    :param query_suffix: The KQL query to execute after the graph() function (e.g., "| graph-match (house)-[relationship]->(character) where labels(house) has 'House' and labels(character) has 'Character' project house.name, character.name | limit 10").
+    :param query_suffix: The KQL query to execute after the graph() function. Must include proper project clause for graph-match queries.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
     :param snapshot_name: Optional specific snapshot name to use. If provided, will use this snapshot.
@@ -681,18 +681,77 @@ def kusto_query_graph_smart(
     
     Examples:
     
-    # Wrong pattern (don't use labels in node patterns):
-    # "(house:House)-[relationship]->(character:Character)"
+    # Basic node counting with graph-match (MUST include project clause):
+    kusto_query_graph_smart(
+        "MyGraph", 
+        "| graph-match (node) project labels=labels(node) | mv-expand label = labels | summarize count() by tostring(label)",
+        cluster_uri
+    )
     
-    # Correct pattern (use labels() function in where clause):
-    # "(house)-[relationship]->(character)" with where_clause "labels(house) has 'House' and labels(character) has 'Character'"
-    
-    # Simple example usage:
+    # Complex relationship matching:
     kusto_query_graph_smart(
         "MyGraph", 
         "| graph-match (house)-[relationship]->(character) where labels(house) has 'House' and labels(character) has 'Character' project house.name, character.name | limit 10",
         cluster_uri
     )
+    
+    # Variable length path matching:
+    kusto_query_graph_smart(
+        "MyGraph", 
+        "| graph-match (source)-[path*1..3]->(destination) project source, destination, path | take 100",
+        cluster_uri
+    )
+    
+    # Advanced security analysis - compromised user to sensitive resource:
+    kusto_query_graph_smart(
+        "SecurityGraph",
+        '''| graph-match (compromisedUser)-->(initialDevice)-[hop*0..3]->(sensitiveResource)
+        where 
+            // Connect with our identity analysis
+            compromisedUser.id in (CompromisedAccounts)
+            // Connect with our asset analysis
+            and sensitiveResource.id in (SensitiveResources)
+        project
+            CompromisedUser = compromisedUser,
+            InitialDevice = initialDevice,
+            SensitiveResourceAccessed = sensitiveResource,
+            Path = hop,
+            // Report if user has legitimate permissions (additional context)
+            HasLegitimateAccess = compromisedUser in 
+                (PermissionChains | where ResourceId == sensitiveResource | project UserId)''',
+        cluster_uri
+    )
+    
+    # Complex permission analysis with group membership chains:
+    kusto_query_graph_smart(
+        "IdentityGraph",
+        '''| graph-match (resource)<-[authorized_on*1..4]-(group)-[hasMember*1..255]->(user)
+        where user.NodeId == interestingUser and user.NodeType == "User" and hasMember.EdgeType == "has_member" and group.NodeType == "Group" and
+            authorized_on.EdgeType in ("authorized_on", "contains_resource")
+        project Username=user.NodeId, userFQDN=user.FQDN, resourceTenantId=resource.TenantId, resourceType=resource.NodeType, resourceName=resource.NodeId''',
+        cluster_uri
+    )
+    
+     # Complex permission analysis with group membership chains:
+    kusto_query_graph_smart(
+        "IdentityGraph",
+        '''| graph-match (resource)<-[authorized_on*1..4]-(group)-[hasMember*1..255]->(user)
+        where user.NodeId == interestingUser and user.NodeType == "User" and hasMember.EdgeType == "has_member" and group.NodeType == "Group" and
+            authorized_on.EdgeType in ("authorized_on", "contains_resource")
+        project Username=user.NodeId, userFQDN=user.FQDN, resourceTenantId=resource.TenantId, resourceType=resource.NodeType, resourceName=resource.NodeId''',
+        cluster_uri
+    )
+    
+	# Complex pattern with variable length edges amd filtering
+    kusto_query_graph_smart("NetworkGraph", 
+    		"| graph-match (source)-[path*1..5]->(destination) where_clause='all(path, bandwidth > 100) project user.name, resource.name, path_length = array_length(access) | limit 10",
+            cluster_uri
+	)
+    
+    Important: 
+    - graph-match queries MUST include a project clause
+    - Use graph-to-table for simple node/edge exploration
+    - Use labels() function in WHERE clauses of graph-match, not in the path pattern
     """
     # Build the graph function call
     if snapshot_name:
