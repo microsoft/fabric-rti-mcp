@@ -71,7 +71,7 @@ def test_add_kusto_cluster_new_cluster() -> None:
     add_kusto_cluster(cluster_uri, description=description)
 
     # Assert
-    assert cluster_uri in KUSTO_CONNECTION_CACHE
+    assert KUSTO_CONNECTION_CACHE.get(cluster_uri) is not None
     connection_wrapper = KUSTO_CONNECTION_CACHE[cluster_uri]
     assert isinstance(connection_wrapper, KustoConnectionWrapper)
     assert connection_wrapper.description == description
@@ -90,8 +90,8 @@ def test_add_kusto_cluster_strips_trailing_slash() -> None:
     add_kusto_cluster(cluster_uri_with_slash, description=description)
 
     # Assert
-    assert cluster_uri_clean in KUSTO_CONNECTION_CACHE
-    assert cluster_uri_with_slash not in KUSTO_CONNECTION_CACHE
+    assert KUSTO_CONNECTION_CACHE.get(cluster_uri_clean) is not None
+    assert KUSTO_CONNECTION_CACHE.get(cluster_uri_with_slash) is None
 
 
 def test_add_kusto_cluster_strips_whitespace() -> None:
@@ -107,8 +107,8 @@ def test_add_kusto_cluster_strips_whitespace() -> None:
     add_kusto_cluster(cluster_uri_with_spaces, description=description)
 
     # Assert
-    assert cluster_uri_clean in KUSTO_CONNECTION_CACHE
-    assert cluster_uri_with_spaces not in KUSTO_CONNECTION_CACHE
+    assert KUSTO_CONNECTION_CACHE.get(cluster_uri_clean) is not None
+    assert KUSTO_CONNECTION_CACHE.get(cluster_uri_with_spaces) is None
 
 
 def test_add_kusto_cluster_existing_cluster() -> None:
@@ -157,7 +157,7 @@ def test_kusto_connect() -> None:
     kusto_connect(cluster_uri, default_database=default_db, description=description)
 
     # Assert
-    assert cluster_uri in KUSTO_CONNECTION_CACHE
+    assert KUSTO_CONNECTION_CACHE.get(cluster_uri) is not None
     connection_wrapper = KUSTO_CONNECTION_CACHE[cluster_uri]
     assert connection_wrapper.description == description
     assert connection_wrapper.default_database == default_db
@@ -297,13 +297,13 @@ class TestEnvironmentVariableLoading:
         
         # Check primary cluster
         primary_uri = 'https://primary.kusto.windows.net'
-        assert primary_uri in cluster_dict
+        assert cluster_dict.get(primary_uri) is not None
         assert cluster_dict[primary_uri].description == 'Primary cluster'
         assert cluster_dict[primary_uri].default_database == 'PrimaryDB'
         
         # Check secondary cluster
         secondary_uri = 'https://secondary.kusto.windows.net'
-        assert secondary_uri in cluster_dict
+        assert cluster_dict.get(secondary_uri) is not None
         assert cluster_dict[secondary_uri].description == 'Secondary cluster'
         assert cluster_dict[secondary_uri].default_database == 'SecondaryDB'
     
@@ -323,19 +323,19 @@ class TestEnvironmentVariableLoading:
         
         # Check primary cluster (minimal config)
         primary_uri = 'https://primary.kusto.windows.net'
-        assert primary_uri in cluster_dict
+        assert cluster_dict.get(primary_uri) is not None
         assert cluster_dict[primary_uri].description == 'default cluster'
         assert cluster_dict[primary_uri].default_database == 'NetDefaultDB'
         
         # Check secondary cluster (minimal config for numbered cluster)
         secondary_uri = 'https://secondary.kusto.windows.net'
-        assert secondary_uri in cluster_dict
+        assert cluster_dict.get(secondary_uri) is not None
         assert cluster_dict[secondary_uri].description == 'cluster 2'
         assert cluster_dict[secondary_uri].default_database == 'NetDefaultDB'
         
         # Check third cluster (partial config)
         third_uri = 'https://third.kusto.windows.net'
-        assert third_uri in cluster_dict
+        assert cluster_dict.get(third_uri) is not None
         assert cluster_dict[third_uri].description == 'Third cluster'
         assert cluster_dict[third_uri].default_database == 'ThirdDB'
     
@@ -352,9 +352,10 @@ class TestEnvironmentVariableLoading:
         # Should only load clusters 1 and 2, stopping at the gap before 5
         assert len(cluster_dict) == 2
         
-        assert 'https://first.kusto.windows.net' in cluster_dict
-        assert 'https://second.kusto.windows.net' in cluster_dict
-        assert 'https://fifth.kusto.windows.net' not in cluster_dict
+        expected_uris = {'https://first.kusto.windows.net', 'https://second.kusto.windows.net'}
+        actual_uris = set(cluster_dict.keys())
+        assert actual_uris == expected_uris
+        assert 'https://fifth.kusto.windows.net' not in actual_uris
     
     @patch.dict('os.environ', {
         'KUSTO_SERVICE_URI': 'https://primary.kusto.windows.net/',
@@ -367,13 +368,13 @@ class TestEnvironmentVariableLoading:
         cluster_uris = [uri for uri, _ in cache.items()]
         
         assert len(cluster_uris) == 3
-        assert 'https://primary.kusto.windows.net' in cluster_uris
-        assert 'https://secondary.kusto.windows.net' in cluster_uris
-        assert 'https://third.kusto.windows.net/' in cluster_uris  # Double slash is not cleaned
+        expected_uris = {'https://primary.kusto.windows.net', 'https://secondary.kusto.windows.net', 'https://third.kusto.windows.net/'}
+        actual_uris = set(cluster_uris)
+        assert actual_uris == expected_uris
         
         # Ensure cleaned URIs don't exist
-        assert 'https://primary.kusto.windows.net/' not in cluster_uris
-        assert '  https://secondary.kusto.windows.net  ' not in cluster_uris
+        unwanted_uris = {'https://primary.kusto.windows.net/', '  https://secondary.kusto.windows.net  '}
+        assert not unwanted_uris.intersection(actual_uris)
     
     @patch.dict('os.environ', {
         'KUSTO_SERVICE_DEFAULT_DB': 'LegacyDefaultDB',
