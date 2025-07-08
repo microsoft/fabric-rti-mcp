@@ -42,7 +42,7 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
         primary_description = os.getenv("KUSTO_DESCRIPTION", "default cluster")
 
         if primary_cluster:
-            self._add_cluster_internal(primary_cluster, primary_db, primary_description)
+            self.add_cluster_internal(primary_cluster, primary_db, primary_description)
 
         # Load numbered clusters (suffix __1, __2, etc.)
         cluster_index = 1
@@ -60,10 +60,15 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
                 f"cluster {cluster_index + 1}",
             )
 
-            self._add_cluster_internal(cluster_uri, cluster_db, cluster_description)
+            self.add_cluster_internal(cluster_uri, cluster_db, cluster_description)
             cluster_index += 1
 
-    def _add_cluster_internal(
+    def __missing__(self, key: str) -> KustoConnectionWrapper:
+        client = KustoConnectionWrapper(key, DEFAULT_DB)
+        self[key] = client
+        return client
+
+    def add_cluster_internal(
         self,
         cluster_uri: str,
         default_database: Optional[str] = None,
@@ -80,11 +85,6 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
             cluster_uri, default_database or DEFAULT_DB, description
         )
 
-    def __missing__(self, key: str) -> KustoConnectionWrapper:
-        client = KustoConnectionWrapper(key, DEFAULT_DB)
-        self[key] = client
-        return client
-
 
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 
@@ -94,7 +94,7 @@ def add_kusto_cluster(
     default_database: Optional[str] = None,
     description: Optional[str] = None,
 ) -> None:
-    KUSTO_CONNECTION_CACHE._add_cluster_internal(
+    KUSTO_CONNECTION_CACHE.add_cluster_internal(
         cluster_uri, default_database, description
     )
 
@@ -330,6 +330,8 @@ def kusto_ingest_inline_into_table(
         database=database,
     )
 
+
+DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 
 DESTRUCTIVE_TOOLS = {
     kusto_command.__name__,
