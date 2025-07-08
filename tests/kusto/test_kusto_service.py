@@ -376,7 +376,9 @@ class TestEnvironmentVariableLoading:
         }
         actual_uris = set(cluster_dict.keys())
         assert actual_uris == expected_uris
-        assert "https://fifth.kusto.windows.net" not in actual_uris
+        # Ensure the gap-skipped cluster is not loaded
+        forbidden_uris = {"https://fifth.kusto.windows.net"}
+        assert not forbidden_uris.intersection(actual_uris)
 
     @patch.dict(
         "os.environ",
@@ -422,7 +424,8 @@ class TestEnvironmentVariableLoading:
         cluster_dict = {uri: client for uri, client in cache.items()}
 
         assert len(cluster_dict) == 1
-        primary_cluster = cluster_dict["https://primary.kusto.windows.net"]
+        primary_uri = "https://primary.kusto.windows.net"
+        primary_cluster = cluster_dict[primary_uri]
         assert primary_cluster.default_database == "LegacyDefaultDB"
 
     @patch.dict(
@@ -440,5 +443,6 @@ class TestEnvironmentVariableLoading:
         cluster_dict = {uri: client for uri, client in cache.items()}
 
         assert len(cluster_dict) == 1
-        primary_cluster = cluster_dict["https://primary.kusto.windows.net"]
+        primary_uri = "https://primary.kusto.windows.net"
+        primary_cluster = cluster_dict[primary_uri]
         assert primary_cluster.default_database == "NewDefaultDB"

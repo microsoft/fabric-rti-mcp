@@ -100,7 +100,7 @@ def add_kusto_cluster(
 
 
 def get_kusto_connection(cluster_uri: str) -> KustoConnectionWrapper:
-    # clean uo the cluster URI since agents can send messy inputs
+    # clean up the cluster URI since agents can send messy inputs
     cluster_uri = cluster_uri.strip()
     if cluster_uri.endswith("/"):
         cluster_uri = cluster_uri[:-1]
