@@ -86,7 +86,7 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
         return client
 
 
-KUSTO_CONNECTION_CACHE: Dict[str, KustoConnectionWrapper] = KustoConnectionCache()
+KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 
 
 def add_kusto_cluster(
