@@ -627,6 +627,7 @@ dev = [
 [package.dev-dependencies]
 dev = [
     { name = "black" },
+    { name = "mypy" },
     { name = "pytest" },
 ]
 
@@ -648,6 +649,7 @@ provides-extras = ["dev"]
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=25.1.0" },
+    { name = "mypy", specifier = ">=1.15.0" },
     { name = "pytest", specifier = ">=8.3.5" },
 ]
 
