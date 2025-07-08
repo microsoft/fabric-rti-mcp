@@ -40,17 +40,17 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
             KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
         )
         primary_description = os.getenv("KUSTO_DESCRIPTION", "default cluster")
-        
+
         if primary_cluster:
             self._add_cluster_internal(primary_cluster, primary_db, primary_description)
-        
+
         # Load numbered clusters (suffix __1, __2, etc.)
         cluster_index = 1
         while True:
             cluster_uri = os.getenv(f"KUSTO_SERVICE_URI__{cluster_index}")
             if not cluster_uri:
                 break
-                
+
             cluster_db = os.getenv(
                 f"KUSTO_DATABASE__{cluster_index}",
                 KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
@@ -59,7 +59,7 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
                 f"KUSTO_DESCRIPTION__{cluster_index}",
                 f"cluster {cluster_index + 1}",
             )
-            
+
             self._add_cluster_internal(cluster_uri, cluster_db, cluster_description)
             cluster_index += 1
 
@@ -94,7 +94,9 @@ def add_kusto_cluster(
     default_database: Optional[str] = None,
     description: Optional[str] = None,
 ) -> None:
-    KUSTO_CONNECTION_CACHE._add_cluster_internal(cluster_uri, default_database, description)
+    KUSTO_CONNECTION_CACHE._add_cluster_internal(
+        cluster_uri, default_database, description
+    )
 
 
 def get_kusto_connection(cluster_uri: str) -> KustoConnectionWrapper:

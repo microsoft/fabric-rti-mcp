@@ -68,5 +68,6 @@ write_to = "fabric_rti_mcp/_version.py"
 
 [dependency-groups]
 dev = [
+    "black>=25.1.0",
     "pytest>=8.3.5",
 ]

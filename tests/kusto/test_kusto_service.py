@@ -242,163 +242,203 @@ def test_kusto_get_clusters_returns_tuples() -> None:
 
 class TestEnvironmentVariableLoading:
     """Test environment variable loading functionality."""
-    
-    @patch.dict('os.environ', {}, clear=True)
+
+    @patch.dict("os.environ", {}, clear=True)
     def test_no_environment_variables(self) -> None:
         """Test that no clusters are loaded when no environment variables are set."""
         cache = KustoConnectionCache()
         clusters = [(uri, client.description) for uri, client in cache.items()]
         assert clusters == []
-    
-    @patch.dict('os.environ', {
-        'KUSTO_SERVICE_URI': 'https://primary.kusto.windows.net',
-        'KUSTO_DATABASE': 'PrimaryDB',
-        'KUSTO_DESCRIPTION': 'Primary cluster'
-    }, clear=True)
+
+    @patch.dict(
+        "os.environ",
+        {
+            "KUSTO_SERVICE_URI": "https://primary.kusto.windows.net",
+            "KUSTO_DATABASE": "PrimaryDB",
+            "KUSTO_DESCRIPTION": "Primary cluster",
+        },
+        clear=True,
+    )
     def test_primary_cluster_only(self) -> None:
         """Test loading only the primary cluster from environment variables."""
         cache = KustoConnectionCache()
         clusters = [(uri, client.description) for uri, client in cache.items()]
-        
+
         assert len(clusters) == 1
         cluster_uri, description = clusters[0]
-        assert cluster_uri == 'https://primary.kusto.windows.net'
-        assert description == 'Primary cluster'
-        assert cache[cluster_uri].default_database == 'PrimaryDB'
-    
-    @patch.dict('os.environ', {
-        'KUSTO_SERVICE_URI': 'https://primary.kusto.windows.net'
-    }, clear=True)
+        assert cluster_uri == "https://primary.kusto.windows.net"
+        assert description == "Primary cluster"
+        assert cache[cluster_uri].default_database == "PrimaryDB"
+
+    @patch.dict(
+        "os.environ",
+        {"KUSTO_SERVICE_URI": "https://primary.kusto.windows.net"},
+        clear=True,
+    )
     def test_primary_cluster_minimal_config(self) -> None:
         """Test loading primary cluster with minimal configuration."""
         cache = KustoConnectionCache()
         clusters = [(uri, client.description) for uri, client in cache.items()]
-        
+
         assert len(clusters) == 1
         cluster_uri, description = clusters[0]
-        assert cluster_uri == 'https://primary.kusto.windows.net'
-        assert description == 'default cluster'
-        assert cache[cluster_uri].default_database == 'NetDefaultDB'  # Default value
-    
-    @patch.dict('os.environ', {
-        'KUSTO_SERVICE_URI': 'https://primary.kusto.windows.net',
-        'KUSTO_DATABASE': 'PrimaryDB',
-        'KUSTO_DESCRIPTION': 'Primary cluster',
-        'KUSTO_SERVICE_URI__1': 'https://secondary.kusto.windows.net',
-        'KUSTO_DATABASE__1': 'SecondaryDB',
-        'KUSTO_DESCRIPTION__1': 'Secondary cluster'
-    }, clear=True)
+        assert cluster_uri == "https://primary.kusto.windows.net"
+        assert description == "default cluster"
+        assert cache[cluster_uri].default_database == "NetDefaultDB"  # Default value
+
+    @patch.dict(
+        "os.environ",
+        {
+            "KUSTO_SERVICE_URI": "https://primary.kusto.windows.net",
+            "KUSTO_DATABASE": "PrimaryDB",
+            "KUSTO_DESCRIPTION": "Primary cluster",
+            "KUSTO_SERVICE_URI__1": "https://secondary.kusto.windows.net",
+            "KUSTO_DATABASE__1": "SecondaryDB",
+            "KUSTO_DESCRIPTION__1": "Secondary cluster",
+        },
+        clear=True,
+    )
     def test_primary_and_secondary_clusters(self) -> None:
         """Test loading primary and secondary clusters."""
         cache = KustoConnectionCache()
         cluster_dict = {uri: client for uri, client in cache.items()}
-        
+
         assert len(cluster_dict) == 2
-        
+
         # Check primary cluster
-        primary_uri = 'https://primary.kusto.windows.net'
+        primary_uri = "https://primary.kusto.windows.net"
         assert cluster_dict.get(primary_uri) is not None
-        assert cluster_dict[primary_uri].description == 'Primary cluster'
-        assert cluster_dict[primary_uri].default_database == 'PrimaryDB'
-        
+        assert cluster_dict[primary_uri].description == "Primary cluster"
+        assert cluster_dict[primary_uri].default_database == "PrimaryDB"
+
         # Check secondary cluster
-        secondary_uri = 'https://secondary.kusto.windows.net'
+        secondary_uri = "https://secondary.kusto.windows.net"
         assert cluster_dict.get(secondary_uri) is not None
-        assert cluster_dict[secondary_uri].description == 'Secondary cluster'
-        assert cluster_dict[secondary_uri].default_database == 'SecondaryDB'
-    
-    @patch.dict('os.environ', {
-        'KUSTO_SERVICE_URI': 'https://primary.kusto.windows.net',
-        'KUSTO_SERVICE_URI__1': 'https://secondary.kusto.windows.net',
-        'KUSTO_SERVICE_URI__2': 'https://third.kusto.windows.net',
-        'KUSTO_DATABASE__2': 'ThirdDB',
-        'KUSTO_DESCRIPTION__2': 'Third cluster'
-    }, clear=True)
+        assert cluster_dict[secondary_uri].description == "Secondary cluster"
+        assert cluster_dict[secondary_uri].default_database == "SecondaryDB"
+
+    @patch.dict(
+        "os.environ",
+        {
+            "KUSTO_SERVICE_URI": "https://primary.kusto.windows.net",
+            "KUSTO_SERVICE_URI__1": "https://secondary.kusto.windows.net",
+            "KUSTO_SERVICE_URI__2": "https://third.kusto.windows.net",
+            "KUSTO_DATABASE__2": "ThirdDB",
+            "KUSTO_DESCRIPTION__2": "Third cluster",
+        },
+        clear=True,
+    )
     def test_multiple_clusters_with_gaps(self) -> None:
         """Test loading multiple clusters with some missing optional values."""
         cache = KustoConnectionCache()
         cluster_dict = {uri: client for uri, client in cache.items()}
-        
+
         assert len(cluster_dict) == 3
-        
+
         # Check primary cluster (minimal config)
-        primary_uri = 'https://primary.kusto.windows.net'
+        primary_uri = "https://primary.kusto.windows.net"
         assert cluster_dict.get(primary_uri) is not None
-        assert cluster_dict[primary_uri].description == 'default cluster'
-        assert cluster_dict[primary_uri].default_database == 'NetDefaultDB'
-        
+        assert cluster_dict[primary_uri].description == "default cluster"
+        assert cluster_dict[primary_uri].default_database == "NetDefaultDB"
+
         # Check secondary cluster (minimal config for numbered cluster)
-        secondary_uri = 'https://secondary.kusto.windows.net'
+        secondary_uri = "https://secondary.kusto.windows.net"
         assert cluster_dict.get(secondary_uri) is not None
-        assert cluster_dict[secondary_uri].description == 'cluster 2'
-        assert cluster_dict[secondary_uri].default_database == 'NetDefaultDB'
-        
+        assert cluster_dict[secondary_uri].description == "cluster 2"
+        assert cluster_dict[secondary_uri].default_database == "NetDefaultDB"
+
         # Check third cluster (partial config)
-        third_uri = 'https://third.kusto.windows.net'
+        third_uri = "https://third.kusto.windows.net"
         assert cluster_dict.get(third_uri) is not None
-        assert cluster_dict[third_uri].description == 'Third cluster'
-        assert cluster_dict[third_uri].default_database == 'ThirdDB'
-    
-    @patch.dict('os.environ', {
-        'KUSTO_SERVICE_URI__1': 'https://first.kusto.windows.net',
-        'KUSTO_SERVICE_URI__2': 'https://second.kusto.windows.net',
-        'KUSTO_SERVICE_URI__5': 'https://fifth.kusto.windows.net'
-    }, clear=True)
+        assert cluster_dict[third_uri].description == "Third cluster"
+        assert cluster_dict[third_uri].default_database == "ThirdDB"
+
+    @patch.dict(
+        "os.environ",
+        {
+            "KUSTO_SERVICE_URI__1": "https://first.kusto.windows.net",
+            "KUSTO_SERVICE_URI__2": "https://second.kusto.windows.net",
+            "KUSTO_SERVICE_URI__5": "https://fifth.kusto.windows.net",
+        },
+        clear=True,
+    )
     def test_numbered_clusters_only_with_gap(self) -> None:
         """Test loading numbered clusters when primary is not set and there are gaps."""
         cache = KustoConnectionCache()
         cluster_dict = {uri: client for uri, client in cache.items()}
-        
+
         # Should only load clusters 1 and 2, stopping at the gap before 5
         assert len(cluster_dict) == 2
-        
-        expected_uris = {'https://first.kusto.windows.net', 'https://second.kusto.windows.net'}
+
+        expected_uris = {
+            "https://first.kusto.windows.net",
+            "https://second.kusto.windows.net",
+        }
         actual_uris = set(cluster_dict.keys())
         assert actual_uris == expected_uris
-        assert 'https://fifth.kusto.windows.net' not in actual_uris
-    
-    @patch.dict('os.environ', {
-        'KUSTO_SERVICE_URI': 'https://primary.kusto.windows.net/',
-        'KUSTO_SERVICE_URI__1': '  https://secondary.kusto.windows.net  ',
-        'KUSTO_SERVICE_URI__2': 'https://third.kusto.windows.net//',
-    }, clear=True)
+        assert "https://fifth.kusto.windows.net" not in actual_uris
+
+    @patch.dict(
+        "os.environ",
+        {
+            "KUSTO_SERVICE_URI": "https://primary.kusto.windows.net/",
+            "KUSTO_SERVICE_URI__1": "  https://secondary.kusto.windows.net  ",
+            "KUSTO_SERVICE_URI__2": "https://third.kusto.windows.net//",
+        },
+        clear=True,
+    )
     def test_cluster_uri_cleaning(self) -> None:
         """Test that cluster URIs are properly cleaned (trailing slashes and whitespace)."""
         cache = KustoConnectionCache()
         cluster_uris = [uri for uri, _ in cache.items()]
-        
+
         assert len(cluster_uris) == 3
-        expected_uris = {'https://primary.kusto.windows.net', 'https://secondary.kusto.windows.net', 'https://third.kusto.windows.net/'}
+        expected_uris = {
+            "https://primary.kusto.windows.net",
+            "https://secondary.kusto.windows.net",
+            "https://third.kusto.windows.net/",
+        }
         actual_uris = set(cluster_uris)
         assert actual_uris == expected_uris
-        
+
         # Ensure cleaned URIs don't exist
-        unwanted_uris = {'https://primary.kusto.windows.net/', '  https://secondary.kusto.windows.net  '}
+        unwanted_uris = {
+            "https://primary.kusto.windows.net/",
+            "  https://secondary.kusto.windows.net  ",
+        }
         assert not unwanted_uris.intersection(actual_uris)
-    
-    @patch.dict('os.environ', {
-        'KUSTO_SERVICE_DEFAULT_DB': 'LegacyDefaultDB',
-        'KUSTO_SERVICE_URI': 'https://primary.kusto.windows.net'
-    }, clear=True)
+
+    @patch.dict(
+        "os.environ",
+        {
+            "KUSTO_SERVICE_DEFAULT_DB": "LegacyDefaultDB",
+            "KUSTO_SERVICE_URI": "https://primary.kusto.windows.net",
+        },
+        clear=True,
+    )
     def test_legacy_default_db_environment_variable(self) -> None:
         """Test that KUSTO_SERVICE_DEFAULT_DB is still supported for backwards compatibility."""
         cache = KustoConnectionCache()
         cluster_dict = {uri: client for uri, client in cache.items()}
-        
+
         assert len(cluster_dict) == 1
-        primary_cluster = cluster_dict['https://primary.kusto.windows.net']
-        assert primary_cluster.default_database == 'LegacyDefaultDB'
-    
-    @patch.dict('os.environ', {
-        'KUSTO_SERVICE_DEFAULT_DB': 'LegacyDefaultDB',
-        'KUSTO_DATABASE': 'NewDefaultDB',
-        'KUSTO_SERVICE_URI': 'https://primary.kusto.windows.net'
-    }, clear=True)
+        primary_cluster = cluster_dict["https://primary.kusto.windows.net"]
+        assert primary_cluster.default_database == "LegacyDefaultDB"
+
+    @patch.dict(
+        "os.environ",
+        {
+            "KUSTO_SERVICE_DEFAULT_DB": "LegacyDefaultDB",
+            "KUSTO_DATABASE": "NewDefaultDB",
+            "KUSTO_SERVICE_URI": "https://primary.kusto.windows.net",
+        },
+        clear=True,
+    )
     def test_kusto_database_takes_precedence_over_legacy(self) -> None:
         """Test that KUSTO_DATABASE takes precedence over KUSTO_SERVICE_DEFAULT_DB."""
         cache = KustoConnectionCache()
         cluster_dict = {uri: client for uri, client in cache.items()}
-        
+
         assert len(cluster_dict) == 1
-        primary_cluster = cluster_dict['https://primary.kusto.windows.net']
-        assert primary_cluster.default_database == 'NewDefaultDB'
+        primary_cluster = cluster_dict["https://primary.kusto.windows.net"]
+        assert primary_cluster.default_database == "NewDefaultDB"
