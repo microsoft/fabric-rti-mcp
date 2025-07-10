@@ -23,16 +23,45 @@ class KustoConnectionWrapper(KustoConnection):
         self.description = description or cluster_uri
 
 
+DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+
+
 class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
     def __init__(self) -> None:
         super().__init__()
-        default_cluster = os.getenv("KUSTO_SERVICE_URI")
-        default_db = os.getenv(
+        self._load_clusters_from_environment()
+
+    def _load_clusters_from_environment(self) -> None:
+        """Load clusters from environment variables."""
+        # Load primary cluster (no suffix)
+        primary_cluster = os.getenv("KUSTO_SERVICE_URI")
+        primary_db = os.getenv("KUSTO_DATABASE") or os.getenv(
             "KUSTO_SERVICE_DEFAULT_DB",
             KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
         )
-        if default_cluster:
-            self.add_cluster_internal(default_cluster, default_db, "default cluster")
+        primary_description = os.getenv("KUSTO_DESCRIPTION", "default cluster")
+
+        if primary_cluster:
+            self.add_cluster_internal(primary_cluster, primary_db, primary_description)
+
+        # Load numbered clusters (suffix __1, __2, etc.)
+        cluster_index = 1
+        while True:
+            cluster_uri = os.getenv(f"KUSTO_SERVICE_URI__{cluster_index}")
+            if not cluster_uri:
+                break
+
+            cluster_db = os.getenv(
+                f"KUSTO_DATABASE__{cluster_index}",
+                KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
+            )
+            cluster_description = os.getenv(
+                f"KUSTO_DESCRIPTION__{cluster_index}",
+                f"cluster {cluster_index + 1}",
+            )
+
+            self.add_cluster_internal(cluster_uri, cluster_db, cluster_description)
+            cluster_index += 1
 
     def __missing__(self, key: str) -> KustoConnectionWrapper:
         client = KustoConnectionWrapper(key, DEFAULT_DB)
@@ -57,6 +86,9 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
         )
 
 
+KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
+
+
 def add_kusto_cluster(
     cluster_uri: str,
     default_database: Optional[str] = None,
@@ -68,7 +100,7 @@ def add_kusto_cluster(
 
 
 def get_kusto_connection(cluster_uri: str) -> KustoConnectionWrapper:
-    # clean uo the cluster URI since agents can send messy inputs
+    # clean up the cluster URI since agents can send messy inputs
     cluster_uri = cluster_uri.strip()
     if cluster_uri.endswith("/"):
         cluster_uri = cluster_uri[:-1]
@@ -299,7 +331,6 @@ def kusto_ingest_inline_into_table(
     )
 
 
-KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 
 DESTRUCTIVE_TOOLS = {
