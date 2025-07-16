@@ -1,15 +1,15 @@
 """Test timeout configuration for Kusto tools."""
 
+import inspect
 import os
+from typing import Any, Callable
 from unittest.mock import MagicMock, Mock, patch
 
 from azure.kusto.data import ClientRequestProperties
-from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp.kusto.kusto_service import (
     KUSTO_CONNECTION_CACHE,
     KustoConnectionWrapper,
-    _execute,
     add_kusto_cluster,
     kusto_command,
     kusto_list_databases,
@@ -17,7 +17,7 @@ from fabric_rti_mcp.kusto.kusto_service import (
 )
 
 
-def test_kusto_connection_wrapper_with_timeout():
+def test_kusto_connection_wrapper_with_timeout() -> None:
     """Test that KustoConnectionWrapper properly stores timeout_seconds."""
     cluster_uri = "https://test.kusto.windows.net"
     default_db = "TestDB"
@@ -33,7 +33,7 @@ def test_kusto_connection_wrapper_with_timeout():
     assert connection.description == description
 
 
-def test_kusto_connection_wrapper_without_timeout():
+def test_kusto_connection_wrapper_without_timeout() -> None:
     """Test that KustoConnectionWrapper works without timeout."""
     cluster_uri = "https://test.kusto.windows.net"
     default_db = "TestDB"
@@ -48,7 +48,7 @@ def test_kusto_connection_wrapper_without_timeout():
     assert connection.description == description
 
 
-def test_add_kusto_cluster_with_timeout():
+def test_add_kusto_cluster_with_timeout() -> None:
     """Test adding a cluster with timeout configuration."""
     cluster_uri = "https://timeout-test.kusto.windows.net"
     default_db = "TestDB"
@@ -72,7 +72,7 @@ def test_add_kusto_cluster_with_timeout():
 
 
 @patch.dict(os.environ, {"KUSTO_SERVICE_DEFAULT_TIMEOUT": "300"})
-def test_environment_variable_timeout():
+def test_environment_variable_timeout() -> None:
     """Test that default timeout is read from environment variable."""
     # Clear cache to force re-initialization
     KUSTO_CONNECTION_CACHE.clear()
@@ -80,8 +80,7 @@ def test_environment_variable_timeout():
     # This should trigger __init__ and read the environment variable
     from fabric_rti_mcp.kusto.kusto_service import KustoConnectionCache
 
-    cache = KustoConnectionCache()
-
+    KustoConnectionCache()
     # The environment variable should be read during initialization
     # We can't easily test this without the default cluster, but we can test
     # that invalid values are handled gracefully
@@ -89,7 +88,7 @@ def test_environment_variable_timeout():
 
 
 @patch.dict(os.environ, {"KUSTO_SERVICE_DEFAULT_TIMEOUT": "invalid"})
-def test_invalid_environment_variable_timeout():
+def test_invalid_environment_variable_timeout() -> None:
     """Test that invalid timeout values in environment are ignored."""
     # Clear cache to force re-initialization
     KUSTO_CONNECTION_CACHE.clear()
@@ -97,8 +96,7 @@ def test_invalid_environment_variable_timeout():
     # This should trigger __init__ and ignore invalid timeout
     from fabric_rti_mcp.kusto.kusto_service import KustoConnectionCache
 
-    cache = KustoConnectionCache()
-
+    KustoConnectionCache()
     # Invalid timeout should be ignored without error
     assert True  # If no exception, test passes
 
@@ -106,9 +104,9 @@ def test_invalid_environment_variable_timeout():
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
 def test_execute_with_per_query_timeout(
     mock_get_kusto_connection: Mock,
-    mock_kusto_response,
+    mock_kusto_response: Any,
     sample_cluster_uri: str,
-):
+) -> None:
     """Test that per-query timeout is properly set in ClientRequestProperties."""
     # Arrange
     mock_client = MagicMock()
@@ -125,7 +123,7 @@ def test_execute_with_per_query_timeout(
     timeout_seconds = 300  # 5 minutes
 
     # Act
-    result = kusto_query(query, sample_cluster_uri, database=database, timeout_seconds=timeout_seconds)
+    kusto_query(query, sample_cluster_uri, database=database, timeout_seconds=timeout_seconds)
 
     # Assert
     mock_client.execute.assert_called_once()
@@ -141,9 +139,9 @@ def test_execute_with_per_query_timeout(
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
 def test_execute_with_connection_level_timeout(
     mock_get_kusto_connection: Mock,
-    mock_kusto_response,
+    mock_kusto_response: Any,
     sample_cluster_uri: str,
-):
+) -> None:
     """Test that connection-level timeout is used when no per-query timeout is specified."""
     # Arrange
     mock_client = MagicMock()
@@ -159,7 +157,7 @@ def test_execute_with_connection_level_timeout(
     database = "test_db"
 
     # Act - no per-query timeout specified
-    result = kusto_query(query, sample_cluster_uri, database=database)
+    kusto_query(query, sample_cluster_uri, database=database)
 
     # Assert
     mock_client.execute.assert_called_once()
@@ -173,9 +171,9 @@ def test_execute_with_connection_level_timeout(
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
 def test_execute_per_query_timeout_overrides_connection_timeout(
     mock_get_kusto_connection: Mock,
-    mock_kusto_response,
+    mock_kusto_response: Any,
     sample_cluster_uri: str,
-):
+) -> None:
     """Test that per-query timeout overrides connection-level timeout."""
     # Arrange
     mock_client = MagicMock()
@@ -192,7 +190,7 @@ def test_execute_per_query_timeout_overrides_connection_timeout(
     per_query_timeout = 120  # 2 minutes per-query timeout
 
     # Act
-    result = kusto_query(query, sample_cluster_uri, database=database, timeout_seconds=per_query_timeout)
+    kusto_query(query, sample_cluster_uri, database=database, timeout_seconds=per_query_timeout)
 
     # Assert
     mock_client.execute.assert_called_once()
@@ -206,9 +204,9 @@ def test_execute_per_query_timeout_overrides_connection_timeout(
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
 def test_execute_no_timeout_specified(
     mock_get_kusto_connection: Mock,
-    mock_kusto_response,
+    mock_kusto_response: Any,
     sample_cluster_uri: str,
-):
+) -> None:
     """Test that no timeout is set when neither per-query nor connection-level timeout is specified."""
     # Arrange
     mock_client = MagicMock()
@@ -224,7 +222,7 @@ def test_execute_no_timeout_specified(
     database = "test_db"
 
     # Act - no timeout specified
-    result = kusto_query(query, sample_cluster_uri, database=database)
+    kusto_query(query, sample_cluster_uri, database=database)
 
     # Assert
     mock_client.execute.assert_called_once()
@@ -235,13 +233,11 @@ def test_execute_no_timeout_specified(
     assert crp is not None
 
 
-def test_timeout_functions_have_timeout_parameter():
+def test_timeout_functions_have_timeout_parameter() -> None:
     """Test that all major Kusto functions accept timeout_seconds parameter."""
     # This is a compile-time test to ensure all functions have the timeout parameter
-    import inspect
-
     # List of functions that should have timeout_seconds parameter
-    functions_with_timeout = [
+    functions_with_timeout: list[Callable[..., Any]] = [
         kusto_query,
         kusto_command,
         kusto_list_databases,
@@ -254,7 +250,7 @@ def test_timeout_functions_have_timeout_parameter():
         assert param.default is None, f"Function {func.__name__} timeout_seconds should default to None"
 
 
-def test_timeout_conversion_to_timespan_format():
+def test_timeout_conversion_to_timespan_format() -> None:
     """Test that timeout seconds are properly converted to timespan format."""
     # Test various timeout values
     test_cases = [
