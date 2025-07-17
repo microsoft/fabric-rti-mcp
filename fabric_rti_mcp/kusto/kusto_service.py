@@ -304,21 +304,27 @@ def kusto_get_shots(prompt: str,
     cluster_uri: str,
     sample_size: int = 3,
     database: Optional[str] = None,
+    embedding_endpoint: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
-    If no database is provided, uses the default database.
 
     :param prompt: The user prompt to find similar shots for.
     :param shots_table_name: Name of the table containing the shots.
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of most similar shots to retrieve. Defaults to 3.
-    :param database: Optional database name. If not provided, uses the "AI" database.
+    :param database: Optional database name. If not provided, uses the "AI" database or the default database.
+    :param embedding_endpoint: Optional endpoint for the embedding model to use. 
+                             If not provided, uses the KUSTO_EMBEDDING_ENDPOINT environment variable
+                             or defaults to the built-in OpenAI endpoint.
     :return: List of dictionaries containing sampled records.
     """
+    
+    # Use provided endpoint, or fall back to environment variable, or use default
+    endpoint = embedding_endpoint or DEFAULT_EMBEDDING_ENDPOINT
 
     kql_query = f"""
-        let model_endpoint = 'https://kusto-openai-eus.openai.azure.com/openai/deployments/kusto-text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system';
+        let model_endpoint = '{endpoint}';
         let embedded_term = toscalar(evaluate ai_embeddings('{prompt}', model_endpoint));
         {shots_table_name}
         | extend similarity = series_cosine_similarity(embedded_term, EmbeddingVector)
@@ -331,6 +337,10 @@ def kusto_get_shots(prompt: str,
 
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+DEFAULT_EMBEDDING_ENDPOINT = os.getenv(
+    "KUSTO_EMBEDDING_ENDPOINT",
+    "https://kusto-openai-eus.openai.azure.com/openai/deployments/kusto-text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system"
+)
 
 DESTRUCTIVE_TOOLS = {
     kusto_command.__name__,
