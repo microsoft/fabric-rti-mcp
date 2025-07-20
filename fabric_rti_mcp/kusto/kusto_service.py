@@ -339,7 +339,7 @@ KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 DEFAULT_EMBEDDING_ENDPOINT = os.getenv(
     "KUSTO_EMBEDDING_ENDPOINT",
-    "https://kusto-openai-eus.openai.azure.com/openai/deployments/kusto-text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system"
+    "https://your-openai-resource.openai.azure.com/openai/deployments/kusto-text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system"
 )
 
 DESTRUCTIVE_TOOLS = {
