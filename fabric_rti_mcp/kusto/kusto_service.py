@@ -310,14 +310,16 @@ def kusto_get_shots(prompt: str,
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
 
     :param prompt: The user prompt to find similar shots for.
-    :param shots_table_name: Name of the table containing the shots.
+    :param shots_table_name: Name of the table containing the shots. The table should have "NL" (string) column
+                             containing the natural language prompt, "KQL" (string) column containing the respective KQL,
+                             and "Embedding" (dynamic) column containing the embedding vector for the NL.
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of most similar shots to retrieve. Defaults to 3.
     :param database: Optional database name. If not provided, uses the "AI" database or the default database.
     :param embedding_endpoint: Optional endpoint for the embedding model to use. 
                              If not provided, uses the KUSTO_EMBEDDING_ENDPOINT environment variable
                              or defaults to the built-in OpenAI endpoint.
-    :return: List of dictionaries containing sampled records.
+    :return: List of dictionaries containing the shots records.
     """
     
     # Use provided endpoint, or fall back to environment variable, or use default
