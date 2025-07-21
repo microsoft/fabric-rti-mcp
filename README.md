@@ -82,7 +82,7 @@ The process should end with the below settings in your `settings.json` or your `
                 "env": {
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", // optionally provide cluster URI
                     "KUSTO_SERVICE_DEFAULT_DB": "Samples", // optionally provide database
-                    "KUSTO_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
+                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
                 }
             }
         }
@@ -117,7 +117,7 @@ The process should end with the below settings in your `settings.json` or your `
                 "env": {
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", // optionally provide cluster URI
                     "KUSTO_SERVICE_DEFAULT_DB": "Samples", // optionally provide database
-                    "KUSTO_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
+                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
                 }
             }
         }
@@ -168,11 +168,11 @@ None - the server will work with default settings for demo purposes.
 |----------|-------------|---------|---------|
 | `KUSTO_SERVICE_URI` | The URI of your Kusto cluster | `https://mycluster.westus.kusto.windows.net` | Uses demo cluster |
 | `KUSTO_SERVICE_DEFAULT_DB` | Default database name for queries | `MyDatabase` | Uses cluster default |
-| `KUSTO_EMBEDDING_ENDPOINT` | Custom Azure OpenAI embedding endpoint for semantic search | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system` | Uses built-in endpoint |
+| `AZ_OPENAI_EMBEDDING_ENDPOINT` | Custom Azure OpenAI embedding endpoint for semantic search | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;managed_identity=system` | Uses built-in endpoint |
 
 ### Embedding Endpoint Configuration
 
-The `KUSTO_EMBEDDING_ENDPOINT` is used by the semantic search functionality (e.g., `kusto_get_shots` function) to find similar query examples. 
+The `AZ_OPENAI_EMBEDDING_ENDPOINT` is used by the semantic search functionality (e.g., `kusto_get_shots` function) to find similar query examples. 
 
 **Format Requirements:**
 ```
