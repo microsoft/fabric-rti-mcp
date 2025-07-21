@@ -252,6 +252,10 @@ tools/
 
 ### Testing & Client Tools
 ```
+tests/                        # Test scripts and validation
+├── validate_final.py         # Final validation for PR readiness
+└── test_kusto_service.py     # Kusto service unit tests
+
 eventstream_test/             # Test utilities and examples
 ├── test_api_config.py        # Test Fabric API configuration
 ├── test_eventstream_client.py # Test Eventstream MCP client
