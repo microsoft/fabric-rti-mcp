@@ -32,14 +32,32 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
             KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
         )
         if default_cluster:
-            add_kusto_cluster(default_cluster, default_db, "default cluster")
+            self.add_cluster_internal(default_cluster, default_db, "default cluster")
 
     def __missing__(self, key: str) -> KustoConnectionWrapper:
         client = KustoConnectionWrapper(key, DEFAULT_DB)
         self[key] = client
         return client
 
-KUSTO_CONNECTION_CACHE: Dict[str, KustoConnectionWrapper] = KustoConnectionCache()
+    def add_cluster_internal(
+        self,
+        cluster_uri: str,
+        default_database: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        """Internal method to add a cluster during cache initialization."""
+        cluster_uri = cluster_uri.strip()
+        if cluster_uri.endswith("/"):
+            cluster_uri = cluster_uri[:-1]
+
+        if cluster_uri in self:
+            return
+        self[cluster_uri] = KustoConnectionWrapper(
+            cluster_uri, default_database or DEFAULT_DB, description
+        )
+
+
+KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 
 
@@ -48,14 +66,8 @@ def add_kusto_cluster(
     default_database: Optional[str] = None,
     description: Optional[str] = None,
 ) -> None:
-    cluster_uri = cluster_uri.strip()
-    if cluster_uri.endswith("/"):
-        cluster_uri = cluster_uri[:-1]
-
-    if cluster_uri in KUSTO_CONNECTION_CACHE:
-        return
-    KUSTO_CONNECTION_CACHE[cluster_uri] = KustoConnectionWrapper(
-        cluster_uri, default_database or DEFAULT_DB, description
+    KUSTO_CONNECTION_CACHE.add_cluster_internal(
+        cluster_uri, default_database, description
     )
 
 
