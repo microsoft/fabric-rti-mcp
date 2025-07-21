@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from fabric_rti_mcp.eventstream import eventstream_service
+from fabric_rti_mcp.eventstream import eventstream_builder_tools
 
 
 def register_tools(mcp: FastMCP) -> None:
@@ -48,3 +49,6 @@ def register_tools(mcp: FastMCP) -> None:
         eventstream_service.eventstream_delete,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
+    
+    # Register builder tools
+    eventstream_builder_tools.register_tools(mcp)
