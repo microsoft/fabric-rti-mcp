@@ -57,6 +57,10 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
         )
 
 
+KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
+DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+
+
 def add_kusto_cluster(
     cluster_uri: str,
     default_database: Optional[str] = None,
@@ -298,9 +302,6 @@ def kusto_ingest_inline_into_table(
         database=database,
     )
 
-
-KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
-DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 
 DESTRUCTIVE_TOOLS = {
     kusto_command.__name__,
