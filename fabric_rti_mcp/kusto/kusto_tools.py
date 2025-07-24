@@ -53,3 +53,7 @@ def register_tools(mcp: FastMCP) -> None:
         kusto_service.kusto_ingest_inline_into_table,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
     )
+    mcp.add_tool(
+        kusto_service.kusto_get_shots,
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+    )

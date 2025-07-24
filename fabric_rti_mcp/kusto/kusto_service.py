@@ -299,8 +299,47 @@ def kusto_ingest_inline_into_table(
     )
 
 
+def kusto_get_shots(prompt: str,
+    shots_table_name: str,
+    cluster_uri: str,
+    sample_size: int = 3,
+    database: Optional[str] = None,
+    embedding_endpoint: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
+
+    :param prompt: The user prompt to find similar shots for.
+    :param shots_table_name: Name of the table containing the shots. The table should have "NL" (string) column
+                             containing the natural language prompt, "KQL" (string) column containing the respective KQL,
+                             and "EmbeddingVector" (dynamic) column containing the embedding vector for the NL.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param sample_size: Number of most similar shots to retrieve. Defaults to 3.
+    :param database: Optional database name. If not provided, uses the "AI" database or the default database.
+    :param embedding_endpoint: Optional endpoint for the embedding model to use. 
+                             If not provided, uses the AZ_OPENAI_EMBEDDING_ENDPOINT environment variable.
+                             If no valid endpoint is set, this function should not be called.
+    :return: List of dictionaries containing the shots records.
+    """
+    
+    # Use provided endpoint, or fall back to environment variable, or use default
+    endpoint = embedding_endpoint or DEFAULT_EMBEDDING_ENDPOINT
+
+    kql_query = f"""
+        let model_endpoint = '{endpoint}';
+        let embedded_term = toscalar(evaluate ai_embeddings('{prompt}', model_endpoint));
+        {shots_table_name}
+        | extend similarity = series_cosine_similarity(embedded_term, EmbeddingVector)
+        | top {sample_size} by similarity
+        | project similarity, EmbeddingText, AugmentedText
+    """
+
+    return _execute(kql_query, cluster_uri, database=database)
+
+
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+DEFAULT_EMBEDDING_ENDPOINT = os.getenv("AZ_OPENAI_EMBEDDING_ENDPOINT")
 
 DESTRUCTIVE_TOOLS = {
     kusto_command.__name__,

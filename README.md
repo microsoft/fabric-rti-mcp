@@ -40,6 +40,7 @@ The Fabric RTI MCP Server creates a seamless integration between AI agents and F
 - Sample rows from a table
 - Execute query
 - Ingest a csv
+- Get shots
 
 ## Getting Started
 
@@ -64,9 +65,9 @@ The Fabric RTI MCP Server is available on [PyPI](https://pypi.org/project/micros
     1. Open the command palette (Ctrl+Shift+P) and run the command `MCP: Add Server`
     2. Select install from Pip
     3. When prompted, enter the package name `microsoft-fabric-rti-mcp`
-    4. Follow the prompts to install the package and add it to your settings.json file
+    4. Follow the prompts to install the package and add it to your settings.json or your mcp.json file
 
-The process should end with the below settings in your `settings.json` file.
+The process should end with the below settings in your `settings.json` or your `mcp.json` file.
 
 #### settings.json
 ```json
@@ -79,8 +80,9 @@ The process should end with the below settings in your `settings.json` file.
                     "microsoft-fabric-rti-mcp"
                 ],
                 "env": {
-                    "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
-                    "KUSTO_DATABASE": "Datasets" //optionally provide database
+                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", // optionally provide cluster URI
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples", // optionally provide database
+                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
                 }
             }
         }
@@ -93,9 +95,11 @@ The process should end with the below settings in your `settings.json` file.
 1. Make sure you have Python 3.10+ installed properly and added to your PATH.
 2. Clone the repository
 3. Install the dependencies (`pip install .` or `uv tool install .`)
-4. Add the settings below into your vscode `settings.json` file. 
-5. Change the path to match the repo location on your machine.
-6. Change the cluster uri in the settings to match your cluster.
+4. Add the settings below into your vscode `settings.json` or your `mcp.json` file. 
+5. Modify the path to match the repo location on your machine.
+6. Modify the cluster uri in the settings to match your cluster.
+7. Modify the cluster default database in the settings to match your database.
+8. Modify the embeddings endpoint in the settings to match yours. This step is optional and needed only in case you supply a shots table
 
 ```json
 {
@@ -111,8 +115,9 @@ The process should end with the below settings in your `settings.json` file.
                     "fabric_rti_mcp.server"
                 ],
                 "env": {
-                    "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
-                    "KUSTO_DATABASE": "Datasets" //optionally provide database
+                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", // optionally provide cluster URI
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples", // optionally provide database
+                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
                 }
             }
         }
@@ -130,22 +135,7 @@ pip install -e ".[dev]"
 
 ### Configure
 
-Add the server to your
-```
-{
-    "mcp": {
-        "servers": {
-            "local-fabric-rti-mcp": {
-                "command": "python",
-                "args": [
-                    "-m",
-                    "fabric_rti_mcp.server"
-                ]
-            }
-        }
-    }
-}
-```
+Follow the [Manual Install](#🔧-manual-install-install-from-source) instructions.
 
 ### Attach the debugger
 Use the `Python: Attach` configuration in your `launch.json` to attach to the running server. 
@@ -164,6 +154,46 @@ Once VS Code picks up the server and starts it, navigate to it's output:
 3. Try a prompt that tells the agent to use the Eventhouse tools, such as "List my Kusto tables"
 4. The agent should be able to use the Fabric RTI MCP Server tools to complete your query
 
+
+## ⚙️ Configuration
+
+The MCP server can be configured using the following environment variables:
+
+### Required Environment Variables
+None - the server will work with default settings for demo purposes.
+
+### Optional Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `KUSTO_SERVICE_URI` | The URI of your Kusto cluster | `https://mycluster.westus.kusto.windows.net` |
+| `KUSTO_SERVICE_DEFAULT_DB` | Default database name for queries | `MyDatabase` |
+| `AZ_OPENAI_EMBEDDING_ENDPOINT` | Custom Azure OpenAI embedding endpoint for semantic search | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate` |
+
+### Embedding Endpoint Configuration
+
+The `AZ_OPENAI_EMBEDDING_ENDPOINT` is used by the semantic search functionality (e.g., `kusto_get_shots` function) to find similar query examples. 
+
+**Format Requirements:**
+```
+https://{your-openai-resource}.openai.azure.com/openai/deployments/{deployment-name}/embeddings?api-version={api-version};impersonate
+```
+
+**Components:**
+- `{your-openai-resource}`: Your Azure OpenAI resource name
+- `{deployment-name}`: Your text embedding deployment name (e.g., `text-embedding-ada-002`)
+- `{api-version}`: API version (e.g., `2024-10-21`, `2023-05-15`)
+- `;impersonate`: Authentication method (you might use managed identity)
+
+**Authentication Requirements:**
+- Your Azure identity must have access to the OpenAI resource
+- In case using managed identity, the OpenAI resource must should be configured to accept managed identity authentication
+- The deployment must exist and be accessible
+
+### Configuration of Shots table
+The `get shots` tool retrieves shots that are most similar to your prompt out of the shots table. This function requires configuration of:
+- Shots table that should have "NL" (string) column containing the natural language prompt, "KQL" (string) column containing the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector for the NL.
+- Azure OpenAI embedding endpoint to create embedding vectors for your prompt. Note that this endpoint must embed using the same model that was used for creating the "EmbeddingVector" column in the Shots table.
 
 ## 🔑 Authentication
 
