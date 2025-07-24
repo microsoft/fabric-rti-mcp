@@ -317,8 +317,8 @@ def kusto_get_shots(prompt: str,
     :param sample_size: Number of most similar shots to retrieve. Defaults to 3.
     :param database: Optional database name. If not provided, uses the "AI" database or the default database.
     :param embedding_endpoint: Optional endpoint for the embedding model to use. 
-                             If not provided, uses the AZ_OPENAI_EMBEDDING_ENDPOINT environment variable
-                             or defaults to the built-in OpenAI endpoint.
+                             If not provided, uses the AZ_OPENAI_EMBEDDING_ENDPOINT environment variable.
+                             If no valid endpoint is set, this function should not be called.
     :return: List of dictionaries containing the shots records.
     """
     
@@ -339,10 +339,7 @@ def kusto_get_shots(prompt: str,
 
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
-DEFAULT_EMBEDDING_ENDPOINT = os.getenv(
-    "AZ_OPENAI_EMBEDDING_ENDPOINT",
-    "https://your-openai-resource.openai.azure.com/openai/deployments/kusto-text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate"
-)
+DEFAULT_EMBEDDING_ENDPOINT = os.getenv("AZ_OPENAI_EMBEDDING_ENDPOINT")
 
 DESTRUCTIVE_TOOLS = {
     kusto_command.__name__,
