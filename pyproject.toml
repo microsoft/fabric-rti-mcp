@@ -37,10 +37,10 @@ dev = [
 microsoft-fabric-rti-mcp = "fabric_rti_mcp.server:main"
 
 [project.urls]
-Homepage = "https://github.com/danield137/kontext-mcp"
-Repository = "https://github.com/danield137/kontext-mcp"
-Issues = "https://github.com/danield137/kontext-mcp/issues"
-Documentation = "https://github.com/danield137/kontext-mcp#readme"
+Homepage = "https://github.com/microsoft/fabric-rti-mcp"
+Repository = "https://github.com/microsoft/fabric-rti-mcp"
+Issues = "https://github.com/microsoft/fabric-rti-mcp/issues"
+Documentation = "https://github.com/microsoft/fabric-rti-mcp#readme"
 
 [tool.setuptools]
 packages = ["fabric_rti_mcp"]
