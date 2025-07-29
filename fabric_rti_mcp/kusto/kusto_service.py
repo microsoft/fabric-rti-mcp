@@ -310,8 +310,8 @@ def kusto_get_shots(prompt: str,
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
 
     :param prompt: The user prompt to find similar shots for.
-    :param shots_table_name: Name of the table containing the shots. The table should have "NL" (string) column
-                             containing the natural language prompt, "KQL" (string) column containing the respective KQL,
+    :param shots_table_name: Name of the table containing the shots. The table should have "EmbeddingText" (string) column
+                             containing the natural language prompt, "AugmentedText" (string) column containing the respective KQL,
                              and "EmbeddingVector" (dynamic) column containing the embedding vector for the NL.
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of most similar shots to retrieve. Defaults to 3.

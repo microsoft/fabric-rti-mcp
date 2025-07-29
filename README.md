@@ -192,7 +192,7 @@ https://{your-openai-resource}.openai.azure.com/openai/deployments/{deployment-n
 
 ### Configuration of Shots table
 The `get shots` tool retrieves shots that are most similar to your prompt out of the shots table. This function requires configuration of:
-- Shots table that should have "NL" (string) column containing the natural language prompt, "KQL" (string) column containing the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector for the NL.
+- Shots table that should have "EmbeddingText" (string) column containing the natural language prompt, "AugmentedText" (string) column containing the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector of the EmbeddingText.
 - Azure OpenAI embedding endpoint to create embedding vectors for your prompt. Note that this endpoint must embed using the same model that was used for creating the "EmbeddingVector" column in the Shots table.
 
 ## 🔑 Authentication
