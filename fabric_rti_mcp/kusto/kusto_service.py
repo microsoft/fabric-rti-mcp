@@ -336,6 +336,18 @@ def kusto_get_shots(prompt: str,
 
     return _execute(kql_query, cluster_uri, database=database)
 
+def kusto_set_azure_openai_policy_callout(
+    enable: bool,
+    cluster_uri: str,
+) -> List[Dict[str, Any]]:
+    """
+    Executes a kusto management command to enable or disable Azure OpenAI policy callout on the cluster.
+    :param enable: whether to enable or disable the policy callout.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :return: The result of the command execution as a list of dictionaries (json).
+    """
+    command = f'.alter cluster policy callout @\'[{{"CalloutType": "azure_openai", "CalloutUriRegex": "https://[A-Za-z0-9-]{{3,63}}\\\\.openai\\\\.azure\\\\.com/.*", "CanCall": {str(enable).lower()}}}]\''
+    return _execute(command, cluster_uri)
 
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
@@ -344,4 +356,5 @@ DEFAULT_EMBEDDING_ENDPOINT = os.getenv("AZ_OPENAI_EMBEDDING_ENDPOINT")
 DESTRUCTIVE_TOOLS = {
     kusto_command.__name__,
     kusto_ingest_inline_into_table.__name__,
+    kusto_set_azure_openai_policy_callout.__name__,
 }

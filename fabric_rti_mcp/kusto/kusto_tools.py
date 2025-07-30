@@ -57,3 +57,7 @@ def register_tools(mcp: FastMCP) -> None:
         kusto_service.kusto_get_shots,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
     )
+    mcp.add_tool(
+        kusto_service.kusto_set_azure_openai_policy_callout,
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
+    )
