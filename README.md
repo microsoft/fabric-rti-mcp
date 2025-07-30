@@ -41,6 +41,7 @@ The Fabric RTI MCP Server creates a seamless integration between AI agents and F
 - Execute query
 - Ingest a csv
 - Get shots
+- Explain KQL results (takes a KQL query and returns a modified query that adds natural language descriptions for each row)
 
 ## Getting Started
 
@@ -82,7 +83,8 @@ The process should end with the below settings in your `settings.json` or your `
                 "env": {
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", // optionally provide cluster URI
                     "KUSTO_SERVICE_DEFAULT_DB": "Samples", // optionally provide database
-                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
+                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate", // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
+                    "AZ_OPENAI_COMPLETION_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-10-21;impersonate" // optionally provide Azure OpenAI completion endpoint (used for explaining row data)
                 }
             }
         }
@@ -169,6 +171,7 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_SERVICE_URI` | The URI of your Kusto cluster | `https://mycluster.westus.kusto.windows.net` |
 | `KUSTO_SERVICE_DEFAULT_DB` | Default database name for queries | `MyDatabase` |
 | `AZ_OPENAI_EMBEDDING_ENDPOINT` | Custom Azure OpenAI embedding endpoint for semantic search | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate` |
+| `AZ_OPENAI_COMPLETION_ENDPOINT` | Custom Azure OpenAI completion endpoint for explaining row data | `https://your-resource.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-10-21;impersonate` |
 
 ### Embedding Endpoint Configuration
 

@@ -337,9 +337,47 @@ def kusto_get_shots(prompt: str,
     return _execute(kql_query, cluster_uri, database=database)
 
 
+def kusto_explain_kql_results(
+    kql_query: str,
+    completion_endpoint: Optional[str] = None,
+) -> str:
+    """
+    Takes a KQL query and modifies it to add natural language explanations for each row using Kusto plugin completion.
+    Each row is packed into JSON format using pack_all() and sent to the completion API for explanation.
+    
+    :param kql_query: The KQL query to modify for adding natural language explanations.
+    :param completion_endpoint: Optional endpoint for the text completion model to use.
+                               If not provided, uses the AZ_OPENAI_COMPLETION_ENDPOINT environment variable.
+                               If no valid endpoint is set, this function should not be called.
+    :return: Modified KQL query string that includes natural language descriptions for each row.
+    """
+    
+    if not kql_query or not kql_query.strip():
+        raise ValueError("KQL query cannot be empty")
+    
+    # Use provided endpoint, or fall back to environment variable, or use default
+    endpoint = completion_endpoint or DEFAULT_COMPLETION_ENDPOINT
+    
+    if not endpoint:
+        raise ValueError("No completion endpoint provided. Set AZ_OPENAI_COMPLETION_ENDPOINT environment variable or provide completion_endpoint parameter.")
+    
+    # Clean up the input query
+    cleaned_query = kql_query.strip()
+    
+    # Create the modified query that adds natural language explanations
+    modified_query = f"""let model_endpoint = '{endpoint}';
+{cleaned_query}
+| extend RowData = tostring(pack_all())
+| extend NaturalLanguageDescription = toscalar(evaluate ai_completion(strcat('Explain this data row in natural language: ', RowData), model_endpoint))
+| project-away RowData"""
+    
+    return modified_query
+
+
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 DEFAULT_EMBEDDING_ENDPOINT = os.getenv("AZ_OPENAI_EMBEDDING_ENDPOINT")
+DEFAULT_COMPLETION_ENDPOINT = os.getenv("AZ_OPENAI_COMPLETION_ENDPOINT")
 
 DESTRUCTIVE_TOOLS = {
     kusto_command.__name__,
