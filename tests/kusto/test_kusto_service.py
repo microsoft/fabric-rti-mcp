@@ -28,6 +28,7 @@ def test_execute_basic_query(
     mock_connection = MagicMock()
     mock_connection.query_client = mock_client
     mock_connection.default_database = "default_db"
+    mock_connection.timeout_seconds = None  # Add timeout_seconds attribute
     mock_get_kusto_connection.return_value = mock_connection
 
     query = "  TestTable | take 10  "  # Added whitespace to test stripping
