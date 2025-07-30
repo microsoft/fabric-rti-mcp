@@ -342,8 +342,12 @@ def kusto_explain_kql_results(
     completion_endpoint: Optional[str] = None,
 ) -> str:
     """
-    Takes a KQL query and modifies it to add natural language explanations for each row using Kusto plugin completion.
-    Each row is packed into JSON format using pack_all() and sent to the completion API for explanation.
+    Use this tool to explain KQL queries and their results in natural language. When users ask to "explain queries", 
+    "explain results", "what do these queries do", or want natural language descriptions of query data, 
+    this tool modifies the provided KQL query to add AI-generated explanations for each result row.
+    
+    Perfect for: explaining query history, describing what queries do, generating human-readable summaries of data.
+    The tool uses AI completion to convert technical query results into easy-to-understand explanations.
     
     :param kql_query: The KQL query to modify for adding natural language explanations.
     :param completion_endpoint: Optional endpoint for the text completion model to use.
@@ -364,12 +368,13 @@ def kusto_explain_kql_results(
     # Clean up the input query
     cleaned_query = kql_query.strip()
     
-    # Create the modified query that adds natural language explanations
-    modified_query = f"""let model_endpoint = '{endpoint}';
-{cleaned_query}
-| extend RowData = tostring(pack_all())
-| extend NaturalLanguageDescription = toscalar(evaluate ai_completion(strcat('Explain this data row in natural language: ', RowData), model_endpoint))
-| project-away RowData"""
+    # Create a working query that calls AI to explain each row using ai_chat_completion_prompt
+    # Avoid let statement to prevent syntax issues with complex queries
+    modified_query = f"""{cleaned_query}
+| extend explanation_prompt = strcat("Explain this data in natural language: ", tostring(pack_all()))
+| evaluate ai_chat_completion_prompt(explanation_prompt, '{endpoint}')
+| extend NaturalLanguageDescription = explanation_prompt_chat_completion
+| project-away explanation_prompt, explanation_prompt_chat_completion"""
     
     return modified_query
 
