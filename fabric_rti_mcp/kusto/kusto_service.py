@@ -337,9 +337,57 @@ def kusto_get_shots(prompt: str,
     return _execute(kql_query, cluster_uri, database=database)
 
 
+def kusto_explain_kql_results(
+    kql_query: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    completion_endpoint: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Use this tool to explain KQL queries and their results in natural language. When users ask to "explain queries", 
+    "explain results", "what do these queries do", or want natural language descriptions of query data, 
+    this tool modifies the provided KQL query to add AI-generated explanations for each result row and executes it.
+    
+    Perfect for: explaining query history, describing what queries do, generating human-readable summaries of data.
+    The tool uses AI completion to convert technical query results into easy-to-understand explanations.
+    
+    :param kql_query: The KQL query to modify for adding natural language explanations.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param completion_endpoint: Optional endpoint for the text completion model to use.
+                               If not provided, uses the AZ_OPENAI_COMPLETION_ENDPOINT environment variable.
+                               If no valid endpoint is set, this function should not be called.
+    :return: The result of the query execution with natural language descriptions as a list of dictionaries (json).
+    """
+    
+    if not kql_query or not kql_query.strip():
+        raise ValueError("KQL query cannot be empty")
+    
+    # Use provided endpoint, or fall back to environment variable, or use default
+    endpoint = completion_endpoint or DEFAULT_COMPLETION_ENDPOINT
+    
+    if not endpoint:
+        raise ValueError("No completion endpoint provided. Set AZ_OPENAI_COMPLETION_ENDPOINT environment variable or provide completion_endpoint parameter.")
+    
+    # Clean up the input query
+    cleaned_query = kql_query.strip()
+    
+    # Create a working query that calls AI to explain each row using ai_chat_completion_prompt
+    # Avoid let statement to prevent syntax issues with complex queries
+    modified_query = f"""{cleaned_query}
+| extend explanation_prompt = strcat("Explain this data in natural language: ", tostring(pack_all()))
+| evaluate ai_chat_completion_prompt(explanation_prompt, '{endpoint}')
+| extend NaturalLanguageDescription = explanation_prompt_chat_completion
+| project-away explanation_prompt, explanation_prompt_chat_completion"""
+    
+    # Execute the modified query and return the results
+    return _execute(modified_query, cluster_uri, database=database)
+
+
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 DEFAULT_EMBEDDING_ENDPOINT = os.getenv("AZ_OPENAI_EMBEDDING_ENDPOINT")
+DEFAULT_COMPLETION_ENDPOINT = os.getenv("AZ_OPENAI_COMPLETION_ENDPOINT")
 
 DESTRUCTIVE_TOOLS = {
     kusto_command.__name__,
