@@ -339,21 +339,25 @@ def kusto_get_shots(prompt: str,
 
 def kusto_explain_kql_results(
     kql_query: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
     completion_endpoint: Optional[str] = None,
-) -> str:
+) -> List[Dict[str, Any]]:
     """
     Use this tool to explain KQL queries and their results in natural language. When users ask to "explain queries", 
     "explain results", "what do these queries do", or want natural language descriptions of query data, 
-    this tool modifies the provided KQL query to add AI-generated explanations for each result row.
+    this tool modifies the provided KQL query to add AI-generated explanations for each result row and executes it.
     
     Perfect for: explaining query history, describing what queries do, generating human-readable summaries of data.
     The tool uses AI completion to convert technical query results into easy-to-understand explanations.
     
     :param kql_query: The KQL query to modify for adding natural language explanations.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
     :param completion_endpoint: Optional endpoint for the text completion model to use.
                                If not provided, uses the AZ_OPENAI_COMPLETION_ENDPOINT environment variable.
                                If no valid endpoint is set, this function should not be called.
-    :return: Modified KQL query string that includes natural language descriptions for each row.
+    :return: The result of the query execution with natural language descriptions as a list of dictionaries (json).
     """
     
     if not kql_query or not kql_query.strip():
@@ -376,7 +380,8 @@ def kusto_explain_kql_results(
 | extend NaturalLanguageDescription = explanation_prompt_chat_completion
 | project-away explanation_prompt, explanation_prompt_chat_completion"""
     
-    return modified_query
+    # Execute the modified query and return the results
+    return _execute(modified_query, cluster_uri, database=database)
 
 
 KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
