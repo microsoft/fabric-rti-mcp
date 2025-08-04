@@ -10,9 +10,7 @@ class KustoConnection:
     def __init__(self, cluster_uri: str):
         kcsb = KustoConnectionStringBuilder.with_azure_token_credential(
             connection_string=cluster_uri,
-            credential_from_login_endpoint=lambda login_endpoint: self._get_credential(
-                login_endpoint
-            ),
+            credential_from_login_endpoint=lambda login_endpoint: self._get_credential(login_endpoint),
         )
         self.query_client = KustoClient(kcsb)
         self.ingestion_client = KustoStreamingIngestClient(kcsb)

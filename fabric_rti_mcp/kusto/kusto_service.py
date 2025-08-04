@@ -15,9 +15,7 @@ from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
 
 
 class KustoConnectionWrapper(KustoConnection):
-    def __init__(
-        self, cluster_uri: str, default_database: str, description: Optional[str] = None
-    ):
+    def __init__(self, cluster_uri: str, default_database: str, description: Optional[str] = None):
         super().__init__(cluster_uri)
         self.default_database = default_database
         self.description = description or cluster_uri
@@ -52,9 +50,7 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
 
         if cluster_uri in self:
             return
-        self[cluster_uri] = KustoConnectionWrapper(
-            cluster_uri, default_database or DEFAULT_DB, description
-        )
+        self[cluster_uri] = KustoConnectionWrapper(cluster_uri, default_database or DEFAULT_DB, description)
 
 
 def add_kusto_cluster(
@@ -62,9 +58,7 @@ def add_kusto_cluster(
     default_database: Optional[str] = None,
     description: Optional[str] = None,
 ) -> None:
-    KUSTO_CONNECTION_CACHE.add_cluster_internal(
-        cluster_uri, default_database, description
-    )
+    KUSTO_CONNECTION_CACHE.add_cluster_internal(cluster_uri, default_database, description)
 
 
 def get_kusto_connection(cluster_uri: str) -> KustoConnectionWrapper:
@@ -113,9 +107,7 @@ def kusto_get_clusters() -> List[Tuple[str, str]]:
     return [(uri, client.description) for uri, client in KUSTO_CONNECTION_CACHE.items()]
 
 
-def kusto_connect(
-    cluster_uri: str, default_database: str, description: Optional[str] = None
-) -> None:
+def kusto_connect(cluster_uri: str, default_database: str, description: Optional[str] = None) -> None:
     """
     Connects to a Kusto cluster and adds it to the cache.
 
@@ -124,14 +116,10 @@ def kusto_connect(
     :param description: Optional description for the cluster. Cannot be used to retrieve the cluster,
                        but can be used to provide additional information about the cluster.
     """
-    add_kusto_cluster(
-        cluster_uri, default_database=default_database, description=description
-    )
+    add_kusto_cluster(cluster_uri, default_database=default_database, description=description)
 
 
-def kusto_query(
-    query: str, cluster_uri: str, database: Optional[str] = None
-) -> List[Dict[str, Any]]:
+def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Executes a KQL query on the specified database. If no database is provided,
     it will use the default database.
@@ -144,9 +132,7 @@ def kusto_query(
     return _execute(query, cluster_uri, database=database)
 
 
-def kusto_command(
-    command: str, cluster_uri: str, database: Optional[str] = None
-) -> List[Dict[str, Any]]:
+def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
     it will use the default database.
@@ -180,9 +166,7 @@ def kusto_list_tables(cluster_uri: str, database: str) -> List[Dict[str, Any]]:
     return _execute(".show tables", cluster_uri, database=database)
 
 
-def kusto_get_entities_schema(
-    cluster_uri: str, database: Optional[str] = None
-) -> List[Dict[str, Any]]:
+def kusto_get_entities_schema(cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Retrieves schema information for all entities (tables, materialized views, functions)
     in the specified database. If no database is provided, uses the default database.
@@ -200,9 +184,7 @@ def kusto_get_entities_schema(
     )
 
 
-def kusto_get_table_schema(
-    table_name: str, cluster_uri: str, database: Optional[str] = None
-) -> List[Dict[str, Any]]:
+def kusto_get_table_schema(table_name: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Retrieves the schema information for a specific table in the specified database.
     If no database is provided, uses the default database.
@@ -212,9 +194,7 @@ def kusto_get_table_schema(
     :param database: Optional database name. If not provided, uses the default database.
     :return: List of dictionaries containing table schema information.
     """
-    return _execute(
-        f".show table {table_name} cslschema", cluster_uri, database=database
-    )
+    return _execute(f".show table {table_name} cslschema", cluster_uri, database=database)
 
 
 def kusto_get_function_schema(
@@ -248,9 +228,7 @@ def kusto_sample_table_data(
     :param database: Optional database name. If not provided, uses the default database.
     :return: List of dictionaries containing sampled records.
     """
-    return _execute(
-        f"{table_name} | sample {sample_size}", cluster_uri, database=database
-    )
+    return _execute(f"{table_name} | sample {sample_size}", cluster_uri, database=database)
 
 
 def kusto_sample_function_data(
@@ -299,7 +277,8 @@ def kusto_ingest_inline_into_table(
     )
 
 
-def kusto_get_shots(prompt: str,
+def kusto_get_shots(
+    prompt: str,
     shots_table_name: str,
     cluster_uri: str,
     sample_size: int = 3,
@@ -310,18 +289,19 @@ def kusto_get_shots(prompt: str,
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
 
     :param prompt: The user prompt to find similar shots for.
-    :param shots_table_name: Name of the table containing the shots. The table should have "EmbeddingText" (string) column
-                             containing the natural language prompt, "AugmentedText" (string) column containing the respective KQL,
-                             and "EmbeddingVector" (dynamic) column containing the embedding vector for the NL.
+    :param shots_table_name: Name of the table containing the shots. The table should have "EmbeddingText" (string)
+                             column containing the natural language prompt, "AugmentedText" (string) column containing
+                             the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector
+                             for the NL.
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of most similar shots to retrieve. Defaults to 3.
     :param database: Optional database name. If not provided, uses the "AI" database or the default database.
-    :param embedding_endpoint: Optional endpoint for the embedding model to use. 
-                             If not provided, uses the AZ_OPENAI_EMBEDDING_ENDPOINT environment variable.
-                             If no valid endpoint is set, this function should not be called.
+    :param embedding_endpoint: Optional endpoint for the embedding model to use. If not provided, uses the
+                             AZ_OPENAI_EMBEDDING_ENDPOINT environment variable. If no valid endpoint is set,
+                             this function should not be called.
     :return: List of dictionaries containing the shots records.
     """
-    
+
     # Use provided endpoint, or fall back to environment variable, or use default
     endpoint = embedding_endpoint or DEFAULT_EMBEDDING_ENDPOINT
 
