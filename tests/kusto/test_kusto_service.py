@@ -1,4 +1,3 @@
-from typing import cast
 from unittest.mock import MagicMock, Mock, patch
 
 from azure.kusto.data import ClientRequestProperties
