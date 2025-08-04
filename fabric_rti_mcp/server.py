@@ -22,7 +22,7 @@ def main() -> None:
     # print pid
     logger.error(f"PID: {os.getpid()}")
     # import later to allow for environment variables to be set from command line
-    mcp = FastMCP("kusto-mcp-server")
+    mcp = FastMCP("fabric-rti-mcp")
     register_tools(mcp)
     mcp.run(transport="stdio")
 
