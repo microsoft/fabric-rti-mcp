@@ -50,7 +50,7 @@ def test_execute_basic_query(
     crp = mock_client.execute.call_args[0][2]
     assert isinstance(crp, ClientRequestProperties)
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
-    assert cast(str, crp.client_request_id).startswith("KFRTI_MCP.kusto_query:")
+    assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
     assert crp.has_option("request_readonly")
 
     # Verify result format
