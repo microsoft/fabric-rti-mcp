@@ -1,6 +1,6 @@
 fmt:
 	isort .
-	black . --line-length=120
+	black .
 
 lint:
 	flake8 .
@@ -15,3 +15,6 @@ precommit:
 	flake8 .
 	mypy . --explicit-package-bases
 	pytest
+
+run:
+	uvx .

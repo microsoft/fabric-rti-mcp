@@ -6,12 +6,8 @@ from fabric_rti_mcp.kusto import kusto_service
 
 def register_tools(mcp: FastMCP) -> None:
     mcp.add_tool(
-        kusto_service.kusto_get_clusters,
+        kusto_service.kusto_known_services,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.add_kusto_cluster,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
     )
     mcp.add_tool(
         kusto_service.kusto_query,
@@ -51,5 +47,9 @@ def register_tools(mcp: FastMCP) -> None:
     )
     mcp.add_tool(
         kusto_service.kusto_ingest_inline_into_table,
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_get_shots,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
     )

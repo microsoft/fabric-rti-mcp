@@ -5,11 +5,13 @@ from mcp.server.fastmcp import FastMCP
 
 from fabric_rti_mcp import __version__
 from fabric_rti_mcp.common import logger
-from fabric_rti_mcp.kusto import kusto_tools
 from fabric_rti_mcp.eventstream import eventstream_tools
+from fabric_rti_mcp.kusto import kusto_config, kusto_tools
 
 
 def register_tools(mcp: FastMCP) -> None:
+    logger.info("Kusto configuration keys found in environment:")
+    logger.info(", ".join(kusto_config.KustoConfig.existing_env_vars()))
     kusto_tools.register_tools(mcp)
     eventstream_tools.register_tools(mcp)
 

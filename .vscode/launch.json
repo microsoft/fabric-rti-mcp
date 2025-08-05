@@ -11,10 +11,10 @@
             "processId": "${command:pickProcess}",
         },
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "Python Debugger: Debug server.py with Arguments",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "fabric_rti_mcp/server.py",
             "console": "integratedTerminal",
             "env": {
                 "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/"
