@@ -15,3 +15,6 @@ precommit:
 	flake8 .
 	mypy . --explicit-package-bases
 	pytest
+
+run:
+	uvx .
