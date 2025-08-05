@@ -1,0 +1,1 @@
+c:/Users/ddubovski/source/repos/fabric-rti-mcp/.github/instructions/fabric-rti-mcp.instructions.md
