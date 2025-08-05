@@ -1,8 +1,10 @@
+from __future__ import annotations
+
+import functools
 import inspect
-import os
 import uuid
-from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from azure.kusto.data import (
     ClientRequestProperties,
@@ -10,63 +12,92 @@ from azure.kusto.data import (
 )
 
 from fabric_rti_mcp import __version__  # type: ignore
-from fabric_rti_mcp.kusto.kusto_connection import KustoConnection
+from fabric_rti_mcp.kusto.kusto_config import KustoConfig
+from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
 
-
-class KustoConnectionWrapper(KustoConnection):
-    def __init__(self, cluster_uri: str, default_database: str, description: Optional[str] = None):
-        super().__init__(cluster_uri)
-        self.default_database = default_database
-        self.description = description or cluster_uri
+_DEFAULT_DB_NAME = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+CONFIG = KustoConfig.from_env()
 
 
-class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
+class KustoConnectionManager:
     def __init__(self) -> None:
-        super().__init__()
-        default_cluster = os.getenv("KUSTO_SERVICE_URI")
-        default_db = os.getenv(
-            "KUSTO_SERVICE_DEFAULT_DB",
-            KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
-        )
-        if default_cluster:
-            self.add_cluster_internal(default_cluster, default_db, "default cluster")
+        self._cache: Dict[str, KustoConnection] = {}
 
-    def __missing__(self, key: str) -> KustoConnectionWrapper:
-        client = KustoConnectionWrapper(key, DEFAULT_DB)
-        self[key] = client
-        return client
+    def connect_to_all_known_services(self) -> None:
+        """
+        Use at your own risk. Connecting takes time and might make the server unresponsive.
+        """
+        if CONFIG.eager_connect:
+            known_services = KustoConfig.get_known_services().values()
+            for known_service in known_services:
+                self.get(known_service.service_uri)
 
-    def add_cluster_internal(
-        self,
-        cluster_uri: str,
-        default_database: Optional[str] = None,
-        description: Optional[str] = None,
-    ) -> None:
-        """Internal method to add a cluster during cache initialization."""
-        cluster_uri = cluster_uri.strip()
-        if cluster_uri.endswith("/"):
-            cluster_uri = cluster_uri[:-1]
+    def get(self, cluster_uri: str) -> KustoConnection:
+        """
+        Retrieves a cached or new KustoConnection for the given URI.
+        This method is the single entry point for accessing connections.
+        """
+        sanitized_uri = sanitize_uri(cluster_uri)
 
-        if cluster_uri in self:
-            return
-        self[cluster_uri] = KustoConnectionWrapper(cluster_uri, default_database or DEFAULT_DB, description)
+        if sanitized_uri in self._cache:
+            return self._cache[sanitized_uri]
+
+        # Connection not found, create a new one.
+        known_services = KustoConfig.get_known_services()
+        default_database = _DEFAULT_DB_NAME
+
+        if sanitized_uri in known_services:
+            default_database = known_services[sanitized_uri].default_database or _DEFAULT_DB_NAME
+        elif not CONFIG.allow_unknown_services:
+            raise ValueError(
+                f"Service URI '{sanitized_uri}' is not in the list of approved services, "
+                "and unknown connections are not permitted by the administrator."
+            )
+
+        connection = KustoConnection(sanitized_uri, default_database=default_database)
+        self._cache[sanitized_uri] = connection
+        return connection
 
 
-def add_kusto_cluster(
-    cluster_uri: str,
-    default_database: Optional[str] = None,
-    description: Optional[str] = None,
-) -> None:
-    KUSTO_CONNECTION_CACHE.add_cluster_internal(cluster_uri, default_database, description)
+# --- In the main module scope ---
+# Instantiate it once to be used as a singleton throughout the module.
+_CONNECTION_MANAGER = KustoConnectionManager()
+# Not recommended for production use, but useful for testing and development.
+if CONFIG.eager_connect:
+    _CONNECTION_MANAGER.connect_to_all_known_services()
 
 
-def get_kusto_connection(cluster_uri: str) -> KustoConnectionWrapper:
-    # clean uo the cluster URI since agents can send messy inputs
-    cluster_uri = cluster_uri.strip()
-    if cluster_uri.endswith("/"):
-        cluster_uri = cluster_uri[:-1]
-    return KUSTO_CONNECTION_CACHE[cluster_uri]
+def get_kusto_connection(cluster_uri: str) -> KustoConnection:
+    # Nicety to allow for easier mocking in tests.
+    return _CONNECTION_MANAGER.get(cluster_uri)
+
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def destructive_operation(func: F) -> F:
+    """
+    Decorator to mark a Kusto operation as 'destructive' (e.g., ingest, drop).
+    This is a robust way to manage the 'request_readonly' property, preventing
+    accidental data modification from read-only functions.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):  # type: ignore
+        return func(*args, **kwargs)
+
+    setattr(wrapper, "_is_destructive", True)  # type: ignore
+    return wrapper  # type: ignore
+
+
+def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequestProperties:
+    crp: ClientRequestProperties = ClientRequestProperties()
+    crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
+    crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
+    if not is_destructive and not ignore_readonly:
+        crp.set_option("request_readonly", True)
+    return crp
 
 
 def _execute(
@@ -76,8 +107,9 @@ def _execute(
     database: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
-    # Get the name of the caller function
-    action = caller_frame.f_code.co_name  # type: ignore
+    action_name = caller_frame.f_code.co_name  # type: ignore
+    caller_func = caller_frame.f_globals.get(action_name)  # type: ignore
+    is_destructive = hasattr(caller_func, "_is_destructive")
 
     connection = get_kusto_connection(cluster_uri)
     client = connection.query_client
@@ -88,35 +120,21 @@ def _execute(
     database = database or connection.default_database
     database = database.strip()
 
-    crp: ClientRequestProperties = ClientRequestProperties()
-    crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
-    crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
-    if action not in DESTRUCTIVE_TOOLS and not readonly_override:
-        crp.set_option("request_readonly", True)
+    crp = _crp(action_name, is_destructive, readonly_override)
     result_set = client.execute(database, query, crp)
     return format_results(result_set)
 
 
-def kusto_get_clusters() -> List[Tuple[str, str]]:
+# NOTE: This is temporary. The intent is to not use environment variables for persistency.
+def kusto_known_services() -> List[Dict[str, str]]:
     """
-    Retrieves a list of all Kusto clusters in the cache.
+    Retrieves a list of all Kusto services known to the MCP.
+    Could be null if no services are configured.
 
-    :return: List of tuples containing cluster URI and description. When selecting a cluster,
-             the URI must be used, the description is used only for additional information.
+    :return: List of objects, {"service": str, "description": str, "default_database": str}
     """
-    return [(uri, client.description) for uri, client in KUSTO_CONNECTION_CACHE.items()]
-
-
-def kusto_connect(cluster_uri: str, default_database: str, description: Optional[str] = None) -> None:
-    """
-    Connects to a Kusto cluster and adds it to the cache.
-
-    :param cluster_uri: The URI of the Kusto cluster.
-    :param default_database: The default database to use for queries on this cluster.
-    :param description: Optional description for the cluster. Cannot be used to retrieve the cluster,
-                       but can be used to provide additional information about the cluster.
-    """
-    add_kusto_cluster(cluster_uri, default_database=default_database, description=description)
+    services = KustoConfig.get_known_services().values()
+    return [asdict(service) for service in services]
 
 
 def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -132,6 +150,7 @@ def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) ->
     return _execute(query, cluster_uri, database=database)
 
 
+@destructive_operation
 def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
@@ -177,7 +196,7 @@ def kusto_get_entities_schema(cluster_uri: str, database: Optional[str] = None) 
     """
     return _execute(
         ".show databases entities with (showObfuscatedStrings=true) "
-        f"| where DatabaseName == '{database or DEFAULT_DB}' "
+        f"| where DatabaseName == '{database or _DEFAULT_DB_NAME}' "
         "| project EntityName, EntityType, Folder, DocString",
         cluster_uri,
         database=database,
@@ -254,6 +273,7 @@ def kusto_sample_function_data(
     )
 
 
+@destructive_operation
 def kusto_ingest_inline_into_table(
     table_name: str,
     data_comma_separator: str,
@@ -301,9 +321,8 @@ def kusto_get_shots(
                              this function should not be called.
     :return: List of dictionaries containing the shots records.
     """
-
     # Use provided endpoint, or fall back to environment variable, or use default
-    endpoint = embedding_endpoint or DEFAULT_EMBEDDING_ENDPOINT
+    endpoint = embedding_endpoint or CONFIG.open_ai_embedding_endpoint
 
     kql_query = f"""
         let model_endpoint = '{endpoint}';
@@ -315,13 +334,3 @@ def kusto_get_shots(
     """
 
     return _execute(kql_query, cluster_uri, database=database)
-
-
-KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
-DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
-DEFAULT_EMBEDDING_ENDPOINT = os.getenv("AZ_OPENAI_EMBEDDING_ENDPOINT")
-
-DESTRUCTIVE_TOOLS = {
-    kusto_command.__name__,
-    kusto_ingest_inline_into_table.__name__,
-}
