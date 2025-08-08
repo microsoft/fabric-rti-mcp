@@ -9,38 +9,67 @@ This server enables AI agents to interact with Fabric RTI services by providing 
 
 ### 🔍 How It Works
 
-The Fabric RTI MCP Server creates a seamless integration between AI agents and Fabric RTI services through:
+The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabric RTI services:
 
-- 🔄 Smart JSON communication that AI agents understand
-- 🏗️ Natural language commands that get translated to Kql operations
-- 💡 Intelligent parameter suggestions and auto-completion!
-- ⚡ Consistent error handling that makes sense
+- � **MCP Protocol**: Uses the Model Context Protocol to expose Fabric RTI capabilities as tools
+- 🏗️ **Natural Language to KQL**: AI agents can translate natural language requests into KQL queries
+- � **Secure Authentication**: Leverages Azure Identity for seamless, secure access to your resources
+- ⚡ **Real-time Data Access**: Direct connection to Eventhouse and Eventstreams for live data analysis
 
 ### ✨ Supported Services
-- **Eventhouse (Kusto)**: Execute KQL queries against Microsoft Fabric RTI [Eventhouse](https://aka.ms/eventhouse) and [Azure Data Explorer(ADX)](https://aka.ms/adx).
+
+**Eventhouse (Kusto)**: Execute KQL queries against Microsoft Fabric RTI [Eventhouse](https://aka.ms/eventhouse) and [Azure Data Explorer (ADX)](https://aka.ms/adx).
+
+**Eventstreams**: Manage Microsoft Fabric [Eventstreams](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/eventstream/eventstream-introduction) for real-time data processing:
+- List Eventstreams in workspaces
+- Get Eventstream details and definitions
+- Create new Eventstreams
+- Update existing Eventstreams
+- Delete Eventstreams
 
 ## 🚧 Coming soon
 - **Activator**
-- **Eventstreams**
 - **Other RTI items**
 
-### 🔍 Explore your data
+### 🔍 Example Prompts
 
-- "Get databases in Eventhouse'"
+**Eventhouse Analytics:**
+- "Get databases in my Eventhouse"
 - "Sample 10 rows from table 'StormEvents' in Eventhouse"
 - "What can you tell me about StormEvents data?"
-- "Analyze the StormEvents to come up with trend analysis ocross past 10 years of data"
+- "Analyze the StormEvents to come up with trend analysis across past 10 years of data"
 - "Analyze the commands in 'CommandExecution' table and categorize them as low/medium/high risks"
+
+**Eventstream Management:**
+- "List all Eventstreams in my workspace"
+- "Show me the details of my IoT data Eventstream"
+- "Create a new Eventstream for processing sensor data"
+- "Update my existing Eventstream to add a new destination"
 
 
 ### Available tools 
-- List databases
-- List tables
-- Get schema for a table
-- Sample rows from a table
-- Execute query
-- Ingest a csv
-- Get shots
+
+#### Eventhouse (Kusto) - 12 Tools:
+- **`kusto_known_services`** - List all available Kusto services configured in the MCP
+- **`kusto_query`** - Execute KQL queries on the specified database
+- **`kusto_command`** - Execute Kusto management commands (destructive operations)
+- **`kusto_list_databases`** - List all databases in the Kusto cluster
+- **`kusto_list_tables`** - List all tables in a specified database
+- **`kusto_get_entities_schema`** - Get schema information for all entities (tables, materialized views, functions) in a database
+- **`kusto_get_table_schema`** - Get detailed schema information for a specific table
+- **`kusto_get_function_schema`** - Get schema information for a specific function, including parameters and output schema
+- **`kusto_sample_table_data`** - Retrieve random sample records from a specified table
+- **`kusto_sample_function_data`** - Retrieve random sample records from the result of a function call
+- **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
+- **`kusto_get_shots`** - Retrieve semantically similar query examples from a shots table using AI embeddings
+
+#### Eventstreams - 6 Tools:
+- **`list_eventstreams`** - List all Eventstreams in your Fabric workspace
+- **`get_eventstream`** - Get detailed information about a specific Eventstream
+- **`create_eventstream`** - Create new Eventstreams with custom configuration
+- **`update_eventstream`** - Modify existing Eventstream settings and destinations
+- **`delete_eventstream`** - Remove Eventstreams and associated resources
+- **`get_eventstream_definition`** - Retrieve complete JSON definition of an Eventstream
 
 ## Getting Started
 
@@ -80,15 +109,17 @@ The process should end with the below settings in your `settings.json` or your `
                     "microsoft-fabric-rti-mcp"
                 ],
                 "env": {
-                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", // optionally provide cluster URI
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples", // optionally provide database
-                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
+                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples",
+                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate"
                 }
             }
         }
     }
 }
 ```
+
+> **Note**: All environment variables are optional. The `KUSTO_SERVICE_URI` and `KUSTO_SERVICE_DEFAULT_DB` provide default cluster and database settings. The `AZ_OPENAI_EMBEDDING_ENDPOINT` is only needed for semantic search functionality in the `kusto_get_shots` tool.
 
 ### 🔧 Manual Install (Install from source)  
 
@@ -105,7 +136,7 @@ The process should end with the below settings in your `settings.json` or your `
 {
     "mcp": {
         "servers": {
-            "kusto-mcp": {
+            "fabric-rti-mcp": {
                 "command": "uv",
                 "args": [
                     "--directory",
@@ -115,9 +146,9 @@ The process should end with the below settings in your `settings.json` or your `
                     "fabric_rti_mcp.server"
                 ],
                 "env": {
-                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", // optionally provide cluster URI
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples", // optionally provide database
-                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate" // optionally provide Azure OpenAI embedding endpoint (used for semantic search in the get shots tool)
+                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples",
+                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate"
                 }
             }
         }
@@ -139,10 +170,10 @@ Follow the [Manual Install](#🔧-manual-install-install-from-source) instructio
 
 ### Attach the debugger
 Use the `Python: Attach` configuration in your `launch.json` to attach to the running server. 
-Once VS Code picks up the server and starts it, navigate to it's output: 
+Once VS Code picks up the server and starts it, navigate to its output: 
 1. Open command palette (Ctrl+Shift+P) and run the command `MCP: List Servers`
-2. Navigate to `local-fabric-rti-mcp` and select `Show Output`
-3. Pick up the process id (PID) of the server from the output
+2. Navigate to `fabric-rti-mcp` and select `Show Output`
+3. Pick up the process ID (PID) of the server from the output
 4. Run the `Python: Attach` configuration in your `launch.json` file, and paste the PID of the server in the prompt
 5. The debugger will attach to the server process, and you can start debugging
 
@@ -164,11 +195,15 @@ None - the server will work with default settings for demo purposes.
 
 ### Optional Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `KUSTO_SERVICE_URI` | The URI of your Kusto cluster | `https://mycluster.westus.kusto.windows.net` |
-| `KUSTO_SERVICE_DEFAULT_DB` | Default database name for queries | `MyDatabase` |
-| `AZ_OPENAI_EMBEDDING_ENDPOINT` | Custom Azure OpenAI embedding endpoint for semantic search | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate` |
+| Variable | Service | Description | Default | Example |
+|----------|---------|-------------|---------|---------|
+| `KUSTO_SERVICE_URI` | Kusto | Default Kusto cluster URI | None | `https://mycluster.westus.kusto.windows.net` |
+| `KUSTO_SERVICE_DEFAULT_DB` | Kusto | Default database name for Kusto queries | `NetDefaultDB` | `MyDatabase` |
+| `AZ_OPENAI_EMBEDDING_ENDPOINT` | Kusto | Azure OpenAI embedding endpoint for semantic search in `kusto_get_shots` | None | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate` |
+| `KUSTO_KNOWN_SERVICES` | Kusto | JSON array of preconfigured Kusto services | None | `[{"service_uri":"https://cluster1.kusto.windows.net","default_database":"DB1","description":"Prod"}]` |
+| `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
+| `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
+| `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 
 ### Embedding Endpoint Configuration
 
@@ -190,21 +225,21 @@ https://{your-openai-resource}.openai.azure.com/openai/deployments/{deployment-n
 - In case using managed identity, the OpenAI resource must should be configured to accept managed identity authentication
 - The deployment must exist and be accessible
 
-### Configuration of Shots table
-The `get shots` tool retrieves shots that are most similar to your prompt out of the shots table. This function requires configuration of:
-- Shots table that should have "EmbeddingText" (string) column containing the natural language prompt, "AugmentedText" (string) column containing the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector of the EmbeddingText.
-- Azure OpenAI embedding endpoint to create embedding vectors for your prompt. Note that this endpoint must embed using the same model that was used for creating the "EmbeddingVector" column in the Shots table.
+### Configuration of Shots Table
+The `kusto_get_shots` tool retrieves shots that are most similar to your prompt from the shots table. This function requires configuration of:
+- **Shots table**: Should have an "EmbeddingText" (string) column containing the natural language prompt, "AugmentedText" (string) column containing the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector of the EmbeddingText.
+- **Azure OpenAI embedding endpoint**: Used to create embedding vectors for your prompt. Note that this endpoint must use the same model that was used for creating the "EmbeddingVector" column in the shots table.
 
 ## 🔑 Authentication
 
-The MCP Server seamlessly integrates with your host operating system's authentication mechanisms, making it super easy to get started! We use Azure Identity under the hood via [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac), which tries these credentials in order:
+The MCP Server seamlessly integrates with your host operating system's authentication mechanisms. We use Azure Identity via [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac), which tries these authentication methods in order:
 
 1. **Environment Variables** (`EnvironmentCredential`) - Perfect for CI/CD pipelines
-1. **Visual Studio** (`VisualStudioCredential`) - Uses your Visual Studio credentials
-1. **Azure CLI** (`AzureCliCredential`) - Uses your existing Azure CLI login
-1. **Azure PowerShell** (`AzurePowerShellCredential`) - Uses your Az PowerShell login
-1. **Azure Developer CLI** (`AzureDeveloperCliCredential`) - Uses your azd login
-1. **Interactive Browser** (`InteractiveBrowserCredential`) - Falls back to browser-based login if needed
+2. **Visual Studio** (`VisualStudioCredential`) - Uses your Visual Studio credentials
+3. **Azure CLI** (`AzureCliCredential`) - Uses your existing Azure CLI login
+4. **Azure PowerShell** (`AzurePowerShellCredential`) - Uses your Az PowerShell login
+5. **Azure Developer CLI** (`AzureDeveloperCliCredential`) - Uses your azd login
+6. **Interactive Browser** (`InteractiveBrowserCredential`) - Falls back to browser-based login if needed
 
 If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials.
 
