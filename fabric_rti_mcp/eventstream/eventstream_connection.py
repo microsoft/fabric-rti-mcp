@@ -1,10 +1,10 @@
-import os
 from typing import Any, Dict, Optional, cast
 
 import httpx
 from azure.identity import ChainedTokenCredential, DefaultAzureCredential
 
-from fabric_rti_mcp.common import logger, GlobalFabricRTIConfig
+from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
+
 
 class EventstreamConnection:
     """

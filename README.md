@@ -11,9 +11,9 @@ This server enables AI agents to interact with Fabric RTI services by providing 
 
 The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabric RTI services:
 
-- � **MCP Protocol**: Uses the Model Context Protocol to expose Fabric RTI capabilities as tools
+- 🔄 **MCP Protocol**: Uses the Model Context Protocol to expose Fabric RTI capabilities as tools
 - 🏗️ **Natural Language to KQL**: AI agents can translate natural language requests into KQL queries
-- � **Secure Authentication**: Leverages Azure Identity for seamless, secure access to your resources
+- 💡 **Secure Authentication**: Leverages Azure Identity for seamless, secure access to your resources
 - ⚡ **Real-time Data Access**: Direct connection to Eventhouse and Eventstreams for live data analysis
 
 ### ✨ Supported Services
@@ -23,9 +23,6 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 **Eventstreams**: Manage Microsoft Fabric [Eventstreams](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/eventstream/eventstream-introduction) for real-time data processing:
 - List Eventstreams in workspaces
 - Get Eventstream details and definitions
-- Create new Eventstreams
-- Update existing Eventstreams
-- Delete Eventstreams
 
 ## 🚧 Coming soon
 - **Activator**
@@ -43,8 +40,6 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 **Eventstream Management:**
 - "List all Eventstreams in my workspace"
 - "Show me the details of my IoT data Eventstream"
-- "Create a new Eventstream for processing sensor data"
-- "Update my existing Eventstream to add a new destination"
 
 
 ### Available tools 
@@ -66,9 +61,6 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 #### Eventstreams - 6 Tools:
 - **`list_eventstreams`** - List all Eventstreams in your Fabric workspace
 - **`get_eventstream`** - Get detailed information about a specific Eventstream
-- **`create_eventstream`** - Create new Eventstreams with custom configuration
-- **`update_eventstream`** - Modify existing Eventstream settings and destinations
-- **`delete_eventstream`** - Remove Eventstreams and associated resources
 - **`get_eventstream_definition`** - Retrieve complete JSON definition of an Eventstream
 
 ## Getting Started
