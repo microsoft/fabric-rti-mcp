@@ -1,10 +1,9 @@
-import os
 from typing import Any, Dict, Optional, cast
 
 import httpx
 from azure.identity import ChainedTokenCredential, DefaultAzureCredential
 
-from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
 
 
 class EventstreamConnection:
@@ -16,7 +15,8 @@ class EventstreamConnection:
     def __init__(self, api_base_url: Optional[str] = None):
         # Use environment variable if provided, otherwise use parameter or default
         if api_base_url is None:
-            api_base_url = os.environ.get("FABRIC_API_BASE_URL", "https://api.fabric.microsoft.com/v1")
+            config = GlobalFabricRTIConfig.from_env()
+            api_base_url = config.fabric_api_base
 
         self.api_base_url = api_base_url.rstrip("/")
         self.credential = self._get_credential()
