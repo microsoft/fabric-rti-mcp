@@ -116,13 +116,13 @@ def test_execute_json_parse_error_includes_correlation_id(
 
 @patch("fabric_rti_mcp.kusto.kusto_service.logger")
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
-def test_correlation_id_is_logged(
+def test_successful_operations_do_not_log_correlation_id(
     mock_get_kusto_connection: Mock,
     mock_logger: Mock,
     sample_cluster_uri: str,
     mock_kusto_response: KustoResponseDataSet,
 ) -> None:
-    """Test that correlation ID is logged for tracing purposes."""
+    """Test that successful operations do not log correlation IDs (only errors do)."""
     # Arrange
     mock_client = MagicMock()
     mock_client.execute.return_value = mock_kusto_response
@@ -137,9 +137,6 @@ def test_correlation_id_is_logged(
     # Act
     kusto_query(query, sample_cluster_uri)
 
-    # Assert - verify correlation ID is logged
-    assert mock_logger.info.called
-    log_call_args = mock_logger.info.call_args_list[0][0][0]
-    assert "correlation ID:" in log_call_args
-    assert "KFRTI_MCP.kusto_query:" in log_call_args
-    assert "kusto_query" in log_call_args
+    # Assert - verify no info or debug logging occurs for successful operations
+    assert not mock_logger.info.called
+    assert not mock_logger.debug.called

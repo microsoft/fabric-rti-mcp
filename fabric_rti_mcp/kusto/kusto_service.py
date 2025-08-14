@@ -116,8 +116,6 @@ def _execute(
     crp = _crp(action_name, is_destructive, readonly_override)
     correlation_id = crp.client_request_id  # type: ignore
 
-    logger.info(f"Executing Kusto operation '{action_name}' with correlation ID: {correlation_id}")
-
     try:
         connection = get_kusto_connection(cluster_uri)
         client = connection.query_client
@@ -128,10 +126,7 @@ def _execute(
         database = database or connection.default_database
         database = database.strip()
 
-        logger.debug(f"Executing query on database '{database}' with correlation ID: {correlation_id}")
         result_set = client.execute(database, query, crp)
-
-        logger.debug(f"Query execution completed successfully with correlation ID: {correlation_id}")
         return format_results(result_set)
 
     except Exception as e:
