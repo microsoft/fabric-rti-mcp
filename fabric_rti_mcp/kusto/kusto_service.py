@@ -12,7 +12,6 @@ from azure.kusto.data import (
 )
 
 from fabric_rti_mcp import __version__  # type: ignore
-from fabric_rti_mcp.common import config
 from fabric_rti_mcp.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
@@ -100,9 +99,9 @@ def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequ
         crp.set_option("request_readonly", True)
 
     # Set global timeout if configured
-    if config.kusto_timeout_seconds is not None:
+    if CONFIG.timeout_seconds is not None:
         # Convert seconds to timespan format (HH:MM:SS)
-        hours, remainder = divmod(config.kusto_timeout_seconds, 3600)
+        hours, remainder = divmod(CONFIG.timeout_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         crp.set_option("servertimeout", timeout_str)

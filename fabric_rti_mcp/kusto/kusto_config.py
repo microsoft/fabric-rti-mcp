@@ -24,6 +24,7 @@ class KustoEnvVarNames:
     known_services = "KUSTO_KNOWN_SERVICES"
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
+    timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
 
     @staticmethod
     def all() -> List[str]:
@@ -35,6 +36,7 @@ class KustoEnvVarNames:
             KustoEnvVarNames.known_services,
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
+            KustoEnvVarNames.timeout,
         ]
 
 
@@ -52,6 +54,8 @@ class KustoConfig:
     # Security setting to allow unknown services. If this is set to False,
     # only services in known_services will be allowed.
     allow_unknown_services: bool = True
+    # Global timeout for all Kusto operations in seconds
+    timeout_seconds: Optional[int] = None
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -72,6 +76,16 @@ class KustoConfig:
         eager_connect = os.getenv(KustoEnvVarNames.eager_connect, "false").lower() in ("true", "1")
         allow_unknown_services = os.getenv(KustoEnvVarNames.allow_unknown_services, "true").lower() in ("true", "1")
 
+        # Parse timeout configuration
+        timeout_seconds = None
+        timeout_env = os.getenv(KustoEnvVarNames.timeout)
+        if timeout_env:
+            try:
+                timeout_seconds = int(timeout_env)
+            except ValueError:
+                # Ignore invalid timeout values
+                pass
+
         if known_services_string:
             try:
                 known_services_json = json.loads(known_services_string)
@@ -80,7 +94,7 @@ class KustoConfig:
                 logger.error(f"Failed to parse {KustoEnvVarNames.known_services}: {e}. Skipping known services.")
 
         return KustoConfig(
-            default_service, open_ai_embedding_endpoint, known_services, eager_connect, allow_unknown_services
+            default_service, open_ai_embedding_endpoint, known_services, eager_connect, allow_unknown_services, timeout_seconds
         )
 
     @staticmethod
