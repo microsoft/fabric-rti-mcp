@@ -34,7 +34,7 @@ class GlobalFabricRTIConfig:
 
         return GlobalFabricRTIConfig(
             fabric_api_base=os.getenv(GlobalFabricRTIEnvVarNames.default_fabric_api_base, DEFAULT_FABRIC_API_BASE),
-            kusto_timeout_seconds=kusto_timeout_seconds
+            kusto_timeout_seconds=kusto_timeout_seconds,
         )
 
     @staticmethod

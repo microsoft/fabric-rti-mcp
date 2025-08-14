@@ -5,28 +5,28 @@ from unittest.mock import Mock, patch
 
 from azure.kusto.data import ClientRequestProperties
 
-from fabric_rti_mcp.common import Config, config
+from fabric_rti_mcp.common import GlobalFabricRTIConfig
 from fabric_rti_mcp.kusto.kusto_service import kusto_query
 
 
 def test_config_loads_timeout_from_env() -> None:
     """Test that Config loads timeout from FABRIC_RTI_KUSTO_TIMEOUT environment variable."""
     with patch.dict(os.environ, {"FABRIC_RTI_KUSTO_TIMEOUT": "300"}):
-        test_config = Config()
+        test_config = GlobalFabricRTIConfig.from_env()
         assert test_config.kusto_timeout_seconds == 300
 
 
 def test_config_handles_invalid_timeout() -> None:
     """Test that Config handles invalid timeout values gracefully."""
     with patch.dict(os.environ, {"FABRIC_RTI_KUSTO_TIMEOUT": "invalid"}):
-        test_config = Config()
+        test_config = GlobalFabricRTIConfig.from_env()
         assert test_config.kusto_timeout_seconds is None
 
 
 def test_config_no_timeout_env() -> None:
     """Test that Config handles missing environment variable."""
     with patch.dict(os.environ, {}, clear=True):
-        test_config = Config()
+        test_config = GlobalFabricRTIConfig.from_env()
         assert test_config.kusto_timeout_seconds is None
 
 
@@ -44,8 +44,9 @@ def test_global_timeout_applied_to_query(mock_format_results: Mock, mock_get_con
     # Mock format_results to return expected result
     mock_format_results.return_value = [{"test": "result"}]
 
-    # Mock config with timeout
-    with patch.object(config, 'kusto_timeout_seconds', 600):
+    # Mock the global config with timeout
+    with patch("fabric_rti_mcp.kusto.kusto_service.config") as mock_config:
+        mock_config.kusto_timeout_seconds = 600
         kusto_query("TestQuery", "https://test.kusto.windows.net")
 
     # Verify that execute was called with ClientRequestProperties
@@ -74,8 +75,9 @@ def test_no_timeout_when_not_configured(mock_format_results: Mock, mock_get_conn
     # Mock format_results to return expected result
     mock_format_results.return_value = [{"test": "result"}]
 
-    # Mock config without timeout
-    with patch.object(config, 'kusto_timeout_seconds', None):
+    # Mock the global config without timeout
+    with patch("fabric_rti_mcp.kusto.kusto_service.config") as mock_config:
+        mock_config.kusto_timeout_seconds = None
         kusto_query("TestQuery", "https://test.kusto.windows.net")
 
     # Verify that execute was called with ClientRequestProperties

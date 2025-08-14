@@ -98,7 +98,7 @@ def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequ
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
     if not is_destructive and not ignore_readonly:
         crp.set_option("request_readonly", True)
-    
+
     # Set global timeout if configured
     if config.kusto_timeout_seconds is not None:
         # Convert seconds to timespan format (HH:MM:SS)
@@ -106,7 +106,7 @@ def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequ
         minutes, seconds = divmod(remainder, 60)
         timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         crp.set_option("servertimeout", timeout_str)
-    
+
     return crp
 
 
