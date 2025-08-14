@@ -91,12 +91,20 @@ def destructive_operation(func: F) -> F:
     return wrapper  # type: ignore
 
 
-def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequestProperties:
+def _crp(
+    action: str, is_destructive: bool, ignore_readonly: bool, additional_properties: Optional[Dict[str, Any]] = None
+) -> ClientRequestProperties:
     crp: ClientRequestProperties = ClientRequestProperties()
     crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
     if not is_destructive and not ignore_readonly:
         crp.set_option("request_readonly", True)
+
+    # Apply any additional properties provided by the user
+    if additional_properties:
+        for key, value in additional_properties.items():
+            crp.set_option(key, value)
+
     return crp
 
 
@@ -105,6 +113,7 @@ def _execute(
     cluster_uri: str,
     readonly_override: bool = False,
     database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
@@ -120,7 +129,7 @@ def _execute(
     database = database or connection.default_database
     database = database.strip()
 
-    crp = _crp(action_name, is_destructive, readonly_override)
+    crp = _crp(action_name, is_destructive, readonly_override, client_request_properties)
     result_set = client.execute(database, query, crp)
     return format_results(result_set)
 
@@ -137,7 +146,12 @@ def kusto_known_services() -> List[Dict[str, str]]:
     return [asdict(service) for service in services]
 
 
-def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
+def kusto_query(
+    query: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """
     Executes a KQL query on the specified database. If no database is provided,
     it will use the default database.
@@ -145,13 +159,19 @@ def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) ->
     :param query: The KQL query to execute.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: The result of the query execution as a list of dictionaries (json).
     """
-    return _execute(query, cluster_uri, database=database)
+    return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
 @destructive_operation
-def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
+def kusto_command(
+    command: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
     it will use the default database.
@@ -159,39 +179,54 @@ def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None
     :param command: The kusto management command to execute.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: The result of the command execution as a list of dictionaries (json).
     """
-    return _execute(command, cluster_uri, database=database)
+    return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
-def kusto_list_databases(cluster_uri: str) -> List[Dict[str, Any]]:
+def kusto_list_databases(
+    cluster_uri: str,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """
     Retrieves a list of all databases in the Kusto cluster.
 
     :param cluster_uri: The URI of the Kusto cluster.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing database information.
     """
-    return _execute(".show databases", cluster_uri)
+    return _execute(".show databases", cluster_uri, client_request_properties=client_request_properties)
 
 
-def kusto_list_tables(cluster_uri: str, database: str) -> List[Dict[str, Any]]:
+def kusto_list_tables(
+    cluster_uri: str,
+    database: str,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """
     Retrieves a list of all tables in the specified database.
 
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: The name of the database to list tables from.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing table information.
     """
-    return _execute(".show tables", cluster_uri, database=database)
+    return _execute(".show tables", cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
-def kusto_get_entities_schema(cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
+def kusto_get_entities_schema(
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """
     Retrieves schema information for all entities (tables, materialized views, functions)
     in the specified database. If no database is provided, uses the default database.
 
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing entity schema information.
     """
     return _execute(
@@ -200,10 +235,16 @@ def kusto_get_entities_schema(cluster_uri: str, database: Optional[str] = None) 
         "| project EntityName, EntityType, Folder, DocString",
         cluster_uri,
         database=database,
+        client_request_properties=client_request_properties,
     )
 
 
-def kusto_get_table_schema(table_name: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
+def kusto_get_table_schema(
+    table_name: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """
     Retrieves the schema information for a specific table in the specified database.
     If no database is provided, uses the default database.
@@ -211,13 +252,22 @@ def kusto_get_table_schema(table_name: str, cluster_uri: str, database: Optional
     :param table_name: Name of the table to get schema for.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing table schema information.
     """
-    return _execute(f".show table {table_name} cslschema", cluster_uri, database=database)
+    return _execute(
+        f".show table {table_name} cslschema",
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+    )
 
 
 def kusto_get_function_schema(
-    function_name: str, cluster_uri: str, database: Optional[str] = None
+    function_name: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Retrieves schema information for a specific function, including parameters and output schema.
@@ -226,9 +276,15 @@ def kusto_get_function_schema(
     :param function_name: Name of the function to get schema for.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing function schema information.
     """
-    return _execute(f".show function {function_name}", cluster_uri, database=database)
+    return _execute(
+        f".show function {function_name}",
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+    )
 
 
 def kusto_sample_table_data(
@@ -236,6 +292,7 @@ def kusto_sample_table_data(
     cluster_uri: str,
     sample_size: int = 10,
     database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Retrieves a random sample of records from the specified table.
@@ -245,9 +302,15 @@ def kusto_sample_table_data(
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of records to sample. Defaults to 10.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing sampled records.
     """
-    return _execute(f"{table_name} | sample {sample_size}", cluster_uri, database=database)
+    return _execute(
+        f"{table_name} | sample {sample_size}",
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+    )
 
 
 def kusto_sample_function_data(
@@ -255,6 +318,7 @@ def kusto_sample_function_data(
     cluster_uri: str,
     sample_size: int = 10,
     database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Retrieves a random sample of records from the result of a function call.
@@ -264,12 +328,14 @@ def kusto_sample_function_data(
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of records to sample. Defaults to 10.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing sampled records.
     """
     return _execute(
         f"{function_call_with_params} | sample {sample_size}",
         cluster_uri,
         database=database,
+        client_request_properties=client_request_properties,
     )
 
 
@@ -279,6 +345,7 @@ def kusto_ingest_inline_into_table(
     data_comma_separator: str,
     cluster_uri: str,
     database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Ingests inline CSV data into a specified table. The data should be provided as a comma-separated string.
@@ -288,12 +355,14 @@ def kusto_ingest_inline_into_table(
     :param data_comma_separator: Comma-separated data string to ingest.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing the ingestion result.
     """
     return _execute(
         f".ingest inline into table {table_name} <| {data_comma_separator}",
         cluster_uri,
         database=database,
+        client_request_properties=client_request_properties,
     )
 
 
@@ -304,6 +373,7 @@ def kusto_get_shots(
     sample_size: int = 3,
     database: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
@@ -319,6 +389,7 @@ def kusto_get_shots(
     :param embedding_endpoint: Optional endpoint for the embedding model to use. If not provided, uses the
                              AZ_OPENAI_EMBEDDING_ENDPOINT environment variable. If no valid endpoint is set,
                              this function should not be called.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing the shots records.
     """
     # Use provided endpoint, or fall back to environment variable, or use default
@@ -333,4 +404,4 @@ def kusto_get_shots(
         | project similarity, EmbeddingText, AugmentedText
     """
 
-    return _execute(kql_query, cluster_uri, database=database)
+    return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
