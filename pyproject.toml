@@ -36,11 +36,21 @@ dev = [
 [project.scripts]
 microsoft-fabric-rti-mcp = "fabric_rti_mcp.server:main"
 
+[project.urls]
+Homepage = "https://github.com/microsoft/fabric-rti-mcp"
+Repository = "https://github.com/microsoft/fabric-rti-mcp"
+Issues = "https://github.com/microsoft/fabric-rti-mcp/issues"
+Documentation = "https://github.com/microsoft/fabric-rti-mcp#readme"
+
 [tool.setuptools]
 packages = ["fabric_rti_mcp"]
 
 [tool.setuptools.package-data]
 fabric_rti_mcp = ["bin/*"]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
