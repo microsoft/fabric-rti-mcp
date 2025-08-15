@@ -97,6 +97,15 @@ def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequ
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
     if not is_destructive and not ignore_readonly:
         crp.set_option("request_readonly", True)
+
+    # Set global timeout if configured
+    if CONFIG.timeout_seconds is not None:
+        # Convert seconds to timespan format (HH:MM:SS)
+        hours, remainder = divmod(CONFIG.timeout_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        crp.set_option("servertimeout", timeout_str)
+
     return crp
 
 
@@ -217,7 +226,9 @@ def kusto_get_table_schema(table_name: str, cluster_uri: str, database: Optional
 
 
 def kusto_get_function_schema(
-    function_name: str, cluster_uri: str, database: Optional[str] = None
+    function_name: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Retrieves schema information for a specific function, including parameters and output schema.
