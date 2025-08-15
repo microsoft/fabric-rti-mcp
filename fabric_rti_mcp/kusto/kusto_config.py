@@ -94,7 +94,12 @@ class KustoConfig:
                 logger.error(f"Failed to parse {KustoEnvVarNames.known_services}: {e}. Skipping known services.")
 
         return KustoConfig(
-            default_service, open_ai_embedding_endpoint, known_services, eager_connect, allow_unknown_services, timeout_seconds
+            default_service,
+            open_ai_embedding_endpoint,
+            known_services,
+            eager_connect,
+            allow_unknown_services,
+            timeout_seconds,
         )
 
     @staticmethod
