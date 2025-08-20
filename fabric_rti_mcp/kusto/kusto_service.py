@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import random
 import uuid
 from dataclasses import asdict
 from typing import Any, Callable, Dict, List, Optional, TypeVar
@@ -18,6 +19,188 @@ from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
 
 _DEFAULT_DB_NAME = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 CONFIG = KustoConfig.from_env()
+
+
+class KustoElicitationError(Exception):
+    """Exception raised when user interaction is needed to resolve missing parameters."""
+
+    def __init__(self, message: str, available_options: List[Dict[str, Any]], parameter_type: str):
+        super().__init__(message)
+        self.available_options = available_options
+        self.parameter_type = parameter_type
+
+
+class KustoSamplingError(Exception):
+    """Exception raised when automatic sampling fails and fallback is needed."""
+
+    def __init__(self, message: str, attempted_sample: Optional[str] = None):
+        super().__init__(message)
+        self.attempted_sample = attempted_sample
+
+
+def _sample_cluster_from_known_services(context_query: Optional[str] = None) -> Optional[str]:
+    """
+    Sample a cluster URI from known services based on context.
+
+    :param context_query: Optional query text to help with selection
+    :return: Selected cluster URI or None if no services available
+    """
+    known_services = KustoConfig.get_known_services()
+    if not known_services:
+        return None
+
+    services_list = list(known_services.values())
+
+    # If only one service, return it
+    if len(services_list) == 1:
+        return services_list[0].service_uri
+
+    # For multiple services, try context-based selection
+    if context_query and "sample" in context_query.lower():
+        # Prefer services with "samples" or "demo" in description
+        for service in services_list:
+            if service.description and any(
+                keyword in service.description.lower() for keyword in ["sample", "demo", "test", "example"]
+            ):
+                return service.service_uri
+
+    # Fallback to default service if available
+    if CONFIG.default_service:
+        return CONFIG.default_service.service_uri
+
+    # Random sampling as last resort
+    return random.choice(services_list).service_uri
+
+
+def _elicit_cluster_selection() -> str:
+    """
+    Elicit cluster selection from user when no cluster_uri is provided.
+
+    :return: Never returns, always raises KustoElicitationError
+    :raises KustoElicitationError: Always raised to prompt user for cluster selection
+    """
+    known_services = KustoConfig.get_known_services()
+
+    if not known_services:
+        available_options = []
+        message = (
+            "No Kusto cluster URI provided and no known services are configured. "
+            "Please provide a cluster_uri parameter (e.g., 'https://mycluster.kusto.windows.net') "
+            "or configure known services via KUSTO_KNOWN_SERVICES environment variable."
+        )
+    else:
+        available_options = [
+            {
+                "service_uri": service.service_uri,
+                "description": service.description or "No description",
+                "default_database": service.default_database or _DEFAULT_DB_NAME,
+            }
+            for service in known_services.values()
+        ]
+
+        service_list = ", ".join([f"'{s['service_uri']}'" for s in available_options])
+        message = (
+            f"No Kusto cluster URI provided. Please specify one of the available clusters: {service_list}. "
+            "Or provide a custom cluster_uri parameter."
+        )
+
+    raise KustoElicitationError(message, available_options, "cluster_uri")
+
+
+def _sample_database_from_cluster(cluster_uri: str, context_query: Optional[str] = None) -> Optional[str]:
+    """
+    Sample a database from available databases in the cluster.
+
+    :param cluster_uri: The cluster to query for databases
+    :param context_query: Optional query text to help with selection
+    :return: Selected database name or None if sampling fails
+    """
+    try:
+        # Get list of databases from cluster
+        databases = _execute(".show databases", cluster_uri)
+
+        if not databases:
+            return None
+
+        # Extract database names and ensure they are strings
+        db_names: List[str] = []
+        for db in databases:
+            db_name = db.get("DatabaseName")
+            if isinstance(db_name, str) and db_name.strip():
+                db_names.append(db_name)
+
+        if not db_names:
+            return None
+
+        # If only one database, return it
+        if len(db_names) == 1:
+            return db_names[0]
+
+        # Context-based selection
+        if context_query:
+            query_lower = context_query.lower()
+
+            # Look for database hints in the query
+            for db_name in db_names:
+                if db_name.lower() in query_lower:
+                    return db_name
+
+            # Prefer common database names for samples/demos
+            if any(keyword in query_lower for keyword in ["sample", "demo", "test", "example"]):
+                for db_name in db_names:
+                    if any(keyword in db_name.lower() for keyword in ["sample", "demo", "test", "example"]):
+                        return db_name
+
+        # Random sampling as fallback
+        return random.choice(db_names)
+
+    except Exception:
+        # If we can't query databases, return None to trigger elicitation
+        return None
+
+
+def _elicit_database_selection(cluster_uri: str) -> str:
+    """
+    Elicit database selection from user when no database is specified.
+
+    :param cluster_uri: The cluster URI to get database list from
+    :return: Never returns, always raises KustoElicitationError
+    :raises KustoElicitationError: Always raised to prompt user for database selection
+    """
+    try:
+        # Try to get available databases
+        databases = _execute(".show databases", cluster_uri)
+        available_options = [
+            {
+                "database_name": db.get("DatabaseName", ""),
+                "size_mb": db.get("TotalExtentSize", 0),
+                "description": f"Database on {cluster_uri}",
+            }
+            for db in databases
+            if db.get("DatabaseName")
+        ]
+
+        if available_options:
+            db_list = ", ".join([f"'{db['database_name']}'" for db in available_options])
+            message = (
+                f"No database specified and no default configured for cluster {cluster_uri}. "
+                f"Available databases: {db_list}. Please specify a database parameter."
+            )
+        else:
+            available_options = []
+            message = (
+                f"No database specified and unable to list databases for cluster {cluster_uri}. "
+                "Please specify a database parameter."
+            )
+
+    except Exception:
+        available_options = []
+        message = (
+            f"No database specified and unable to connect to cluster {cluster_uri} to list databases. "
+            "Please specify a database parameter."
+        )
+
+    raise KustoElicitationError(message, available_options, "database")
 
 
 class KustoConnectionManager:
@@ -71,6 +254,31 @@ if CONFIG.eager_connect:
 def get_kusto_connection(cluster_uri: str) -> KustoConnection:
     # Nicety to allow for easier mocking in tests.
     return _CONNECTION_MANAGER.get(cluster_uri)
+
+
+def get_kusto_connection_with_elicitation(
+    cluster_uri: Optional[str] = None, context_query: Optional[str] = None
+) -> KustoConnection:
+    """
+    Get a Kusto connection with elicitation and sampling support.
+
+    :param cluster_uri: Optional cluster URI. If None, will attempt sampling or elicitation
+    :param context_query: Optional query context to help with intelligent sampling
+    :return: KustoConnection instance
+    :raises KustoElicitationError: When user input is needed for cluster selection
+    """
+    if cluster_uri is None:
+        # Try sampling from known services first
+        sampled_uri = _sample_cluster_from_known_services(context_query)
+        if sampled_uri:
+            cluster_uri = sampled_uri
+        else:
+            # No sampling possible, elicit user choice
+            _elicit_cluster_selection()  # This will always raise KustoElicitationError
+            # This line should never be reached due to the exception above
+            raise RuntimeError("Elicitation should have raised KustoElicitationError")
+
+    return get_kusto_connection(cluster_uri)
 
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -127,6 +335,65 @@ def _execute(
     query = query.strip()
 
     database = database or connection.default_database
+    database = database.strip()
+
+    crp = _crp(action_name, is_destructive, readonly_override)
+    result_set = client.execute(database, query, crp)
+    return format_results(result_set)
+
+
+def _execute_with_elicitation(
+    query: str,
+    cluster_uri: Optional[str] = None,
+    readonly_override: bool = False,
+    database: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Execute a query with elicitation and sampling support for missing parameters.
+
+    :param query: The KQL query to execute
+    :param cluster_uri: Optional cluster URI. If None, will attempt sampling or elicitation
+    :param readonly_override: Whether to override read-only settings
+    :param database: Optional database name. If None, will attempt sampling or elicitation
+    :return: Query results
+    :raises KustoElicitationError: When user input is needed for parameter resolution
+    """
+    caller_frame = inspect.currentframe().f_back  # type: ignore
+    action_name = caller_frame.f_code.co_name  # type: ignore
+    caller_func = caller_frame.f_globals.get(action_name)  # type: ignore
+    is_destructive = hasattr(caller_func, "_is_destructive")
+
+    # Handle cluster_uri elicitation/sampling
+    if cluster_uri is None:
+        sampled_uri = _sample_cluster_from_known_services(query)
+        if sampled_uri:
+            cluster_uri = sampled_uri
+        else:
+            _elicit_cluster_selection()  # This will always raise KustoElicitationError
+            # This line should never be reached due to the exception above
+            raise RuntimeError("Elicitation should have raised KustoElicitationError")
+
+    # At this point cluster_uri is guaranteed to be a string
+    connection = get_kusto_connection(cluster_uri)
+    client = connection.query_client
+
+    # agents can send messy inputs
+    query = query.strip()
+
+    # Handle database elicitation/sampling
+    if database is None:
+        database = connection.default_database
+        if not database or database == _DEFAULT_DB_NAME:
+            # Try sampling from available databases
+            sampled_db = _sample_database_from_cluster(cluster_uri, query)
+            if sampled_db:
+                database = sampled_db
+            else:
+                # No sampling possible, elicit user choice
+                _elicit_database_selection(cluster_uri)  # This will always raise KustoElicitationError
+                # This line should never be reached due to the exception above
+                raise RuntimeError("Elicitation should have raised KustoElicitationError")
+
     database = database.strip()
 
     crp = _crp(action_name, is_destructive, readonly_override)
@@ -345,3 +612,64 @@ def kusto_get_shots(
     """
 
     return _execute(kql_query, cluster_uri, database=database)
+
+
+def kusto_query_with_elicitation(
+    query: str, cluster_uri: Optional[str] = None, database: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Executes a KQL query with elicitation and sampling support for missing parameters.
+    If cluster_uri or database are not provided, the system will attempt to sample
+    from available options or elicit user choice.
+
+    :param query: The KQL query to execute.
+    :param cluster_uri: Optional URI of the Kusto cluster. If not provided, will attempt
+                       sampling from known services or elicit user choice.
+    :param database: Optional database name. If not provided, will attempt sampling
+                    from available databases or elicit user choice.
+    :return: The result of the query execution as a list of dictionaries (json).
+    :raises KustoElicitationError: When user input is needed to resolve missing parameters.
+    """
+    return _execute_with_elicitation(query, cluster_uri, database=database)
+
+
+def kusto_sample_data_with_elicitation(
+    table_name: str,
+    cluster_uri: Optional[str] = None,
+    sample_size: int = 10,
+    database: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Retrieves a random sample of records from the specified table with elicitation support.
+    If cluster_uri or database are not provided, the system will attempt to sample
+    from available options or elicit user choice.
+
+    :param table_name: Name of the table to sample data from.
+    :param cluster_uri: Optional URI of the Kusto cluster. If not provided, will attempt
+                       sampling from known services or elicit user choice.
+    :param sample_size: Number of records to sample. Defaults to 10.
+    :param database: Optional database name. If not provided, will attempt sampling
+                    from available databases or elicit user choice.
+    :return: List of dictionaries containing sampled records.
+    :raises KustoElicitationError: When user input is needed to resolve missing parameters.
+    """
+    return _execute_with_elicitation(f"{table_name} | sample {sample_size}", cluster_uri, database=database)
+
+
+def kusto_explore_with_elicitation(
+    cluster_uri: Optional[str] = None,
+    database: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Explores available tables in a database with elicitation support.
+    If cluster_uri or database are not provided, the system will attempt to sample
+    from available options or elicit user choice.
+
+    :param cluster_uri: Optional URI of the Kusto cluster. If not provided, will attempt
+                       sampling from known services or elicit user choice.
+    :param database: Optional database name. If not provided, will attempt sampling
+                    from available databases or elicit user choice.
+    :return: List of dictionaries containing table information.
+    :raises KustoElicitationError: When user input is needed to resolve missing parameters.
+    """
+    return _execute_with_elicitation(".show tables", cluster_uri, database=database)

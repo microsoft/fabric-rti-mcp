@@ -53,3 +53,15 @@ def register_tools(mcp: FastMCP) -> None:
         kusto_service.kusto_get_shots,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
     )
+    mcp.add_tool(
+        kusto_service.kusto_query_with_elicitation,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_sample_data_with_elicitation,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_explore_with_elicitation,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
