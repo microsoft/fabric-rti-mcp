@@ -28,7 +28,14 @@ def main() -> None:
     # import later to allow for environment variables to be set from command line
     mcp = FastMCP("fabric-rti-mcp-server")
     register_tools(mcp)
+
     mcp.run(transport="stdio")
+
+    # If the MCP server needs to be run on a localhost to be accessed by other tools,
+    # comment the above mcp.run(transport="stdio") line and uncomment the command below.
+    # This will provide a hostable HTTP endpoint that can be used by multiple applications,
+    # not just GitHub Copilot Chat in VS Code.
+    mcp.run(transport="streamable-http")
 
 
 if __name__ == "__main__":
