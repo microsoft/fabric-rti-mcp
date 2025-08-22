@@ -12,6 +12,7 @@ from azure.kusto.data import (
 )
 
 from fabric_rti_mcp import __version__  # type: ignore
+from fabric_rti_mcp.common import logger
 from fabric_rti_mcp.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
@@ -100,7 +101,15 @@ def _crp(
     if not is_destructive and not ignore_readonly:
         crp.set_option("request_readonly", True)
 
-    # Apply any additional properties provided by the user
+    # Set global timeout if configured
+    if CONFIG.timeout_seconds is not None:
+        # Convert seconds to timespan format (HH:MM:SS)
+        hours, remainder = divmod(CONFIG.timeout_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        crp.set_option("servertimeout", timeout_str)
+
+    # Apply any additional properties provided by the user (can override global settings)
     if additional_properties:
         for key, value in additional_properties.items():
             crp.set_option(key, value)
@@ -120,18 +129,27 @@ def _execute(
     caller_func = caller_frame.f_globals.get(action_name)  # type: ignore
     is_destructive = hasattr(caller_func, "_is_destructive")
 
-    connection = get_kusto_connection(cluster_uri)
-    client = connection.query_client
-
-    # agents can send messy inputs
-    query = query.strip()
-
-    database = database or connection.default_database
-    database = database.strip()
-
+    # Generate correlation ID for tracing
     crp = _crp(action_name, is_destructive, readonly_override, client_request_properties)
-    result_set = client.execute(database, query, crp)
-    return format_results(result_set)
+    correlation_id = crp.client_request_id  # type: ignore
+
+    try:
+        connection = get_kusto_connection(cluster_uri)
+        client = connection.query_client
+
+        # agents can send messy inputs
+        query = query.strip()
+
+        database = database or connection.default_database
+        database = database.strip()
+
+        result_set = client.execute(database, query, crp)
+        return format_results(result_set)
+
+    except Exception as e:
+        error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg) from e
 
 
 # NOTE: This is temporary. The intent is to not use environment variables for persistency.

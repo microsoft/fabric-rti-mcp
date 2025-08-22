@@ -21,10 +21,14 @@ class GlobalFabricRTIConfig:
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
         return GlobalFabricRTIConfig(
-            fabric_api_base=os.getenv(GlobalFabricRTIEnvVarNames.default_fabric_api_base, DEFAULT_FABRIC_API_BASE)
+            fabric_api_base=os.getenv(GlobalFabricRTIEnvVarNames.default_fabric_api_base, DEFAULT_FABRIC_API_BASE),
         )
 
     @staticmethod
     def existing_env_vars() -> list[str]:
         """Return a list of environment variable names that are currently set."""
         return [GlobalFabricRTIEnvVarNames.default_fabric_api_base]
+
+
+# Global configuration instance
+config = GlobalFabricRTIConfig.from_env()
