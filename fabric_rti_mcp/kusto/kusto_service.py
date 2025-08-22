@@ -12,6 +12,7 @@ from azure.kusto.data import (
 )
 
 from fabric_rti_mcp import __version__  # type: ignore
+from fabric_rti_mcp.common import logger
 from fabric_rti_mcp.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
@@ -120,18 +121,27 @@ def _execute(
     caller_func = caller_frame.f_globals.get(action_name)  # type: ignore
     is_destructive = hasattr(caller_func, "_is_destructive")
 
-    connection = get_kusto_connection(cluster_uri)
-    client = connection.query_client
-
-    # agents can send messy inputs
-    query = query.strip()
-
-    database = database or connection.default_database
-    database = database.strip()
-
+    # Generate correlation ID for tracing
     crp = _crp(action_name, is_destructive, readonly_override)
-    result_set = client.execute(database, query, crp)
-    return format_results(result_set)
+    correlation_id = crp.client_request_id  # type: ignore
+
+    try:
+        connection = get_kusto_connection(cluster_uri)
+        client = connection.query_client
+
+        # agents can send messy inputs
+        query = query.strip()
+
+        database = database or connection.default_database
+        database = database.strip()
+
+        result_set = client.execute(database, query, crp)
+        return format_results(result_set)
+
+    except Exception as e:
+        error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg) from e
 
 
 # NOTE: This is temporary. The intent is to not use environment variables for persistency.
