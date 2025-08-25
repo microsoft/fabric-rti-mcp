@@ -3,6 +3,9 @@
     "python.testing.pytestArgs": [],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
+    "cSpell.words": [
+        "Eventstream"
+    ],
     "mcp": {
         "servers": {
             "fabric-rti-mcp": {
@@ -17,7 +20,7 @@
                 "env": {
                     "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/",
                     "KUSTO_DATABASE": "Datasets",
-                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
+                    "FABRIC_API_BASE_URL": "https://dailyapi.fabric.microsoft.com/v1"
                 }
             }
         }

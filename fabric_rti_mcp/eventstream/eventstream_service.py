@@ -7,17 +7,16 @@ Uses Azure Identity for transparent authentication (consistent with Kusto module
 import asyncio
 import base64
 import json
-import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Coroutine
+from typing import Any, Coroutine, Dict, List, Optional
 
-from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
 from fabric_rti_mcp.eventstream.eventstream_connection import EventstreamConnection
 
 # Microsoft Fabric API configuration
-DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
 DEFAULT_TIMEOUT = 30
+FABRIC_CONFIG = GlobalFabricRTIConfig.from_env()
 
 
 def get_fabric_api_base() -> str:
@@ -25,7 +24,7 @@ def get_fabric_api_base() -> str:
     Get the Fabric API base URL from environment variable.
     Falls back to default if not set.
     """
-    return os.environ.get("FABRIC_API_BASE_URL", DEFAULT_FABRIC_API_BASE)
+    return FABRIC_CONFIG.fabric_api_base
 
 
 class EventstreamConnectionCache:
