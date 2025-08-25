@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""
+Decode working eventstream definition to understand format issues
+"""
+
+import base64
+import json
+
+# Payloads from working eventstream
+eventstream_payload = "ew0KICAic291cmNlcyI6IFsNCiAgICB7DQogICAgICAiaWQiOiAiMTRlOGNlZjctNzEwZS00ZTlmLWE2ZjItMzExYTU5ZTNhMDBlIiwNCiAgICAgICJuYW1lIjogIkJpY3ljbGVEYXRhU291cmNlIiwNCiAgICAgICJ0eXBlIjogIlNhbXBsZURhdGEiLA0KICAgICAgInByb3BlcnRpZXMiOiB7DQogICAgICAgICJ0eXBlIjogIkJpY3ljbGVzIg0KICAgICAgfQ0KICAgIH0NCiAgXSwNCiAgImRlc3RpbmF0aW9ucyI6IFsNCiAgICB7DQogICAgICAiaWQiOiAiYWQ3ODRiMDgtNTBjZi00N2Y0LWIxM2QtODQ1NDVkNzQ4ZWNkIiwNCiAgICAgICJuYW1lIjogIkJpY3ljbGVEYXRhRW5kcG9pbnQiLA0KICAgICAgInR5cGUiOiAiQ3VzdG9tRW5kcG9pbnQiLA0KICAgICAgInByb3BlcnRpZXMiOiB7fSwNCiAgICAgICJpbnB1dE5vZGVzIjogWw0KICAgICAgICB7DQogICAgICAgICAgIm5hbWUiOiAiUHJvY2Vzc2VkQmljeWNsZURhdGEiDQogICAgICAgIH0NCiAgICAgIF0NCiAgICB9DQogIF0sDQogICJzdHJlYW1zIjogWw0KICAgIHsNCiAgICAgICJpZCI6ICI3N2YyZTZjYS03OTZiLTRkOTMtODNlNy01YjczNDVmOThjOGQiLA0KICAgICAgIm5hbWUiOiAiUHJvY2Vzc2VkQmljeWNsZURhdGEiLA0KICAgICAgInR5cGUiOiAiRGVyaXZlZFN0cmVhbSIsDQogICAgICAicHJvcGVydGllcyI6IHsNCiAgICAgICAgImlucHV0U2VyaWFsaXphdGlvbiI6IHsNCiAgICAgICAgICAidHlwZSI6ICJKc29uIiwNCiAgICAgICAgICAicHJvcGVydGllcyI6IHsNCiAgICAgICAgICAgICJlbmNvZGluZyI6ICJVVEY4Ig0KICAgICAgICAgIH0NCiAgICAgICAgfQ0KICAgICAgfSwNCiAgICAgICJpbnB1dE5vZGVzIjogWw0KICAgICAgICB7DQogICAgICAgICAgIm5hbWUiOiAiRXZlbnRzdHJlYW1NQ1BTYW1wbGVCaWtlcy1zdHJlYW0iDQogICAgICAgIH0NCiAgICAgIF0NCiAgICB9LA0KICAgIHsNCiAgICAgICJpZCI6ICJhYTMzZmI2MC1kY2U2LTQ0MTYtOTg1My1jMGMyZDljODcwYjciLA0KICAgICAgIm5hbWUiOiAiRXZlbnRzdHJlYW1NQ1BTYW1wbGVCaWtlcy1zdHJlYW0iLA0KICAgICAgInR5cGUiOiAiRGVmYXVsdFN0cmVhbSIsDQogICAgICAicHJvcGVydGllcyI6IHt9LA0KICAgICAgImlucHV0Tm9kZXMiOiBbDQogICAgICAgIHsNCiAgICAgICAgICAibmFtZSI6ICJCaWN5Y2xlRGF0YVNvdXJjZSINCiAgICAgICAgfQ0KICAgICAgXQ0KICAgIH0NCiAgXSwNCiAgIm9wZXJhdG9ycyI6IFtdLA0KICAiY29tcGF0aWJpbGl0eUxldmVsIjogIjEuMCINCn0="
+
+properties_payload = "ew0KICAicmV0ZW50aW9uVGltZUluRGF5cyI6IDEsDQogICJldmVudFRocm91Z2hwdXRMZXZlbCI6ICJMb3ciDQp9"
+
+platform_payload = "ewogICIkc2NoZW1hIjogImh0dHBzOi8vZGV2ZWxvcGVyLm1pY3Jvc29mdC5jb20vanNvbi1zY2hlbWFzL2ZhYnJpYy9naXRJbnRlZ3JhdGlvbi9wbGF0Zm9ybVByb3BlcnRpZXMvMi4wLjAvc2NoZW1hLmpzb24iLAogICJtZXRhZGF0YSI6IHsKICAgICJ0eXBlIjogIkV2ZW50c3RyZWFtIiwKICAgICJkaXNwbGF5TmFtZSI6ICJFdmVudHN0cmVhbU1DUFNhbXBsZUJpa2VzIiwKICAgICJkZXNjcmlwdGlvbiI6ICJFdmVudHN0cmVhbSB3aXRoIEJpY3ljbGVzIHNhbXBsZSBkYXRhIHNvdXJjZSBhbmQgcHJvY2Vzc2luZyBzdHJlYW1zIgogIH0sCiAgImNvbmZpZyI6IHsKICAgICJ2ZXJzaW9uIjogIjIuMCIsCiAgICAibG9naWNhbElkIjogIjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIKICB9Cn0="
+
+print("=== EVENTSTREAM.JSON ===")
+try:
+    decoded = base64.b64decode(eventstream_payload).decode('utf-8')
+    parsed = json.loads(decoded)
+    print(json.dumps(parsed, indent=2))
+except Exception as e:
+    print(f"Error decoding eventstream.json: {e}")
+
+print("\n=== EVENTSTREAMPROPERTIES.JSON ===")
+try:
+    decoded = base64.b64decode(properties_payload).decode('utf-8')
+    parsed = json.loads(decoded)
+    print(json.dumps(parsed, indent=2))
+except Exception as e:
+    print(f"Error decoding eventstreamProperties.json: {e}")
+
+print("\n=== .PLATFORM ===")
+try:
+    decoded = base64.b64decode(platform_payload).decode('utf-8')
+    parsed = json.loads(decoded)
+    print(json.dumps(parsed, indent=2))
+except Exception as e:
+    print(f"Error decoding .platform: {e}")
