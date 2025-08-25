@@ -1,53 +1,54 @@
-from fastmcp import FastMCP, ToolAnnotations
+from fastmcp import FastMCP
 from fabric_rti_mcp.kusto import kusto_service
 
 
 def register_tools(mcp: FastMCP) -> None:
-    mcp.add_tool(
-        kusto_service.kusto_known_services,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_query,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_command,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_list_databases,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_list_tables,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_get_entities_schema,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_get_table_schema,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_get_function_schema,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_sample_table_data,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_sample_function_data,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_ingest_inline_into_table,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_get_shots,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
-    )
+    """Register all Kusto tools with the MCP server using modern decorator pattern."""
+    
+    @mcp.tool()
+    def kusto_known_services():
+        return kusto_service.kusto_known_services()
+    
+    @mcp.tool()
+    def kusto_query(query: str, cluster_uri: str, database: str = None):
+        return kusto_service.kusto_query(query, cluster_uri, database)
+    
+    @mcp.tool()
+    def kusto_command(command: str, cluster_uri: str, database: str = None):
+        return kusto_service.kusto_command(command, cluster_uri, database)
+    
+    @mcp.tool()
+    def kusto_list_databases(cluster_uri: str):
+        return kusto_service.kusto_list_databases(cluster_uri)
+    
+    @mcp.tool()
+    def kusto_list_tables(cluster_uri: str, database: str):
+        return kusto_service.kusto_list_tables(cluster_uri, database)
+    
+    @mcp.tool()
+    def kusto_get_entities_schema(cluster_uri: str, database: str = None):
+        return kusto_service.kusto_get_entities_schema(cluster_uri, database)
+    
+    @mcp.tool()
+    def kusto_get_table_schema(table_name: str, cluster_uri: str, database: str = None):
+        return kusto_service.kusto_get_table_schema(table_name, cluster_uri, database)
+    
+    @mcp.tool()
+    def kusto_get_function_schema(function_name: str, cluster_uri: str, database: str = None):
+        return kusto_service.kusto_get_function_schema(function_name, cluster_uri, database)
+    
+    @mcp.tool()
+    def kusto_sample_table_data(table_name: str, cluster_uri: str, sample_size: int = 10, database: str = None):
+        return kusto_service.kusto_sample_table_data(table_name, cluster_uri, sample_size, database)
+    
+    @mcp.tool()
+    def kusto_sample_function_data(function_call_with_params: str, cluster_uri: str, sample_size: int = 10, database: str = None):
+        return kusto_service.kusto_sample_function_data(function_call_with_params, cluster_uri, sample_size, database)
+    
+    @mcp.tool()
+    def kusto_ingest_inline_into_table(table_name: str, data_comma_separator: str, cluster_uri: str, database: str = None):
+        return kusto_service.kusto_ingest_inline_into_table(table_name, data_comma_separator, cluster_uri, database)
+    
+    @mcp.tool()
+    def kusto_get_shots(prompt: str, shots_table_name: str, cluster_uri: str, sample_size: int = 3, database: str = None, embedding_endpoint: str = None):
+        return kusto_service.kusto_get_shots(prompt, shots_table_name, cluster_uri, sample_size, database, embedding_endpoint)

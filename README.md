@@ -64,14 +64,22 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
 - **`kusto_get_shots`** - Retrieve semantically similar query examples from a shots table using AI embeddings
 
-#### Eventstreams - 6 Tools:
+#### Eventstreams - 17 Tools:
+
+**Core Operations (6 tools):**
 - **`eventstream_list`** - List all Eventstreams in your Fabric workspace
 - **`eventstream_get`** - Get detailed information about a specific Eventstream
 - **`eventstream_get_definition`** - Retrieve complete JSON definition of an Eventstream
-- **`eventstream_create`** - Create new Eventstreams with custom configuration
-- **`eventstream_create_simple`** - Simple eventstream creation with just workspace and name
+- **`eventstream_create`** - Create new Eventstreams with custom configuration (auto-includes default stream)
 - **`eventstream_update`** - Modify existing Eventstream settings and destinations
 - **`eventstream_delete`** - Remove Eventstreams and associated resources
+
+**Builder Tools (11 tools):**
+- **Session Management**: `eventstream_start_definition`, `eventstream_get_current_definition`, `eventstream_clear_definition`
+- **Sources**: `eventstream_add_sample_data_source`, `eventstream_add_custom_endpoint_source`
+- **Streams**: `eventstream_add_derived_stream`
+- **Destinations**: `eventstream_add_eventhouse_destination`, `eventstream_add_custom_endpoint_destination`
+- **Validation**: `eventstream_validate_definition`, `eventstream_create_from_definition`, `eventstream_list_available_components`
 
 > **💡 Pro Tip**: All tools work with natural language! Just describe what you want to do and the AI agent will use the appropriate tools automatically.
 
