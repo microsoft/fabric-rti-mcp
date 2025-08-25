@@ -5,7 +5,8 @@ Provides transparent authentication similar to Kusto module
 
 import os
 from typing import Dict, Any, Optional
-from azure.identity import DefaultAzureCredential, ChainedTokenCredential
+# Lazy import Azure SDK to avoid startup hangs
+# from azure.identity import DefaultAzureCredential, ChainedTokenCredential
 import httpx
 
 from fabric_rti_mcp.common import logger
@@ -28,24 +29,33 @@ class EventstreamConnection:
         self._cached_token = None
         self._token_expiry = None
         
-    def _get_credential(self) -> ChainedTokenCredential:
+    def _get_credential(self):
         """
         Get Azure credential using the same pattern as Kusto module.
         This ensures consistent authentication behavior across both modules.
+        Uses lazy import to avoid startup hangs.
         
         Uses the user's default tenant, allowing the MCP server to work
         for users in any tenant (not hard-coded to Microsoft's tenant).
         """
-        return DefaultAzureCredential(
-            exclude_shared_token_cache_credential=True,
-            exclude_interactive_browser_credential=False,
-        )
+        try:
+            from azure.identity import DefaultAzureCredential
+            return DefaultAzureCredential(
+                exclude_shared_token_cache_credential=True,
+                exclude_interactive_browser_credential=False,
+            )
+        except ImportError as e:
+            logger.error(f"Azure Identity not available: {e}")
+            return None
     
     def _get_access_token(self) -> str:
         """
         Get a valid access token for Fabric API.
         Handles token caching and refresh automatically.
         """
+        if self.credential is None:
+            raise Exception("Azure credentials not available - Azure Identity library may not be installed")
+        
         try:
             # Get token from Azure credential
             token = self.credential.get_token(self.token_scope)

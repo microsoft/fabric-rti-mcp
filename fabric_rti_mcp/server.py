@@ -1,7 +1,7 @@
 import os
 import sys
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from fabric_rti_mcp import __version__
 from fabric_rti_mcp.common import logger

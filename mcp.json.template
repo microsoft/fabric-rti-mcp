@@ -1,0 +1,24 @@
+{
+	"servers": {
+		"fabric-rti-mcp": {
+			"command": "uv",
+			"args": [
+				"--directory",
+				"<PATH_TO_FABRIC_RTI_MCP_DIRECTORY>",
+				"run",
+				"-m",
+				"fabric_rti_mcp.server"
+			],
+			"env": {
+				"KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
+				"KUSTO_DATABASE": "Samples",
+				"FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
+			},
+			"type": "stdio",
+			"allowDangerous": true,
+			"enableModificationTools": true,
+			"trustLevel": "full"
+		}
+	},
+	"inputs": []
+}

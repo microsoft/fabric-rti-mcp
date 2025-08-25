@@ -467,3 +467,27 @@ fabric_rti_mcp/eventstream/config.py
 
 # Design documents (development planning artifacts)
 EVENTSTREAM_BUILDER_DESIGN.md
+
+# Transient development and debugging files
+debug_imports.py
+quick_check.py
+sanity_check.py
+build_eventstream_demo.py
+demo_eventstream_definition.py
+decode_working_eventstream.py
+show_rest_api_payload.py
+fix_eventstream_creation.py
+
+# Transient analysis and internal documentation
+EVENTSTREAM_FAILURE_ANALYSIS.md
+EVENTSTREAM_DEFINITION_SCHEMA_FIX.md
+SANITY_CHECK_REPORT.md
+FUNCTION_DUPLICATION_RESOLUTION.md
+pr_breakdown_plan.md
+
+# Local configuration files (contain personal paths)
+mcp.json
+**/mcp.json
+
+# VS Code user data files
+vscode-userdata:

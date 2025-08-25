@@ -18,7 +18,9 @@ classifiers = [
 ]
 dependencies = [
     "httpx~=0.28.1",
-    "fastmcp~=2.5.0",
+    "fastmcp~=1.0.0",
+    "mcp~=1.0.0",
+    "uvicorn>=0.18.0",
     "azure-kusto-data~=5.0.0",
     "azure-identity",
     "azure-kusto-ingest~=5.0.0",

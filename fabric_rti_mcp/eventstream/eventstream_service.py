@@ -136,17 +136,17 @@ def eventstream_create(
     """
     # Auto-generate name if ID provided but name is not
     if eventstream_id and not eventstream_name:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        eventstream_name = f"Eventstream_{timestamp}"
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M")
+        eventstream_name = f"Eventstream-{timestamp}"
     
     # Auto-generate name if neither provided
     if not eventstream_name and not eventstream_id:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        eventstream_name = f"Eventstream_{timestamp}"
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M")
+        eventstream_name = f"Eventstream-{timestamp}"
     
     # Ensure we have a name at this point
     if not eventstream_name:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M")
         eventstream_name = f"Eventstream_{timestamp}"
     
     # Auto-generate definition if not provided
@@ -158,14 +158,49 @@ def eventstream_create(
     definition_json = json.dumps(definition)
     definition_b64 = base64.b64encode(definition_json.encode("utf-8")).decode("utf-8")
     
+    # Prepare eventstreamProperties.json (retention and throughput settings)
+    properties = {
+        "retentionTimeInDays": 1,
+        "eventThroughputLevel": "Low"
+    }
+    properties_json = json.dumps(properties)
+    properties_b64 = base64.b64encode(properties_json.encode("utf-8")).decode("utf-8")
+    
+    # Prepare .platform (metadata and config)
+    platform_metadata = {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+        "metadata": {
+            "type": "Eventstream",
+            "displayName": eventstream_name,
+            "description": description or ""
+        },
+        "config": {
+            "version": "2.0",
+            "logicalId": "00000000-0000-0000-0000-000000000000"
+        }
+    }
+    platform_json = json.dumps(platform_metadata)
+    platform_b64 = base64.b64encode(platform_json.encode("utf-8")).decode("utf-8")
+    
     payload: Dict[str, Any] = {
         "displayName": eventstream_name,
         "type": "Eventstream",
+        "description": description or "",
         "definition": {
             "parts": [
                 {
                     "path": "eventstream.json",
                     "payload": definition_b64,
+                    "payloadType": "InlineBase64"
+                },
+                {
+                    "path": "eventstreamProperties.json",
+                    "payload": properties_b64,
+                    "payloadType": "InlineBase64"
+                },
+                {
+                    "path": ".platform",
+                    "payload": platform_b64,
                     "payloadType": "InlineBase64"
                 }
             ]
@@ -301,57 +336,35 @@ def _create_basic_eventstream_definition(
     stream_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Create a basic eventstream definition that can be extended later.
+    Create a basic eventstream definition for immediate API creation.
+    This creates a minimal definition with one default stream for direct eventstream creation.
     
-    :param name: Name for the default stream
+    :param name: Name for the default stream (used as stream name prefix)
     :param stream_id: ID for the default stream (auto-generated if not provided)
-    :return: Basic eventstream definition
+    :return: Basic eventstream definition ready for API submission
     """
     if stream_id is None:
         stream_id = str(uuid.uuid4())
         
     return {
-        "compatibilityLevel": "1.0",
         "sources": [],
         "destinations": [],
         "operators": [],
         "streams": [
             {
-                "id": stream_id,
                 "name": f"{name}-stream",
                 "type": "DefaultStream",
                 "properties": {},
                 "inputNodes": []
             }
-        ]
+        ],
+        "compatibilityLevel": "1.0"
     }
-
-
-def eventstream_create_simple(
-    workspace_id: str,
-    name: str,
-    description: Optional[str] = None
-) -> List[Dict[str, Any]]:
-    """
-    Simple eventstream creation - just provide workspace and name.
-    Perfect for quick testing and getting started.
-    
-    :param workspace_id: The workspace ID (UUID)
-    :param name: Name for the new eventstream
-    :param description: Optional description
-    :return: Created eventstream details
-    """
-    return eventstream_create(
-        workspace_id=workspace_id,
-        eventstream_name=name,
-        description=description
-    )
 
 
 # List of destructive operations
 DESTRUCTIVE_TOOLS = {
     eventstream_create.__name__,
-    eventstream_create_simple.__name__,
     eventstream_delete.__name__,
     eventstream_update.__name__,
 }
