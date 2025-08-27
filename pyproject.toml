@@ -72,6 +72,7 @@ warn_unused_ignores = false
 warn_no_return = true
 warn_unreachable = true
 strict = true
+files = ["fabric_rti_mcp"]
 exclude = ['scripts/build_executables.py', 'setup_dist.py', 'fabric_rti_mcp/_version.py']
 
 [tool.setuptools_scm]

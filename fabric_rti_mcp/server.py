@@ -17,7 +17,7 @@ def launch_mcp_inspector() -> None:
     if not config.debug_mode:
         return
 
-    def start_inspector():
+    def start_inspector() -> None:
         try:
             logger.error("Debug mode enabled - launching MCP Inspector...")
             # Give the main server a moment to start

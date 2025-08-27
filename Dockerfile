@@ -1,3 +1,25 @@
+# ------------------------------------------------------------------------------
+# ⚠️  DEVELOPMENT IMAGE – NOT FOR PRODUCTION USE ⚠️
+# ------------------------------------------------------------------------------
+# This Dockerfile starts an MCP server with **NO built-in authentication,
+# transport security, or token verification**.
+#
+# If you attach an Azure Managed Identity (or any cloud credential) the server
+# inherits it; anyone who can reach the container can then act as that
+# identity.  Because the server does not verify audience / issuer / expiry,
+# a malicious caller could forward arbitrary tokens to downstream services.
+#
+# Therefore **NEVER**:
+#   • Run this image in production.
+#   • Expose it to the Internet or untrusted networks.
+#
+# If you need a hardened build, you MUST add:
+#   1. TLS termination (or run behind a trusted proxy with TLS).  
+#   2. Strong authentication (e.g., OAuth 2.0 / mTLS).  
+#   3. Token verification: validate issuer, audience, signature, expiry,     
+#      and revocation before forwarding calls.  
+#   4. Least-privilege scoping of any attached identities.
+# ------------------------------------------------------------------------------
 FROM python:3.12-slim
 
 # Set working directory
