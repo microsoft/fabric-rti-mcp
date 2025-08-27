@@ -3,8 +3,8 @@ fmt:
 	black .
 
 lint:
-	flake8 .
-	mypy . --explicit-package-bases 
+flake8 .
+mypy fabric_rti_mcp --explicit-package-bases 
 
 test:
 	pytest
