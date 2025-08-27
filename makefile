@@ -18,3 +18,6 @@ precommit:
 
 run:
 	uvx .
+
+live-test:
+	python -m tests.live.test_kusto_tools_live
