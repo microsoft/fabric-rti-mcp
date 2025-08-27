@@ -16,6 +16,7 @@ except ImportError:
     print("MCP client dependencies not available. Install with: pip install mcp")
     sys.exit(1)
 
+
 class McpClient:
     """MCP client bound to a single MCP server."""
 
@@ -34,9 +35,7 @@ class McpClient:
             return self.session
 
         server_params = StdioServerParameters(
-            command=self.command[0], 
-            args=self.command[1:] if len(self.command) > 1 else [], 
-            env=self.env
+            command=self.command[0], args=self.command[1:] if len(self.command) > 1 else [], env=self.env
         )
 
         self.stdio_context = stdio_client(server_params)
@@ -52,10 +51,10 @@ class McpClient:
 
         if self.session is None:
             raise RuntimeError("Failed to create session")
-        
+
         return self.session
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         """Disconnect from the MCP server."""
         if not self._connected:
             return
@@ -92,7 +91,7 @@ class McpClient:
         result = await self.session.call_tool(tool_name, arguments=arguments)
 
         # First, check if there's structured content (preferred)
-        if hasattr(result, 'structuredContent') and result.structuredContent:
+        if hasattr(result, "structuredContent") and result.structuredContent:
             return {"result": result.structuredContent.get("result", result.structuredContent), "success": True}
 
         # Fall back to parsing text content
@@ -108,10 +107,10 @@ class McpClient:
                         except json.JSONDecodeError:
                             # If parsing fails, treat as text
                             parsed_items.append(content_item.text)
-                
+
                 # Return the array of parsed items
                 return {"result": parsed_items, "success": True}
-            
+
             # Single content item - parse as before
             content_item = result.content[0]
             if isinstance(content_item, TextContent):
@@ -146,49 +145,49 @@ class McpClient:
 class KustoToolsLiveTester:
     """Live tester for Kusto tools via MCP client."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.client: McpClient | None = None
         self.test_cluster_uri = "https://help.kusto.windows.net"
         self.test_database = "Samples"
 
-    async def setup(self):
+    async def setup(self) -> None:
         """Set up the MCP client connection."""
         # Get the path to the server script
         server_script = os.path.join(os.path.dirname(__file__), "..", "..", "fabric_rti_mcp", "server.py")
         server_script = os.path.abspath(server_script)
-        
+
         if not os.path.exists(server_script):
             raise FileNotFoundError(f"Server script not found at {server_script}")
 
         # Create MCP client with Python command to run the server
         command = [sys.executable, server_script]
         env = dict(os.environ)  # Copy current environment
-        
+
         self.client = McpClient("fabric-rti-mcp-server", command, env)
         await self.client.connect()
         print(f"✅ Connected to MCP server: {self.client.name}")
 
-    async def teardown(self):
+    async def teardown(self) -> None:
         """Clean up the MCP client connection."""
         if self.client:
             await self.client.disconnect()
             print("✅ Disconnected from MCP server")
 
-    async def test_list_tools(self):
+    async def test_list_tools(self) -> None:
         """Test listing available tools."""
         print("\n🔧 Testing tool listing...")
         if not self.client:
             raise RuntimeError("Client not initialized")
-        
+
         tools = await self.client.list_tools()
         print(f"Available tools: {tools}")
-        
+
         kusto_tools = [tool for tool in tools if tool.startswith("kusto_")]
         print(f"Kusto tools found: {kusto_tools}")
-        
+
         expected_kusto_tools = [
             "kusto_known_services",
-            "kusto_query", 
+            "kusto_query",
             "kusto_command",
             "kusto_list_databases",
             "kusto_list_tables",
@@ -198,25 +197,25 @@ class KustoToolsLiveTester:
             "kusto_sample_table_data",
             "kusto_sample_function_data",
             "kusto_ingest_inline_into_table",
-            "kusto_get_shots"
+            "kusto_get_shots",
         ]
-        
+
         missing_tools = set(expected_kusto_tools) - set(kusto_tools)
         if missing_tools:
             print(f"⚠️  Missing expected tools: {missing_tools}")
         else:
             print("✅ All expected Kusto tools found")
 
-    async def test_known_services(self):
+    async def test_known_services(self) -> None:
         """Test kusto_known_services tool."""
         print("\n🔧 Testing kusto_known_services...")
         if not self.client:
             raise RuntimeError("Client not initialized")
-        
+
         try:
             result = await self.client.call_tool("kusto_known_services", {})
             print(f"Known services result: {json.dumps(result, indent=2)}")
-            
+
             if result.get("success"):
                 services = result.get("result", [])
                 if not isinstance(services, list):
@@ -226,67 +225,67 @@ class KustoToolsLiveTester:
                     print(f"  - {service.get('service_uri', 'N/A')}: {service.get('description', 'N/A')}")
             else:
                 print(f"❌ Failed to get known services: {result}")
-                
+
         except Exception as e:
             print(f"❌ Error testing known services: {e}")
 
-    async def test_list_databases(self):
+    async def test_list_databases(self) -> None:
         """Test kusto_list_databases tool if cluster URI is configured."""
         print("\n🗄️  Testing kusto_list_databases...")
         if not self.client:
             raise RuntimeError("Client not initialized")
-        
+
         if not self.test_cluster_uri:
             print("⚠️  No KUSTO_CLUSTER_URI configured, skipping database listing test")
             return
-        
+
         try:
-            result = await self.client.call_tool("kusto_list_databases", {
-                "cluster_uri": self.test_cluster_uri
-            })
+            result = await self.client.call_tool("kusto_list_databases", {"cluster_uri": self.test_cluster_uri})
             print(f"List databases result: {json.dumps(result, indent=2)}")
-            
+
             if result.get("success"):
                 # Handle both list and single object responses
                 databases = result.get("result", [])
                 if not isinstance(databases, list):
                     databases = [databases] if databases else []
-                
+
                 # Assert minimum count to verify array fix is working
                 min_expected_dbs = 8
                 if len(databases) < min_expected_dbs:
-                    raise AssertionError(f"Expected at least {min_expected_dbs} databases, got {len(databases)}. This suggests the array truncation bug is still present.")
-                
+                    raise AssertionError(
+                        f"Expected at least {min_expected_dbs} databases, got {len(databases)}."
+                        "This suggests the array truncation bug is still present."
+                    )
+
                 print(f"✅ Found {len(databases)} databases (>= {min_expected_dbs} as expected)")
                 for db in databases[:5]:  # Show first 5
                     print(f"  - {db.get('DatabaseName', 'N/A')}")
             else:
                 print(f"❌ Failed to list databases: {result}")
                 raise AssertionError(f"Database listing failed: {result}")
-                
+
         except Exception as e:
             print(f"❌ Error testing list databases: {e}")
             raise
 
-    async def test_simple_query(self):
+    async def test_simple_query(self) -> None:
         """Test kusto_query tool with a simple query."""
         print("\n🔍 Testing kusto_query...")
         if not self.client:
             raise RuntimeError("Client not initialized")
-        
+
         if not self.test_cluster_uri:
             print("⚠️  No KUSTO_CLUSTER_URI configured, skipping query test")
             return
-        
+
         try:
             # Simple query to get current time
-            result = await self.client.call_tool("kusto_query", {
-                "query": "print now()",
-                "cluster_uri": self.test_cluster_uri,
-                "database": self.test_database
-            })
+            result = await self.client.call_tool(
+                "kusto_query",
+                {"query": "print now()", "cluster_uri": self.test_cluster_uri, "database": self.test_database},
+            )
             print(f"Query result: {json.dumps(result, indent=2)}")
-            
+
             if result.get("success"):
                 # Handle both list and single object responses
                 query_results = result.get("result", [])
@@ -297,7 +296,7 @@ class KustoToolsLiveTester:
                     print(f"   Sample result: {query_results[0]}")
             else:
                 print(f"❌ Query failed: {result}")
-                
+
         except Exception as e:
             print(f"❌ Error testing query: {e}")
 
@@ -306,36 +305,38 @@ class KustoToolsLiveTester:
         print("\n📊 Testing kusto_list_tables...")
         if not self.client:
             raise RuntimeError("Client not initialized")
-        
+
         if not self.test_cluster_uri:
             print("⚠️  No KUSTO_CLUSTER_URI configured, skipping tables listing test")
             return
-        
+
         try:
-            result = await self.client.call_tool("kusto_list_tables", {
-                "cluster_uri": self.test_cluster_uri,
-                "database": self.test_database
-            })
+            result = await self.client.call_tool(
+                "kusto_list_tables", {"cluster_uri": self.test_cluster_uri, "database": self.test_database}
+            )
             print(f"List tables result: {json.dumps(result, indent=2)}")
-            
+
             if result.get("success"):
                 # Handle both list and single object responses
                 tables = result.get("result", [])
                 if not isinstance(tables, list):
                     tables = [tables] if tables else []
-                
+
                 # Assert minimum count to verify array fix is working
                 min_expected_tables = 50  # Samples database has many tables
                 if len(tables) < min_expected_tables:
-                    raise AssertionError(f"Expected at least {min_expected_tables} tables, got {len(tables)}. This suggests the array truncation bug is still present.")
-                
+                    raise AssertionError(
+                        f"Expected at least {min_expected_tables} tables, got {len(tables)}. "
+                        "This suggests the array truncation bug is still present."
+                    )
+
                 print(f"✅ Found {len(tables)} tables (>= {min_expected_tables} as expected)")
                 for table in tables[:5]:  # Show first 5
                     print(f"  - {table.get('TableName', 'N/A')}")
             else:
                 print(f"❌ Failed to list tables: {result}")
                 raise AssertionError(f"Table listing failed: {result}")
-                
+
         except Exception as e:
             print(f"❌ Error testing list tables: {e}")
             raise
@@ -345,20 +346,23 @@ class KustoToolsLiveTester:
         print("\n📝 Testing kusto_sample_table_data...")
         if not self.client:
             raise RuntimeError("Client not initialized")
-        
+
         if not self.test_cluster_uri:
             print("⚠️  No KUSTO_CLUSTER_URI configured, skipping table sample test")
             return
-        
+
         try:
-            result = await self.client.call_tool("kusto_sample_table_data", {
-                "table_name": "StormEvents",
-                "cluster_uri": self.test_cluster_uri,
-                "sample_size": 3,
-                "database": self.test_database
-            })
+            result = await self.client.call_tool(
+                "kusto_sample_table_data",
+                {
+                    "table_name": "StormEvents",
+                    "cluster_uri": self.test_cluster_uri,
+                    "sample_size": 3,
+                    "database": self.test_database,
+                },
+            )
             print(f"Sample table data result (truncated): {str(result)[:500]}...")
-            
+
             if result.get("success"):
                 # Handle both list and single object responses
                 sample_data = result.get("result", [])
@@ -367,17 +371,17 @@ class KustoToolsLiveTester:
                 print(f"✅ Retrieved {len(sample_data)} sample records")
             else:
                 print(f"❌ Failed to sample table data: {result}")
-                
+
         except Exception as e:
             print(f"❌ Error testing table sample: {e}")
 
     async def run_all_tests(self):
         """Run all available tests."""
         print("🚀 Starting Kusto tools live testing...")
-        
+
         try:
             await self.setup()
-            
+
             # Run tests
             await self.test_list_tools()
             await self.test_known_services()
@@ -385,9 +389,9 @@ class KustoToolsLiveTester:
             await self.test_simple_query()
             await self.test_list_tables()
             await self.test_table_sample()
-            
+
             print("\n✅ All tests completed!")
-            
+
         except Exception as e:
             print(f"\n❌ Test suite failed: {e}")
             raise
