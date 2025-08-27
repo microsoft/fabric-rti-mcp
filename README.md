@@ -18,9 +18,9 @@ The Fabric RTI MCP Server creates a seamless integration between AI agents and F
 
 ### ✨ Supported Services
 - **Eventhouse (Kusto)**: Execute KQL queries against Microsoft Fabric RTI [Eventhouse](https://aka.ms/eventhouse) and [Azure Data Explorer(ADX)](https://aka.ms/adx).
+- **Data Activator**: Create alerts from KQL queries that monitor data and send notifications via Teams and email.
 
 ## 🚧 Coming soon
-- **Activator**
 - **Eventstreams**
 - **Other RTI items**
 
@@ -32,6 +32,12 @@ The Fabric RTI MCP Server creates a seamless integration between AI agents and F
 - "Analyze the StormEvents to come up with trend analysis ocross past 10 years of data"
 - "Analyze the commands in 'CommandExecution' table and categorize them as low/medium/high risks"
 
+### 🚨 Monitor and Alert
+
+- "Create an alert for anomaly detection on login failures"
+- "Set up monitoring for high CPU usage with Teams notifications"
+- "Alert me when the error rate exceeds 5% in the last hour"
+- "Create a security alert for unauthorized access attempts"
 
 ### Available tools 
 - List databases
@@ -41,6 +47,9 @@ The Fabric RTI MCP Server creates a seamless integration between AI agents and F
 - Execute query
 - Ingest a csv
 - Get shots
+- Create Data Activator alerts from KQL queries
+- List Fabric workspaces
+- List Data Activator items
 
 ## Getting Started
 
