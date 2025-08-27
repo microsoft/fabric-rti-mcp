@@ -1,0 +1,7 @@
+httpx~=0.28.1
+fastmcp~=2.5.0
+mcp>=1.12.2  # Added mcp module which is required by the server
+azure-kusto-data~=5.0.0
+azure-identity
+azure-kusto-ingest~=5.0.0
+starlette~=0.31.0

@@ -1,9 +1,34 @@
-from typing import Optional
+from contextvars import ContextVar
+from typing import Any, Optional
 
-from azure.identity import ChainedTokenCredential, DefaultAzureCredential
+from azure.core.credentials import AccessToken, TokenCredential
+from azure.identity import DefaultAzureCredential
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
+import time
 
+# Thread-safe context variable to store the current request's auth token
+_request_token: ContextVar[Optional[str]] = ContextVar('_request_token', default=None)
+
+def set_auth_token(token: Optional[str]) -> None:
+    """Set the auth token for the current request context"""
+    _request_token.set(token)
+
+def get_auth_token() -> Optional[str]:
+    """Get the auth token from the current request context"""
+    return _request_token.get()
+
+class BearerTokenCredential(TokenCredential):
+    """A credential that uses a bearer token directly."""
+    
+    def __init__(self, token: str):
+        self.token = token
+    
+    def get_token(self, *scopes: str, **kwargs: Any) -> AccessToken:
+        """Get the token for the specified scopes."""
+        # Create an AccessToken with a far future expiration
+        actoken = AccessToken(token=self.token, expires_on=int(time.time()) + 3600)
+        return actoken
 
 class KustoConnection:
     query_client: KustoClient
@@ -23,7 +48,14 @@ class KustoConnection:
         default_database = default_database.strip()
         self.default_database = default_database
 
-    def _get_credential(self, login_endpoint: str) -> ChainedTokenCredential:
+    def _get_credential(self, login_endpoint: str) -> TokenCredential:
+
+        # Check if we have a bearer token from HTTP auth
+        token = get_auth_token()
+        if token:
+            # Use the bearer token directly if available (HTTP mode)
+            return BearerTokenCredential(token)
+        
         return DefaultAzureCredential(
             exclude_shared_token_cache_credential=True,
             exclude_interactive_browser_credential=False,
