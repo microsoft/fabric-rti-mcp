@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from azure.kusto.data import KustoConnectionStringBuilder
+from dotenv import load_dotenv
 
 from fabric_rti_mcp.common import logger
 
@@ -60,6 +62,11 @@ class KustoConfig:
     @staticmethod
     def from_env() -> KustoConfig:
         """Create a KustoConfig instance from environment variables."""
+        # Load .env file if it exists
+        env_file = Path.cwd() / ".env"
+        if env_file.exists():
+            load_dotenv(env_file)
+
         default_service_uri = os.getenv(KustoEnvVarNames.default_service_uri)
         default_db = os.getenv(
             KustoEnvVarNames.default_service_default_db, KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME

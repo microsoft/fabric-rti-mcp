@@ -233,6 +233,59 @@ The MCP Server seamlessly integrates with your host operating system's authentic
 
 If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials.
 
+## 🐳 Running in Docker
+
+The Fabric RTI MCP Server can be deployed as a Docker container for production use. The Docker image includes all dependencies and can be configured via environment variables.
+
+### Build the Docker Image
+
+```bash
+docker build -t fabric-rti-mcp .
+```
+
+### Run with Docker
+
+#### Basic HTTP Server
+```bash
+docker run -p 8000:8000 \
+  -e FABRIC_RTI_TRANSPORT=http \
+  -e KUSTO_SERVICE_URI=https://your-cluster.kusto.windows.net \
+  -e KUSTO_SERVICE_DEFAULT_DB=YourDatabase \
+  fabric-rti-mcp
+```
+
+#### With Managed Identity (for Azure deployments)
+```bash
+docker run -p 8000:8000 \
+  -e FABRIC_RTI_TRANSPORT=http \
+  -e KUSTO_SERVICE_URI=https://your-cluster.kusto.windows.net \
+  -e KUSTO_SERVICE_DEFAULT_DB=YourDatabase \
+  -e AZURE_CLIENT_ID=your-managed-identity-client-id \
+  fabric-rti-mcp
+```
+
+#### With Azure Container Instances
+```bash
+az container create \
+  --resource-group myResourceGroup \
+  --name fabric-rti-mcp \
+  --image fabric-rti-mcp \
+  --ports 8000 \
+  --environment-variables \
+    FABRIC_RTI_TRANSPORT=http \
+    KUSTO_SERVICE_URI=https://your-cluster.kusto.windows.net \
+    KUSTO_SERVICE_DEFAULT_DB=YourDatabase \
+  --assign-identity
+```
+
+### Environment Variables
+
+All environment variables listed in the [Configuration](#⚙️-configuration) section are available in the Docker container. The Docker image sets the following defaults:
+
+- `FABRIC_RTI_TRANSPORT=http` (enables HTTP mode)
+- `FABRIC_RTI_HTTP_HOST=0.0.0.0` (listens on all interfaces)
+- `FABRIC_RTI_HTTP_PORT=8000` (default port)
+
 ## 🛡️ Security Note
 
 Your credentials are always handled securely through the official [Azure Identity SDK](https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/identity/Azure.Identity/README.md) - **we never store or manage tokens directly**.
