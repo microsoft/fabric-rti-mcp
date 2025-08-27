@@ -300,7 +300,7 @@ class KustoToolsLiveTester:
         except Exception as e:
             print(f"❌ Error testing query: {e}")
 
-    async def test_list_tables(self):
+    async def test_list_tables(self) -> None:
         """Test kusto_list_tables tool."""
         print("\n📊 Testing kusto_list_tables...")
         if not self.client:
@@ -341,7 +341,7 @@ class KustoToolsLiveTester:
             print(f"❌ Error testing list tables: {e}")
             raise
 
-    async def test_table_sample(self):
+    async def test_table_sample(self) -> None:
         """Test kusto_sample_table_data tool."""
         print("\n📝 Testing kusto_sample_table_data...")
         if not self.client:
@@ -375,7 +375,7 @@ class KustoToolsLiveTester:
         except Exception as e:
             print(f"❌ Error testing table sample: {e}")
 
-    async def run_all_tests(self):
+    async def run_all_tests(self) -> None:
         """Run all available tests."""
         print("🚀 Starting Kusto tools live testing...")
 
@@ -399,7 +399,7 @@ class KustoToolsLiveTester:
             await self.teardown()
 
 
-async def main():
+async def main() -> None:
     """Main entry point for live testing."""
     print("=" * 60)
     print("Fabric RTI MCP - Kusto Tools Live Testing")
