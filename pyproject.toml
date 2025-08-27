@@ -18,10 +18,11 @@ classifiers = [
 ]
 dependencies = [
     "httpx~=0.28.1",
-    "fastmcp~=2.5.0",
+    "fastmcp~=2.11.0",
     "azure-kusto-data~=5.0.0",
     "azure-identity",
-    "azure-kusto-ingest~=5.0.0"
+    "azure-kusto-ingest~=5.0.0",
+    "python-dotenv"
 ]
 
 [project.optional-dependencies]
@@ -71,6 +72,7 @@ warn_unused_ignores = false
 warn_no_return = true
 warn_unreachable = true
 strict = true
+files = ["fabric_rti_mcp"]
 exclude = ['scripts/build_executables.py', 'setup_dist.py', 'fabric_rti_mcp/_version.py']
 
 [tool.setuptools_scm]

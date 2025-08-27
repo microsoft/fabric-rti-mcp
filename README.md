@@ -233,6 +233,14 @@ The MCP Server seamlessly integrates with your host operating system's authentic
 
 If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials.
 
+### Environment Variables
+
+All environment variables listed in the [Configuration](#⚙️-configuration) section are available in the Docker container. The Docker image sets the following defaults:
+
+- `FABRIC_RTI_TRANSPORT=http` (enables HTTP mode)
+- `FABRIC_RTI_HTTP_HOST=0.0.0.0` (listens on all interfaces)
+- `FABRIC_RTI_HTTP_PORT=8000` (default port)
+
 ## 🛡️ Security Note
 
 Your credentials are always handled securely through the official [Azure Identity SDK](https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/identity/Azure.Identity/README.md) - **we never store or manage tokens directly**.
