@@ -17,6 +17,7 @@ class GlobalFabricRTIEnvVarNames:
     azure_service_deployment_default_port = "PORT" # Azure App Services or Azure Container Apps uses this port name
     functions_deployment_default_port = "FUNCTIONS_CUSTOMHANDLER_PORT" # Azure Functions uses this port name
     http_path = "FABRIC_RTI_HTTP_PATH"
+    stateless_http = "FABRIC_RTI_STATELESS_HTTP"
 
 
 
@@ -25,6 +26,7 @@ DEFAULT_FABRIC_RTI_TRANSPORT = "stdio"
 DEFAULT_FABRIC_RTI_HTTP_PORT = 3000
 DEFAULT_FABRIC_RTI_HTTP_PATH = "/mcp"
 DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
+DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -34,6 +36,7 @@ class GlobalFabricRTIConfig:
     http_host: str
     http_port: int
     http_path: str
+    stateless_http: bool
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -43,6 +46,7 @@ class GlobalFabricRTIConfig:
             http_host=os.getenv(GlobalFabricRTIEnvVarNames.http_host, DEFAULT_FABRIC_RTI_HTTP_HOST),
             http_port=int(os.getenv("PORT", os.getenv("FUNCTIONS_CUSTOMHANDLER_PORT", os.getenv(GlobalFabricRTIEnvVarNames.http_port, DEFAULT_FABRIC_RTI_HTTP_PORT)))),
             http_path=os.getenv(GlobalFabricRTIEnvVarNames.http_path, DEFAULT_FABRIC_RTI_HTTP_PATH),
+            stateless_http=bool(os.getenv(GlobalFabricRTIEnvVarNames.stateless_http, DEFAULT_FABRIC_RTI_STATELESS_HTTP)),
         )
 
     @staticmethod
@@ -55,6 +59,7 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.http_host,
             GlobalFabricRTIEnvVarNames.http_port,
             GlobalFabricRTIEnvVarNames.http_path,
+            GlobalFabricRTIEnvVarNames.stateless_http
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -71,14 +76,16 @@ class GlobalFabricRTIConfig:
         parser.add_argument("--http", action="store_true", help="Use HTTP transport")
         parser.add_argument("--host", type=str, help="HTTP host to listen on")
         parser.add_argument("--port", type=int, help="HTTP port to listen on")
-        args = parser.parse_args()  
-        
+        parser.add_argument("--stateless-http", type=bool, help="Enable or disable stateless HTTP")
+        args = parser.parse_args()
+
         transport = base_config.transport
         if args.stdio:
             transport = "stdio"
         elif args.http or os.getenv("PORT"):  # if it is running in Azure (Port is set), use HTTP transport
             transport = "http"
-            
+
+        stateless_http = args.stateless_http if args.stateless_http is not None else base_config.stateless_http
         http_host = args.host if args.host is not None else base_config.http_host
         http_port = args.port if args.port is not None else base_config.http_port
             
@@ -87,7 +94,8 @@ class GlobalFabricRTIConfig:
             transport=transport,
             http_host=http_host,
             http_port=http_port,
-            http_path=base_config.http_path
+            http_path=base_config.http_path,
+            stateless_http=stateless_http,
         )
 
 

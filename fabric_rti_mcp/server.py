@@ -75,6 +75,7 @@ def main() -> None:
             logger.info(f"Host: {config.http_host}")
             logger.info(f"Port: {config.http_port}")
             logger.info(f"Path: {config.http_path}")
+            logger.info(f"Stateless HTTP: {config.stateless_http}")
 
         # TODO: Add telemetry configuration here
         
@@ -85,7 +86,7 @@ def main() -> None:
                 host=config.http_host,
                 port=config.http_port,
                 streamable_http_path=config.http_path,
-                stateless_http=True
+                stateless_http=config.stateless_http,
             )
         else:
             fastmcp_server = FastMCP(name)
