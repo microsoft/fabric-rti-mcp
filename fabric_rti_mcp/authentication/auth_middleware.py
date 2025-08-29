@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import base64
 import json
-from typing import Callable, Awaitable, Dict, Any
+from typing import Any, Awaitable, Callable, Dict
 
 from mcp.server.fastmcp import FastMCP
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
 from fabric_rti_mcp.common import logger
 from fabric_rti_mcp.kusto.kusto_connection import set_auth_token
-from starlette.middleware.cors import CORSMiddleware
+
 
 def extract_token_from_header(auth_header: str) -> str:
     """Extract clean token from authorization header."""

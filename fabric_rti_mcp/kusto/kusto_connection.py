@@ -1,3 +1,4 @@
+import time
 from contextvars import ContextVar
 from typing import Any, Optional
 
@@ -5,7 +6,6 @@ from azure.core.credentials import AccessToken, TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
-import time
 
 # Thread-safe context variable to store the current request's auth token
 _request_token: ContextVar[Optional[str]] = ContextVar('_request_token', default=None)
