@@ -1,8 +1,3 @@
-"""
-Middleware module for MCP servers with auth
-
-This module provides middleware components for authentication, authorization in Http mode.
-"""
 from __future__ import annotations
 
 import base64
@@ -14,6 +9,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from fabric_rti_mcp.common import logger
 from fabric_rti_mcp.kusto.kusto_connection import set_auth_token
+from starlette.middleware.cors import CORSMiddleware
 
 def extract_token_from_header(auth_header: str) -> str:
     """Extract clean token from authorization header."""
@@ -64,7 +60,7 @@ def decode_jwt_token(token: str) -> Dict[str, Any]:
             return {}
     except Exception as e:
         logger.warning(f"Error decoding JWT token: {str(e)}")
-        return {}
+        return {} # TBD : Handle token validation errors errors when validation is added
 
 def add_auth_middleware(fastmcp: FastMCP) -> None:
     """
@@ -84,7 +80,6 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
         app = original_streamable_app()
 
         # Add CORS middleware
-        from starlette.middleware.cors import CORSMiddleware
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],  # Allows all origins
@@ -97,9 +92,6 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
         @app.middleware("http")  # type: ignore
         async def check_auth(request: Request, call_next: Callable[[Request], Awaitable[JSONResponse]]) -> JSONResponse:  # noqa: F811  # type: ignore[reportUnusedFunction]
             try:
-                # Store request context for tools to access
-                #set_current_request_context(request)
-
                 # Skip auth check for health endpoint
                 if request.url.path == "/health":
                     return await call_next(request)
@@ -117,21 +109,17 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
                         "message": "Authorization header required"
                     }, status_code=401)
 
-                # Validate the token using MISE-compliant approach
-                request_uri = str(request.url) if hasattr(request, 'url') else ""
-                request_method = request.method if hasattr(request, 'method') else "GET"
+                request_uri = str(request.url) if 'url' in request else ""
+                request_method = request.method if 'method' in request else "GET"
                 logger.info(f"Request URI: {request_uri}, Method: {request_method}")
 
-                # Extract and store the token to be accessible in tools
                 token = extract_token_from_header(auth_header)
                 
                 # Store the original token without modification
                 set_auth_token(token)
                 
-                # Decode and log token claims (doesn't modify the original token)
                 token_payload = decode_jwt_token(token)
                 
-                # Log relevant claims
                 audience = token_payload.get('aud', 'N/A')
                 tenant_id = token_payload.get('tid', 'N/A')
                 scopes = token_payload.get('scp', token_payload.get('roles', 'N/A'))
@@ -143,7 +131,6 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
                 # Continue with request
                 response = await call_next(request)
                 
-                # Log response details
                 logger.info(f"Response status code: {response.status_code}")
                 
                 return response
@@ -154,9 +141,6 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
                     "error": "server_error",
                     "message": "Internal server error"
                 }, status_code=500)
-           # finally:
-                # Always clear request context, regardless of how the request completes
-                #clear_current_request_context()
 
         return app
     
