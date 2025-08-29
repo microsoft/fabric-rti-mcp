@@ -23,7 +23,7 @@ def setup_shutdown_handler(sig: int, frame: Optional[types.FrameType]) -> None:
     """Handle process termination signals."""
     signal_name = signal.Signals(sig).name
     logger.info(f"Received signal {sig} ({signal_name}), shutting down...")
-    
+
     # Exit the process
     sys.exit(0)
 
@@ -32,35 +32,39 @@ def register_tools(mcp: FastMCP) -> None:
     """Register all tools with the MCP server."""
     logger.info("Kusto configuration keys found in environment:")
     logger.info(", ".join(kusto_config.KustoConfig.existing_env_vars()))
-    
+
     kusto_tools.register_tools(mcp)
     eventstream_tools.register_tools(mcp)
+
 
 # Health check function defined at module level
 async def health_check(request: Request) -> JSONResponse:
     """Health check endpoint."""
     current_time = datetime.now(timezone.utc)
     logger.info(f"Server health check at {current_time}")
-    global server_start_time
-    return JSONResponse({
-        "status": "healthy",
-        "current_time_utc": current_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "server": "fabric-rti-mcp",
-        "start_time_utc": server_start_time.strftime("%Y-%m-%d %H:%M:%S UTC")
-    })
+    return JSONResponse(
+        {
+            "status": "healthy",
+            "current_time_utc": current_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "server": "fabric-rti-mcp",
+            "start_time_utc": server_start_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        }
+    )
+
 
 def add_health_endpoint(mcp: FastMCP) -> None:
     """Add health endpoint for Kubernetes liveness probes."""
     # Register the pre-defined health check function
     mcp.custom_route("/health", methods=["GET"])(health_check)
-    
+
+
 def main() -> None:
     """Main entry point for the server."""
     try:
         # Set up signal handlers for graceful shutdown
-        signal.signal(signal.SIGINT, setup_shutdown_handler) # Signal Interrupt)
-        signal.signal(signal.SIGTERM, setup_shutdown_handler) # Signal Terminate
-        
+        signal.signal(signal.SIGINT, setup_shutdown_handler)  # Signal Interrupt)
+        signal.signal(signal.SIGTERM, setup_shutdown_handler)  # Signal Terminate
+
         # Set up logging to stderr because stdout is used for stdio transport
         # writing to stderr because stdout is used for the transport
         # and we want to see the logs in the console
@@ -70,7 +74,7 @@ def main() -> None:
         logger.info(f"Platform: {sys.platform}")
         logger.info(f"PID: {os.getpid()}")
         logger.info(f"Transport: {config.transport}")
-        
+
         if config.transport == "http":
             logger.info(f"Host: {config.http_host}")
             logger.info(f"Port: {config.http_port}")
@@ -78,7 +82,7 @@ def main() -> None:
             logger.info(f"Stateless HTTP: {config.stateless_http}")
 
         # TODO: Add telemetry configuration here
-        
+
         name = "fabric-rti-mcp-server"
         if config.transport == "http":
             fastmcp_server = FastMCP(
@@ -100,7 +104,7 @@ def main() -> None:
             logger.info("Adding authorization middleware")
             add_auth_middleware(fastmcp_server)
 
-        # TBD - Add telemetry 
+        # TBD - Add telemetry
 
         # 3. Run the server with the specified transport
         if config.transport == "http":
@@ -109,7 +113,7 @@ def main() -> None:
         else:
             logger.info(f"Starting {name} (stdio)")
             fastmcp_server.run(transport="stdio")
-            
+
     except KeyboardInterrupt:
         logger.info("Server interrupted by user")
     except Exception as error:

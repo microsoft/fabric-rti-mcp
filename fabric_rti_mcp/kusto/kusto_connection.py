@@ -8,27 +8,31 @@ from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
 
 # Thread-safe context variable to store the current request's auth token
-_request_token: ContextVar[Optional[str]] = ContextVar('_request_token', default=None)
+_request_token: ContextVar[Optional[str]] = ContextVar("_request_token", default=None)
+
 
 def set_auth_token(token: Optional[str]) -> None:
     """Set the auth token for the current request context"""
     _request_token.set(token)
 
+
 def get_auth_token() -> Optional[str]:
     """Get the auth token from the current request context"""
     return _request_token.get()
 
+
 class BearerTokenCredential(TokenCredential):
     """A credential that uses a bearer token directly."""
-    
+
     def __init__(self, token: str):
         self.token = token
-    
+
     def get_token(self, *scopes: str, **kwargs: Any) -> AccessToken:
         """Get the token for the specified scopes."""
         # Create an AccessToken with a far future expiration
         actoken = AccessToken(token=self.token, expires_on=int(time.time()) + 3600)
         return actoken
+
 
 class KustoConnection:
     query_client: KustoClient
@@ -55,7 +59,7 @@ class KustoConnection:
         if token:
             # Use the bearer token directly if available (HTTP mode)
             return BearerTokenCredential(token)
-        
+
         return DefaultAzureCredential(
             exclude_shared_token_cache_credential=True,
             exclude_interactive_browser_credential=False,

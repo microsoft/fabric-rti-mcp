@@ -19,40 +19,41 @@ def extract_token_from_header(auth_header: str) -> str:
         return auth_header[7:]  # Remove "Bearer " (7 characters)
     return auth_header
 
+
 def decode_jwt_token(token: str) -> Dict[str, Any]:
     """
     Decode a JWT token without verification.
-    
+
     This function decodes the JWT token and extracts its payload.
     It doesn't verify the signature since we're just interested in logging the claims.
     It doesn't modify the original token - it only reads and extracts information.
-    
+
     Args:
         token: The JWT token string
-    
+
     Returns:
         Dict containing the decoded payload
     """
     # Create a copy of the token to ensure we don't modify the original
     token_copy = token[:]
-    
+
     try:
         # JWT tokens have 3 parts: header.payload.signature
-        parts = token_copy.split('.')
+        parts = token_copy.split(".")
         if len(parts) != 3:
             logger.warning("Invalid JWT token format")
             return {}
-        
+
         # Decode the payload (middle part)
         payload_encoded = parts[1]
-        
+
         # Add padding if needed
-        padding = '=' * (4 - len(payload_encoded) % 4) if len(payload_encoded) % 4 else ''
+        padding = "=" * (4 - len(payload_encoded) % 4) if len(payload_encoded) % 4 else ""
         payload_padded = payload_encoded + padding
-        
+
         # Replace URL safe characters
-        payload_fixed = payload_padded.replace('-', '+').replace('_', '/')
-        
+        payload_fixed = payload_padded.replace("-", "+").replace("_", "/")
+
         # Decode base64
         try:
             decoded = base64.b64decode(payload_fixed)
@@ -62,18 +63,19 @@ def decode_jwt_token(token: str) -> Dict[str, Any]:
             return {}
     except Exception as e:
         logger.warning(f"Error decoding JWT token: {str(e)}")
-        return {} # TBD : Handle token validation errors errors when validation is added
+        return {}  # TBD : Handle token validation errors errors when validation is added
+
 
 def add_auth_middleware(fastmcp: FastMCP) -> None:
     """
     Add HTTP authorization middleware by overriding streamable_http_app method.
-    
+
     It adds authentication middleware to the HTTP transport layer.
-    
+
     Args:
         fastmcp: The FastMCP instance to add middleware to
     """
-    
+
     # Store the original streamable_http_app method
     original_streamable_app = fastmcp.streamable_http_app
 
@@ -89,10 +91,12 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
             allow_methods=["*"],  # Allows all methods
             allow_headers=["*"],  # Allows all headers
         )
-        
+
         # Add middleware to check authentication for MCP endpoints
         @app.middleware("http")  # type: ignore
-        async def check_auth(request: Request, call_next: Callable[[Request], Awaitable[JSONResponse]]) -> JSONResponse:  # noqa: F811  # type: ignore[reportUnusedFunction]
+        async def check_auth(
+            request: Request, call_next: Callable[[Request], Awaitable[JSONResponse]]
+        ) -> JSONResponse:  # noqa: F811  # type: ignore[reportUnusedFunction]
             try:
                 # Skip auth check for health endpoint
                 if request.url.path == "/health":
@@ -106,47 +110,41 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
                 auth_header = request.headers.get("Authorization", "") or request.headers.get("authorization", "")
 
                 if not auth_header:
-                    return JSONResponse({
-                        "error": "unauthorized",
-                        "message": "Authorization header required"
-                    }, status_code=401)
+                    return JSONResponse(
+                        {"error": "unauthorized", "message": "Authorization header required"}, status_code=401
+                    )
 
-                request_uri = str(request.url) if 'url' in request else ""
-                request_method = request.method if 'method' in request else "GET"
+                request_uri = str(request.url) if "url" in request else ""
+                request_method = request.method if "method" in request else "GET"
                 logger.info(f"Request URI: {request_uri}, Method: {request_method}")
 
                 token = extract_token_from_header(auth_header)
-                
+
                 # Store the original token without modification
                 set_auth_token(token)
-                
+
                 token_payload = decode_jwt_token(token)
-                
-                audience = token_payload.get('aud', 'N/A')
-                tenant_id = token_payload.get('tid', 'N/A')
-                scopes = token_payload.get('scp', token_payload.get('roles', 'N/A'))
-                
+
+                audience = token_payload.get("aud", "N/A")
+                tenant_id = token_payload.get("tid", "N/A")
+                scopes = token_payload.get("scp", token_payload.get("roles", "N/A"))
+
                 logger.info(f"Token audience: {audience}")
                 logger.info(f"Token tenant ID: {tenant_id}")
                 logger.info(f"Token scopes/roles: {scopes}")
 
                 # Continue with request
                 response = await call_next(request)
-                
+
                 logger.info(f"Response status code: {response.status_code}")
-                
+
                 return response
 
             except Exception as e:
                 logger.error(f"Error in auth middleware: {e}")
-                return JSONResponse({
-                    "error": "server_error",
-                    "message": "Internal server error"
-                }, status_code=500)
+                return JSONResponse({"error": "server_error", "message": "Internal server error"}, status_code=500)
 
         return app
-    
+
     # Replace the streamable_http_app method with auth-enabled version
     fastmcp.streamable_http_app = auth_required_streamable_app
-
-
