@@ -5,6 +5,7 @@ import json
 from typing import Any, Awaitable, Callable, Dict
 
 from mcp.server.fastmcp import FastMCP
+from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -57,7 +58,8 @@ def decode_jwt_token(token: str) -> Dict[str, Any]:
         # Decode base64
         try:
             decoded = base64.b64decode(payload_fixed)
-            return json.loads(decoded)
+            payload: Dict[str, Any] = json.loads(decoded)
+            return payload
         except Exception as e:
             logger.warning(f"Failed to decode JWT payload: {str(e)}")
             return {}
@@ -79,7 +81,7 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
     # Store the original streamable_http_app method
     original_streamable_app = fastmcp.streamable_http_app
 
-    def auth_required_streamable_app():
+    def auth_required_streamable_app() -> Starlette:
         """StreamableHTTP app with auth middleware."""
         app = original_streamable_app()
 
@@ -147,4 +149,4 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
         return app
 
     # Replace the streamable_http_app method with auth-enabled version
-    fastmcp.streamable_http_app = auth_required_streamable_app
+    fastmcp.streamable_http_app = auth_required_streamable_app  # type: ignore
