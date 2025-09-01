@@ -6,7 +6,10 @@ import asyncio
 import json
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from typing import Any
+
+from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
 
 try:
     from mcp import ClientSession, StdioServerParameters
@@ -244,22 +247,20 @@ class KustoToolsLiveTester:
             print(f"List databases result: {json.dumps(result, indent=2)}")
 
             if result.get("success"):
-                # Handle both list and single object responses
-                databases = result.get("result", [])
-                if not isinstance(databases, list):
-                    databases = [databases] if databases else []
+                # Use the new parser to convert to canonical format
+                query_result = result.get("result", {})
+                parsed_data = KustoFormatter.parse(query_result)
+
+                # Extract database names from parsed rows
+                databases = [row.get("DatabaseName", "") for row in parsed_data]
+                databases = [db for db in databases if db]  # Filter out empty strings
 
                 # Assert minimum count to verify array fix is working
                 min_expected_dbs = 8
-                if len(databases) < min_expected_dbs:
-                    raise AssertionError(
-                        f"Expected at least {min_expected_dbs} databases, got {len(databases)}."
-                        "This suggests the array truncation bug is still present."
-                    )
-
-                print(f"✅ Found {len(databases)} databases (>= {min_expected_dbs} as expected)")
-                for db in databases[:5]:  # Show first 5
-                    print(f"  - {db.get('DatabaseName', 'N/A')}")
+                assert (
+                    len(databases) >= min_expected_dbs
+                ), f"Expected at least {min_expected_dbs} databases, got {len(databases)}."
+                print(f"✅ Found {len(databases)} databases")
             else:
                 print(f"❌ Failed to list databases: {result}")
                 raise AssertionError(f"Database listing failed: {result}")
@@ -284,16 +285,24 @@ class KustoToolsLiveTester:
                 "kusto_query",
                 {"query": "print now()", "cluster_uri": self.test_cluster_uri, "database": self.test_database},
             )
-            print(f"Query result: {json.dumps(result, indent=2)}")
 
             if result.get("success"):
-                # Handle both list and single object responses
-                query_results = result.get("result", [])
-                if not isinstance(query_results, list):
-                    query_results = [query_results] if query_results else []
-                print(f"✅ Query executed successfully, got {len(query_results)} rows")
-                if query_results:
-                    print(f"   Sample result: {query_results[0]}")
+                # Use the new parser to convert to canonical format
+                query_results = result.get("result", {})
+                print(f"Query result: {json.dumps(query_results, indent=2)}")
+                parsed_data = KustoFormatter.parse(query_results)
+
+                if parsed_data and len(parsed_data) > 0:
+                    # Get the timestamp value from the first row
+                    scalar_value = parsed_data[0].get("print_0", "")
+                    print(f"✅ Query succeeded, current time from Kusto: {scalar_value}")
+                    if scalar_value:
+                        parsed_date = datetime.fromisoformat(scalar_value.replace("Z", "+00:00"))
+                        assert datetime.now(tz=timezone.utc) - parsed_date < timedelta(
+                            minutes=1
+                        ), "Query result is stale"
+                else:
+                    print("❌ No data returned from query")
             else:
                 print(f"❌ Query failed: {result}")
 
@@ -314,25 +323,22 @@ class KustoToolsLiveTester:
             result = await self.client.call_tool(
                 "kusto_list_tables", {"cluster_uri": self.test_cluster_uri, "database": self.test_database}
             )
-            print(f"List tables result: {json.dumps(result, indent=2)}")
 
             if result.get("success"):
-                # Handle both list and single object responses
-                tables = result.get("result", [])
-                if not isinstance(tables, list):
-                    tables = [tables] if tables else []
+                # Use the new parser to convert to canonical format
+                query_result = result.get("result", {})
+                parsed_data = KustoFormatter.parse(query_result)
+
+                # Extract table names from parsed rows
+                tables = [row.get("TableName", "") for row in parsed_data]
+                tables = [table for table in tables if table]  # Filter out empty strings
 
                 # Assert minimum count to verify array fix is working
                 min_expected_tables = 50  # Samples database has many tables
-                if len(tables) < min_expected_tables:
-                    raise AssertionError(
-                        f"Expected at least {min_expected_tables} tables, got {len(tables)}. "
-                        "This suggests the array truncation bug is still present."
-                    )
-
+                assert (
+                    len(tables) > min_expected_tables
+                ), f"Expected at least {min_expected_tables} tables, got {len(tables)}. "
                 print(f"✅ Found {len(tables)} tables (>= {min_expected_tables} as expected)")
-                for table in tables[:5]:  # Show first 5
-                    print(f"  - {table.get('TableName', 'N/A')}")
             else:
                 print(f"❌ Failed to list tables: {result}")
                 raise AssertionError(f"Table listing failed: {result}")
@@ -361,7 +367,6 @@ class KustoToolsLiveTester:
                     "database": self.test_database,
                 },
             )
-            print(f"Sample table data result (truncated): {str(result)[:500]}...")
 
             if result.get("success"):
                 # Handle both list and single object responses
