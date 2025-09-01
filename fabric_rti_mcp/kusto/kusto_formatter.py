@@ -2,7 +2,7 @@ import csv
 import io
 import json
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, cast
 
 from azure.kusto.data.response import KustoResponseDataSet
 
@@ -89,7 +89,7 @@ class KustoFormatter:
         first_result = result_set.primary_results[0]
 
         # Build columnar structure
-        columnar_data = {}
+        columnar_data: dict[str, list[Any]] = {}
 
         # Initialize columns
         for i, col in enumerate(first_result.columns):
@@ -123,7 +123,7 @@ class KustoFormatter:
         return KustoResponseFormat(format="header_arrays", data="\n".join(lines))
 
     @staticmethod
-    def parse(response: Union[KustoResponseFormat, dict[str, Any]]) -> list[dict[str, Any]]:
+    def parse(response: KustoResponseFormat | dict[str, Any]) -> list[dict[str, Any]] | None:
         """
         Parse any KustoResponseFormat back to canonical JSON array format.
 
@@ -133,42 +133,55 @@ class KustoFormatter:
         Returns:
             List of dictionaries where each dict represents a row with column names as keys
         """
+        if response is None:  # type: ignore
+            return None  # type: ignore
+
         if isinstance(response, dict):
             format_type = response.get("format", "")
             data = response.get("data")
-        else:
+        elif isinstance(response, KustoResponseFormat):  # type: ignore
             format_type = response.format
             data = response.data
+        else:
+            raise ValueError("Invalid KustoResponseFormat")
+
+        # Handle None data early
+        if data is None:
+            return None
 
         if format_type == "json":
             return KustoFormatter._parse_json(data)
         elif format_type == "csv":
-            return KustoFormatter._parse_csv(data if isinstance(data, str) else "")
+            return KustoFormatter._parse_csv(data)
         elif format_type == "tsv":
-            return KustoFormatter._parse_tsv(data if isinstance(data, str) else "")
+            return KustoFormatter._parse_tsv(data)
         elif format_type == "columnar":
             return KustoFormatter._parse_columnar(data)
         elif format_type == "header_arrays":
-            return KustoFormatter._parse_header_arrays(data if isinstance(data, str) else "")
+            return KustoFormatter._parse_header_arrays(data)
         else:
             raise ValueError(f"Unsupported format: {format_type}")
 
     @staticmethod
     def _parse_json(data: Any) -> list[dict[str, Any]]:
         """Parse JSON format data (already in canonical format)"""
-        if not isinstance(data, list):
-            return []
-        return data
+        if data is None or (not isinstance(data, list) and not isinstance(data, dict)):  # type: ignore
+            raise ValueError("Invalid JSON format")
+        return data  # type: ignore
 
     @staticmethod
     def _parse_csv(data: str) -> list[dict[str, Any]]:
         """Parse CSV format data back to canonical JSON"""
-        if not data or not isinstance(data, str):
+        if data == "":
             return []
+        if data is None:  # type: ignore
+            return None  # type: ignore
+        if not isinstance(data, str):  # type: ignore
+            raise ValueError("Invalid CSV format")
 
         lines = data.strip().split("\n")
         if len(lines) < 1:
-            return []
+            raise ValueError("Invalid CSV format")
 
         # Parse CSV using csv.reader to handle escaping properly
         csv_reader = csv.reader(io.StringIO(data))
@@ -178,12 +191,12 @@ class KustoFormatter:
             return []
 
         headers = rows[0]
-        result = []
+        result: list[dict[str, Any]] = []
 
         for row in rows[1:]:
             # Pad row with empty strings if shorter than headers
             padded_row = row + [""] * (len(headers) - len(row))
-            row_dict = {}
+            row_dict: dict[str, Any] = {}
             for i, header in enumerate(headers):
                 value = padded_row[i] if i < len(padded_row) else ""
                 # Convert empty strings back to None if needed
@@ -195,21 +208,23 @@ class KustoFormatter:
     @staticmethod
     def _parse_tsv(data: str) -> list[dict[str, Any]]:
         """Parse TSV format data back to canonical JSON"""
-        if not data or not isinstance(data, str):
+        if data == "":
             return []
+        if not isinstance(data, str):  # type: ignore
+            raise ValueError("Invalid TSV format")
 
         lines = data.strip().split("\n")
         if len(lines) < 1:
-            return []
+            raise ValueError("Invalid TSV format")
 
         # Parse header
         headers = lines[0].split("\t")
-        result = []
+        result: list[dict[str, Any]] = []
 
         # Parse data rows
         for line in lines[1:]:
             values = line.split("\t")
-            row_dict = {}
+            row_dict: dict[str, Any] = {}
 
             for i, header in enumerate(headers):
                 value = values[i] if i < len(values) else ""
@@ -231,23 +246,21 @@ class KustoFormatter:
     @staticmethod
     def _parse_columnar(data: Any) -> list[dict[str, Any]]:
         """Parse columnar format data back to canonical JSON"""
-        if not isinstance(data, dict):
-            return []
-
-        if not data:
-            return []
+        if data is None or not isinstance(data, dict):
+            raise ValueError("Invalid columnar format")
+        data = cast(dict[str, list[Any]], data)
 
         # Get column names and determine row count
-        columns = list(data.keys())
+        columns: list[str] = list(data.keys())  # type: ignore
         if not columns:
             return []
 
         # All columns should have the same length
         row_count = len(data[columns[0]]) if columns[0] in data else 0
 
-        result = []
+        result: list[dict[str, Any]] = []
         for row_idx in range(row_count):
-            row_dict = {}
+            row_dict: dict[str, Any] = {}
             for col_name in columns:
                 col_values = data.get(col_name, [])
                 row_dict[col_name] = col_values[row_idx] if row_idx < len(col_values) else None
@@ -258,8 +271,8 @@ class KustoFormatter:
     @staticmethod
     def _parse_header_arrays(data: str) -> list[dict[str, Any]]:
         """Parse header_arrays format data back to canonical JSON"""
-        if not data or not isinstance(data, str):
-            return []
+        if data is None or not isinstance(data, str):  # type: ignore
+            raise ValueError("Invalid header_arrays format")
 
         lines = data.strip().split("\n")
         if len(lines) < 1:
@@ -267,19 +280,19 @@ class KustoFormatter:
 
         try:
             # Parse header (first line)
-            headers = json.loads(lines[0])
-            if not isinstance(headers, list):
-                return []
+            headers: list[str] = json.loads(lines[0])
+            if not isinstance(headers, list):  # type: ignore
+                return []  # type: ignore
 
-            result = []
+            result: list[dict[str, Any]] = []
 
             # Parse data rows (remaining lines)
             for line in lines[1:]:
-                row_values = json.loads(line)
-                if not isinstance(row_values, list):
-                    continue
+                row_values: list[Any] = json.loads(line)
+                if not isinstance(row_values, list):  # type: ignore
+                    continue  # type: ignore
 
-                row_dict = {}
+                row_dict: dict[str, Any] = {}
                 for i, header in enumerate(headers):
                     row_dict[header] = row_values[i] if i < len(row_values) else None
                 result.append(row_dict)

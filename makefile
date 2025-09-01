@@ -4,17 +4,12 @@ fmt:
 
 lint:
 	flake8 .
-	mypy . --explicit-package-bases 
+	mypy fabric_rti_mcp --explicit-package-bases
 
 test:
 	pytest
 
-precommit:
-	isort .
-	black .
-	flake8 .
-	mypy . --explicit-package-bases
-	pytest
+precommit: fmt lint test
 
 run:
 	uvx .

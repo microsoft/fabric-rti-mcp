@@ -323,17 +323,29 @@ class TestParsingFunctionality:
 
     def test_parse_malformed_data_cases(self) -> None:
         """Test parsing with malformed data returns empty list."""
-        # Test non-list JSON data
-        assert KustoFormatter.parse({"format": "json", "data": "not a list"}) == []
+        # Test invalid json should raise
+        try:
+            KustoFormatter.parse({"format": "json", "data": "not a list"})
+            assert False, "Expected ValueError to be raised"
+        except ValueError as e:
+            assert "Invalid JSON format" in str(e)
 
-        # Test non-string CSV data
-        assert KustoFormatter.parse({"format": "csv", "data": None}) == []
+        # Test None is a noop
+        assert KustoFormatter.parse({"format": "csv", "data": None}) is None
 
-        # Test non-string TSV data
-        assert KustoFormatter.parse({"format": "tsv", "data": 123}) == []
+        # Test invalid TSV data should raise
+        try:
+            KustoFormatter.parse({"format": "tsv", "data": 123})
+            assert False, "Expected ValueError to be raised"
+        except ValueError as e:
+            assert "Invalid TSV format" in str(e)
 
-        # Test non-dict columnar data
-        assert KustoFormatter.parse({"format": "columnar", "data": "not a dict"}) == []
+        # Test invalid columnar data should raise
+        try:
+            KustoFormatter.parse({"format": "columnar", "data": "not a dict"})
+            assert False, "Expected ValueError to be raised"
+        except ValueError as e:
+            assert "Invalid columnar format" in str(e)
 
         # Test malformed JSON in header_arrays
         assert KustoFormatter.parse({"format": "header_arrays", "data": "invalid json"}) == []
