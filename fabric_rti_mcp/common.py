@@ -86,7 +86,7 @@ class GlobalFabricRTIConfig:
         parser.add_argument("--host", type=str, help="HTTP host to listen on")
         parser.add_argument("--port", type=int, help="HTTP port to listen on")
         parser.add_argument("--stateless-http", type=bool, help="Enable or disable stateless HTTP")
-        args = parser.parse_args()
+        args, _ = parser.parse_known_args()
 
         transport = base_config.transport
         if args.stdio:

@@ -15,7 +15,7 @@ from fabric_rti_mcp import __version__  # type: ignore
 from fabric_rti_mcp.common import logger
 from fabric_rti_mcp.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
-from fabric_rti_mcp.kusto.kusto_response_formatter import format_results
+from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
 
 _DEFAULT_DB_NAME = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
 CONFIG = KustoConfig.from_env()
@@ -115,7 +115,7 @@ def _execute(
     cluster_uri: str,
     readonly_override: bool = False,
     database: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
     caller_func = caller_frame.f_globals.get(action_name)  # type: ignore
@@ -136,7 +136,7 @@ def _execute(
         database = database.strip()
 
         result_set = client.execute(database, query, crp)
-        return format_results(result_set)
+        return asdict(KustoFormatter.to_columnar(result_set))
 
     except Exception as e:
         error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"
@@ -156,7 +156,7 @@ def kusto_known_services() -> List[Dict[str, str]]:
     return [asdict(service) for service in services]
 
 
-def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
+def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
     """
     Executes a KQL query on the specified database. If no database is provided,
     it will use the default database.
@@ -170,7 +170,7 @@ def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) ->
 
 
 @destructive_operation
-def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
+def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
     it will use the default database.
@@ -183,7 +183,7 @@ def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None
     return _execute(command, cluster_uri, database=database)
 
 
-def kusto_list_databases(cluster_uri: str) -> List[Dict[str, Any]]:
+def kusto_list_databases(cluster_uri: str) -> Dict[str, Any]:
     """
     Retrieves a list of all databases in the Kusto cluster.
 
@@ -193,18 +193,18 @@ def kusto_list_databases(cluster_uri: str) -> List[Dict[str, Any]]:
     return _execute(".show databases", cluster_uri)
 
 
-def kusto_list_tables(cluster_uri: str, database: str) -> List[Dict[str, Any]]:
+def kusto_list_tables(cluster_uri: str, database: str) -> Dict[str, Any]:
     """
     Retrieves a list of all tables in the specified database.
 
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: The name of the database to list tables from.
-    :return: List of dictionaries containing table information.
+    :return: List of dictionaries containing table names, cslschema and a docstring.
     """
-    return _execute(".show tables", cluster_uri, database=database)
+    return _execute(".show database cslschema | project-away DatabaseName", cluster_uri, database=database)
 
 
-def kusto_get_entities_schema(cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
+def kusto_get_entities_schema(cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
     """
     Retrieves schema information for all entities (tables, materialized views, functions)
     in the specified database. If no database is provided, uses the default database.
@@ -222,7 +222,7 @@ def kusto_get_entities_schema(cluster_uri: str, database: Optional[str] = None) 
     )
 
 
-def kusto_get_table_schema(table_name: str, cluster_uri: str, database: Optional[str] = None) -> List[Dict[str, Any]]:
+def kusto_get_table_schema(table_name: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
     """
     Retrieves the schema information for a specific table in the specified database.
     If no database is provided, uses the default database.
@@ -239,7 +239,7 @@ def kusto_get_function_schema(
     function_name: str,
     cluster_uri: str,
     database: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Retrieves schema information for a specific function, including parameters and output schema.
     If no database is provided, uses the default database.
@@ -257,7 +257,7 @@ def kusto_sample_table_data(
     cluster_uri: str,
     sample_size: int = 10,
     database: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Retrieves a random sample of records from the specified table.
     If no database is provided, uses the default database.
@@ -276,7 +276,7 @@ def kusto_sample_function_data(
     cluster_uri: str,
     sample_size: int = 10,
     database: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Retrieves a random sample of records from the result of a function call.
     If no database is provided, uses the default database.
@@ -300,7 +300,7 @@ def kusto_ingest_inline_into_table(
     data_comma_separator: str,
     cluster_uri: str,
     database: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Ingests inline CSV data into a specified table. The data should be provided as a comma-separated string.
     If no database is provided, uses the default database.
@@ -325,7 +325,7 @@ def kusto_get_shots(
     sample_size: int = 3,
     database: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
 
