@@ -230,8 +230,20 @@ The MCP Server seamlessly integrates with your host operating system's authentic
 4. **Azure PowerShell** (`AzurePowerShellCredential`) - Uses your Az PowerShell login
 5. **Azure Developer CLI** (`AzureDeveloperCliCredential`) - Uses your azd login
 6. **Interactive Browser** (`InteractiveBrowserCredential`) - Falls back to browser-based login if needed
+7. **Managed Identity** (`ManagedIdentityCredential`) - For server deployments in Azure
 
 If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials.
+
+### OBO (On-Behalf-Of) Authentication
+
+For OBO token exchange (when your application needs to call other services on behalf of the authenticated user), the server uses managed identity credentials. This is configured using these environment variables:
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `AZURE_TENANT_ID` | Your Azure tenant ID | None | `72f988bf-86f1-41af-91ab-2d7cd011db47` |
+| `AZURE_CLIENT_ID` | Client ID of your application | None | `11111111-1111-1111-1111-111111111111` |
+
+The server uses managed identity credentials for OBO token exchange. This is recommended for deployments in Azure services like App Service, Azure Functions, or Azure Container Instances. When deployed to these services, the application will automatically use the managed identity assigned to the service.
 
 ## 🛡️ Security Note
 

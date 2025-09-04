@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: fabric-rti-mcp
+metadata:
+  template: fabric-rti-mcp@1.0.1
+services:
+  mcp:
+    project: .
+    language: python
+    host: function
