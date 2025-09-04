@@ -65,7 +65,7 @@ class TokenOboExchanger:
 
             mgid = "a6f04c9b-1ff2-405e-baa4-d12c456b8a01"
             managed_identity_credential = ManagedIdentityCredential(client_id=mgid)
-            miScopes = f"https://management.azure.com/.default"
+            miScopes = "api://AzureADTokenExchange/.default"
             self.logger.info(f"Start: Managed Identity token acquire {miScopes}")
             access_token_result = managed_identity_credential.get_token(miScopes)
             assertion_token = access_token_result.token
