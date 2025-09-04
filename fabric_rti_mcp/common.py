@@ -18,6 +18,8 @@ class GlobalFabricRTIEnvVarNames:
     functions_deployment_default_port = "FUNCTIONS_CUSTOMHANDLER_PORT"  # Azure Functions uses this port name
     http_path = "FABRIC_RTI_HTTP_PATH"
     stateless_http = "FABRIC_RTI_STATELESS_HTTP"
+    azure_tenant_id = "AZURE_TENANT_ID"
+    azure_client_id = "AZURE_CLIENT_ID"
 
 
 DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
@@ -25,7 +27,9 @@ DEFAULT_FABRIC_RTI_TRANSPORT = "stdio"
 DEFAULT_FABRIC_RTI_HTTP_PORT = 3000
 DEFAULT_FABRIC_RTI_HTTP_PATH = "/mcp"
 DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
-DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
+DEFAULT_FABRIC_RTI_STATELESS_HTTP = True 
+DEFAULT_AZURE_TENANT_ID = "72f988bf-86f1-41af-91ab-2d7cd011db47"
+DEFAULT_AZURE_CLIENT_ID = "a17e14b0-76cc-4c45-b67b-8a675dab4de3" # may not need to use default?
 
 
 @dataclass(slots=True, frozen=True)
@@ -36,6 +40,8 @@ class GlobalFabricRTIConfig:
     http_port: int
     http_path: str
     stateless_http: bool
+    azure_tenant_id: str
+    azure_client_id: str
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -56,6 +62,8 @@ class GlobalFabricRTIConfig:
             stateless_http=bool(
                 os.getenv(GlobalFabricRTIEnvVarNames.stateless_http, DEFAULT_FABRIC_RTI_STATELESS_HTTP)
             ),
+            azure_tenant_id=os.getenv(GlobalFabricRTIEnvVarNames.azure_tenant_id, DEFAULT_AZURE_TENANT_ID),
+            azure_client_id=os.getenv(GlobalFabricRTIEnvVarNames.azure_client_id, DEFAULT_AZURE_CLIENT_ID),
         )
 
     @staticmethod
@@ -69,6 +77,8 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.http_port,
             GlobalFabricRTIEnvVarNames.http_path,
             GlobalFabricRTIEnvVarNames.stateless_http,
+            GlobalFabricRTIEnvVarNames.azure_tenant_id,
+            GlobalFabricRTIEnvVarNames.azure_client_id,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -105,6 +115,8 @@ class GlobalFabricRTIConfig:
             http_port=http_port,
             http_path=base_config.http_path,
             stateless_http=stateless_http,
+            azure_tenant_id=base_config.azure_tenant_id,
+            azure_client_id=base_config.azure_client_id,
         )
 
 
