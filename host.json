@@ -9,7 +9,15 @@
         "description": {
             "defaultExecutablePath": "python",
             "workingDirectory": "",
-            "arguments": ["-m", "fabric_rti_mcp.server", "--http"]
+            "arguments": [
+                "-m", 
+                "fabric_rti_mcp.server", 
+                "--http", 
+                "--stateless-http",
+                "--use-obo-flow", 
+                "--entra-app-client-id=a17e14b0-76cc-4c45-b67b-8a675dab4de3", 
+                "--umi-client-id=a6f04c9b-1ff2-405e-baa4-d12c456b8a01"
+            ]
         },
         "enableForwardingHttpRequest": true,
         "enableHttpProxyingRequest": true

@@ -6,6 +6,9 @@
         "FABRIC_RTI_HTTP_PATH": "/mcp",
         "FABRIC_RTI_HTTP_HOST": "0.0.0.0",
         "AzureWebJobsFeatureFlags": "EnableWorkerIndexing",
-        "FABRIC_RTI_MCP_DISABLE_AUTH": "true"
+        "FABRIC_RTI_MCP_DISABLE_AUTH": "true",
+        "ENTRA_APP_CLIENT_ID": "a17e14b0-76cc-4c45-b67b-8a675dab4de3",
+        "UMI_CLIENT_ID": "a6f04c9b-1ff2-405e-baa4-d12c456b8a01",
+        "USE_OBO_FLOW": "false"
     }
 }

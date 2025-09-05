@@ -10,9 +10,11 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from fabric_rti_mcp.common import logger
-from fabric_rti_mcp.kusto.kusto_connection import set_auth_token
 from fabric_rti_mcp.authentication.token_obo_exchanger import TokenOboExchanger
+from fabric_rti_mcp.common import global_config as config
+from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.config.obo_config import obo_config
+from fabric_rti_mcp.kusto.kusto_connection import set_auth_token
 
 
 def extract_token_from_header(auth_header: str) -> str:
@@ -124,20 +126,29 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
                 token = extract_token_from_header(auth_header)
 
                 try:
-                    # Create token exchanger and perform OBO token exchange
-                    token_exchanger = TokenOboExchanger()
-                    exchanged_token = await token_exchanger.perform_obo_token_exchange(
-                        user_token=token,
-                        resource_uri="https://kusto.kusto.windows.net" # TBD: Use cluster name?
-                    )
-                    # Update token to use the exchanged token
-                    token = exchanged_token
-                    logger.info("Successfully performed OBO token exchange")
+
+                    if config.use_obo_flow:
+                        logger.info("Started performing OBO token exchange")
+                        # Create token exchanger and perform OBO token exchange
+                        token_exchanger = TokenOboExchanger()
+                        exchanged_token = await token_exchanger.perform_obo_token_exchange(
+                            user_token=token, resource_uri=obo_config.kusto_audience
+                        )
+                        # Update token to use the exchanged token
+                        token = exchanged_token
+                        logger.info("Successfully performed OBO token exchange")
+                    else:
+                        logger.info("OBO flow not enabled; using original token")
+
                 except Exception as e:
                     # Log the error and raise it to fail the request
                     logger.error(f"Error during OBO token exchange: {e}")
                     return JSONResponse(
-                        {"error": "unauthorized", "message": "Unauthorized to get the required token to access the resource"}, status_code=401
+                        {
+                            "error": "unauthorized",
+                            "message": "Unauthorized to get the required token to access the resource",
+                        },
+                        status_code=401,
                     )
 
                 # Store the token for use by services

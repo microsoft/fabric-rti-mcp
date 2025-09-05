@@ -5,11 +5,12 @@ from typing import Any, Dict, Optional
 import msal
 from azure.identity import ManagedIdentityCredential
 
-from fabric_rti_mcp.common import logger, GlobalFabricRTIEnvVarNames, config as global_config
+from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.config.obo_config import OBOFlowEnvVarNames, obo_config
 
 
 class TokenOboExchanger:
-    
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         Initialize the TokenOboExchanger with optional configuration.
@@ -19,82 +20,86 @@ class TokenOboExchanger:
         """
         self.config = config or {}
         self.logger = logger
-        self.tenant_id = global_config.azure_tenant_id
-        self.client_id = global_config.azure_client_id
-        # Always use managed identity
-        self.use_managed_identity = True
+        self.tenant_id = obo_config.azure_tenant_id
+        self.entra_app_client_id = obo_config.entra_app_client_id
+        self.umi_client_id = obo_config.umi_client_id
+        self.logger.info(
+            f"TokenOboExchanger initialized with tenant_id: {self.tenant_id}, "
+            f"entra_app_client_id: {self.entra_app_client_id} and umi_client_id: {self.umi_client_id}"
+        )
 
-    async def perform_obo_token_exchange(
-        self, 
-        user_token: str, 
-        resource_uri: str
-    ) -> str:
+    async def perform_obo_token_exchange(self, user_token: str, resource_uri: str) -> str:
         """
         Perform an On-Behalf-Of token exchange to get a new token for a resource.
 
         Args:
             user_token: The original user token
-            resource_uri: The URI of the target resource for which to get a token (e.g., https://graph.microsoft.com)
+            resource_uri: The URI of the target resource to get a token (ex. https://kusto.kusto.windows.net)
 
         Returns:
             New access token for the specified resource
         """
-        self.logger.info(f"Performing OBO token exchange for target resource: {resource_uri}")
-        
-        # Use provided client_id or fall back to environment variable
-        client_id = self.client_id
-        
+        self.logger.info(f"TokenOboExchanger: Performing OBO token exchange for target resource: {resource_uri}")
+
+        client_id = self.entra_app_client_id
+
         if not client_id:
-            self.logger.error("Client ID not provided for OBO token exchange")
-            raise ValueError(f"Client ID is required for OBO token exchange. Set {GlobalFabricRTIEnvVarNames.azure_client_id} environment variable.")
-        
+            self.logger.error("TokenOboExchanger: Entra App client ID is not provided for OBO token exchange")
+            raise ValueError(
+                f"Entra App client ID is required for OBO token exchange. "
+                f"Set {OBOFlowEnvVarNames.entra_app_client_id} environment variable."
+            )
+
         if not self.tenant_id:
-            self.logger.error("Tenant ID not available for OBO token exchange")
-            raise ValueError(f"{GlobalFabricRTIEnvVarNames.azure_tenant_id} environment variable is required for OBO token exchange")
+            self.logger.error("TokenOboExchanger: Tenant ID not available for OBO token exchange")
+            raise ValueError(
+                f"{OBOFlowEnvVarNames.azure_tenant_id} environment variable is required for OBO token exchange"
+            )
         
+        if not self.umi_client_id:
+            self.logger.error("TokenOboExchanger: UMI Client ID not available for OBO token exchange")
+            raise ValueError(
+                f"{OBOFlowEnvVarNames.umi_client_id} environment variable is required for OBO token exchange"
+            )
+
         try:
             authority = f"https://login.microsoftonline.com/{self.tenant_id}"
+            self.logger.info(
+                f"TokenOboExchanger: Using Managed Identity for OBO token exchange tenant_id: {self.tenant_id}, "
+                f"entra_app_client_id: {self.entra_app_client_id} and umi_client_id: {self.umi_client_id}"
+            )
 
-            self.logger.info(f"Using Managed Identity for OBO token exchange with client ID: {client_id} and Tenant id: {self.tenant_id}")
-
-            # Get a token for the client application using managed identity
-            # credential = ManagedIdentityCredential(client_id=client_id)
-            
-            # For the app's own token
-            # app_token = credential.get_token("https://management.azure.com/.default")
-
-            mgid = "a6f04c9b-1ff2-405e-baa4-d12c456b8a01"
-            managed_identity_credential = ManagedIdentityCredential(client_id=mgid)
-            miScopes = "api://AzureADTokenExchange/.default"
-            self.logger.info(f"Start: Managed Identity token acquire {miScopes}")
-            access_token_result = managed_identity_credential.get_token(miScopes)
+            managed_identity_credential = ManagedIdentityCredential(client_id=self.umi_client_id)
+            miScopes = "api://AzureADTokenExchange/.default" # this is the default scope to be used
+            self.logger.info(f"TokenOboExchanger: Start managed identity token acquire for scopes {miScopes}")
+            access_token_result = managed_identity_credential.get_token(miScopes) # get the MI token to be used as client assesrtion for OBO
             assertion_token = access_token_result.token
 
-            self.logger.info(f"Create MSAL with Managed Identity token acquired token = {assertion_token[7:18]}")
-            # Create the MSAL application using the token we got
             app = msal.ConfidentialClientApplication(
                 client_id=client_id,
                 authority=authority,
-                client_credential={"client_assertion": assertion_token, "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}
+                client_credential={
+                    "client_assertion": assertion_token,
+                    "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                },
             )
-            
+
             # Set the scopes for the target resource we want to access
             target_scopes = [f"{resource_uri}/.default"]
-            self.logger.info(f"Requesting access to scopes: {target_scopes}")
-            
+            self.logger.info(f"TokenOboExchanger: Requesting access to scopes: {target_scopes}")
+
             # Use the user token to acquire a new token for the target resource
-            result = app.acquire_token_on_behalf_of(
-                user_assertion=user_token,
-                scopes=target_scopes
-            )
-            
+            result = app.acquire_token_on_behalf_of(user_assertion=user_token, scopes=target_scopes)
+
             if "access_token" not in result:
-                error_message = f"Failed to acquire token: {result.get('error_description', result.get('error', 'Unknown error'))}"
+                error_msg = result.get("error_description") or result.get("error") or "Unknown error"
+                error_message = f"TokenOboExchanger: Failed to acquire token: {error_msg}"
                 self.logger.error(error_message)
                 raise Exception(error_message)
-            
-            self.logger.info("Successfully acquired OBO token")
-            return result["access_token"]
+
+            self.logger.info("TokenOboExchanger: Successfully acquired OBO token")
+            access_token: str = result["access_token"]
+            return access_token
         except Exception as e:
-            self.logger.error(f"Error performing OBO token exchange: {e}")
-            raise
+            self.logger.error(f"TokenOboExchanger: Error performing OBO token exchange: {e}")
+            raise Exception(f"OBO token exchange failed: {e}") from e
