@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-import msal
+import msal  # type: ignore
 from azure.identity import ManagedIdentityCredential
 
 from fabric_rti_mcp.common import logger
