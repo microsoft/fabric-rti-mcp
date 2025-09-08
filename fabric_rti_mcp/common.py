@@ -18,6 +18,7 @@ class GlobalFabricRTIEnvVarNames:
     functions_deployment_default_port = "FUNCTIONS_CUSTOMHANDLER_PORT"  # Azure Functions uses this port name
     http_path = "FABRIC_RTI_HTTP_PATH"
     stateless_http = "FABRIC_RTI_STATELESS_HTTP"
+    use_obo_flow = "USE_OBO_FLOW"
 
 
 DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
@@ -26,6 +27,7 @@ DEFAULT_FABRIC_RTI_HTTP_PORT = 3000
 DEFAULT_FABRIC_RTI_HTTP_PATH = "/mcp"
 DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
 DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
+DEFAULT_USE_OBO_FLOW = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -36,6 +38,7 @@ class GlobalFabricRTIConfig:
     http_port: int
     http_path: str
     stateless_http: bool
+    use_obo_flow: bool
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -56,6 +59,7 @@ class GlobalFabricRTIConfig:
             stateless_http=bool(
                 os.getenv(GlobalFabricRTIEnvVarNames.stateless_http, DEFAULT_FABRIC_RTI_STATELESS_HTTP)
             ),
+            use_obo_flow=bool(os.getenv(GlobalFabricRTIEnvVarNames.use_obo_flow, DEFAULT_USE_OBO_FLOW)),
         )
 
     @staticmethod
@@ -69,6 +73,7 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.http_port,
             GlobalFabricRTIEnvVarNames.http_path,
             GlobalFabricRTIEnvVarNames.stateless_http,
+            GlobalFabricRTIEnvVarNames.use_obo_flow,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -85,7 +90,8 @@ class GlobalFabricRTIConfig:
         parser.add_argument("--http", action="store_true", help="Use HTTP transport")
         parser.add_argument("--host", type=str, help="HTTP host to listen on")
         parser.add_argument("--port", type=int, help="HTTP port to listen on")
-        parser.add_argument("--stateless-http", type=bool, help="Enable or disable stateless HTTP")
+        parser.add_argument("--stateless-http", action="store_true", help="Enable or disable stateless HTTP")
+        parser.add_argument("--use-obo-flow", action="store_true", help="Enable or disable OBO flow")
         args, _ = parser.parse_known_args()
 
         transport = base_config.transport
@@ -97,6 +103,7 @@ class GlobalFabricRTIConfig:
         stateless_http = args.stateless_http if args.stateless_http is not None else base_config.stateless_http
         http_host = args.host if args.host is not None else base_config.http_host
         http_port = args.port if args.port is not None else base_config.http_port
+        use_obo_flow = args.use_obo_flow if args.use_obo_flow is not None else base_config.use_obo_flow
 
         return GlobalFabricRTIConfig(
             fabric_api_base=base_config.fabric_api_base,
@@ -105,8 +112,9 @@ class GlobalFabricRTIConfig:
             http_port=http_port,
             http_path=base_config.http_path,
             stateless_http=stateless_http,
+            use_obo_flow=use_obo_flow,
         )
 
 
 # Global configuration instance
-config = GlobalFabricRTIConfig.with_args()
+global_config = GlobalFabricRTIConfig.with_args()

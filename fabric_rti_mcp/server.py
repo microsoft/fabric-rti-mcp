@@ -11,7 +11,9 @@ from starlette.responses import JSONResponse
 
 from fabric_rti_mcp import __version__
 from fabric_rti_mcp.authentication.auth_middleware import add_auth_middleware
-from fabric_rti_mcp.common import config, logger
+from fabric_rti_mcp.common import global_config as config
+from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.config.obo_config import obo_config
 from fabric_rti_mcp.eventstream import eventstream_tools
 from fabric_rti_mcp.kusto import kusto_config, kusto_tools
 
@@ -80,8 +82,12 @@ def main() -> None:
             logger.info(f"Port: {config.http_port}")
             logger.info(f"Path: {config.http_path}")
             logger.info(f"Stateless HTTP: {config.stateless_http}")
+            logger.info(f"Use OBO flow: {config.use_obo_flow}")
 
         # TODO: Add telemetry configuration here
+
+        if config.use_obo_flow and (not obo_config.entra_app_client_id or not obo_config.umi_client_id):
+            raise ValueError("OBO flow is enabled but required client IDs are missing")
 
         name = "fabric-rti-mcp-server"
         if config.transport == "http":
