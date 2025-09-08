@@ -14,25 +14,10 @@ from fabric_rti_mcp.authentication.auth_middleware import add_auth_middleware
 from fabric_rti_mcp.common import config, logger
 from fabric_rti_mcp.eventstream import eventstream_tools
 from fabric_rti_mcp.kusto import kusto_config, kusto_tools
+
 # Global variable to store server start time
 server_start_time = datetime.now(timezone.utc)
 
-KUSTO_INSTRUCTIONS = """
-- Kusto
-    - Description: Kusto service for querying and managing data.
-    - Guideline:
-        - Clearly distinguish between different parts of queries (e.g. relational, graph, semantic similarity).
-          Although they can be mixed, they have different semantics:
-            - Relational queries focus on structured data and relationships.
-            - Graph queries explore connections between entities. To use them you must have:
-                - A graph reference (e.g. graph('name'))
-                - A graph-match clause with a graph pattern (e.g. | graph-match (node)-[edge]->(target) project node, edge)
-                - The graph-match node must have a projection clause to be valid
-            - Semantic similarity queries assess the meaning and context of data.
-                - Use series_cosine_similarity(vector_a, vector_b)
-        - Don't guess schema / values. Always execute `kusto_get_entity_schema()` first,
-            and if still unsure, use a simple query like `take 1` to understand the data.
-"""
 
 def setup_shutdown_handler(sig: int, frame: Optional[types.FrameType]) -> None:
     """Handle process termination signals."""
@@ -108,13 +93,7 @@ def main() -> None:
                 stateless_http=config.stateless_http,
             )
         else:
-            fastmcp_server = FastMCP(name, instructions="""
-This server has the following services:
-{ki}
-- EventStream
-    - Description: EventStream service for processing and managing events.
-    - Guideline: ``
-                                     """.format(ki=KUSTO_INSTRUCTIONS))
+            fastmcp_server = FastMCP(name)
 
         # 1. Register tools
         register_tools(fastmcp_server)
