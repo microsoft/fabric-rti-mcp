@@ -6,7 +6,7 @@ import msal  # type: ignore
 from azure.identity import ManagedIdentityCredential
 
 from fabric_rti_mcp.common import logger
-from fabric_rti_mcp.config.obo_config import OBOFlowEnvVarNames, obo_config
+from fabric_rti_mcp.config.obo_config import FabricRtiMcpOBOFlowEnvVarNames, obo_config
 
 
 class TokenOboExchanger:
@@ -47,19 +47,19 @@ class TokenOboExchanger:
             self.logger.error("TokenOboExchanger: Entra App client ID is not provided for OBO token exchange")
             raise ValueError(
                 f"Entra App client ID is required for OBO token exchange. "
-                f"Set {OBOFlowEnvVarNames.entra_app_client_id} environment variable."
+                f"Set {FabricRtiMcpOBOFlowEnvVarNames.entra_app_client_id} environment variable."
             )
 
         if not self.tenant_id:
             self.logger.error("TokenOboExchanger: Tenant ID not available for OBO token exchange")
             raise ValueError(
-                f"{OBOFlowEnvVarNames.azure_tenant_id} environment variable is required for OBO token exchange"
+                f"{FabricRtiMcpOBOFlowEnvVarNames.azure_tenant_id} environment variable required for OBO token exchange"
             )
 
         if not self.umi_client_id:
             self.logger.error("TokenOboExchanger: UMI Client ID not available for OBO token exchange")
             raise ValueError(
-                f"{OBOFlowEnvVarNames.umi_client_id} environment variable is required for OBO token exchange"
+                f"{FabricRtiMcpOBOFlowEnvVarNames.umi_client_id} environment variable required for OBO token exchange"
             )
 
         try:
