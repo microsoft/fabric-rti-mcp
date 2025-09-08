@@ -197,6 +197,15 @@ def kusto_graph_query(graph_name:str, query: str, cluster_uri: str, database: st
     :param database: Optional database name. If not provided, uses the default database.
     :return: List of dictionaries containing query results.
     
+    Critical:
+    * Graph queries must have a graph-match clause and a projection clause. Optionally they may contain a where clause.
+    * Graph entities are only accessible in the graph-match context. When leaving the context (sub-sequent '|'), the data is treated as a table, and graph-specific functions (like labels()) will not be available.
+    * Always prefer expressing everything with graph patterns. Avoid using graph-to-table operator unless you have no other way around it.
+    * There is no id() function on graph entities. If you need a unique identifier, make sure to check the schema and use an appropriate property.
+    * There is no `type` property on graph entities. Use `labels()` function to get the list of labels for a node or edge.
+    * Properties that are used outside the graph-match context are renamed to `_` instead of `.`. For example, `node.name` becomes `node_name`.
+    * For variable length paths, you can use `all` or `any` to enforce conditions on all/any edges in variable path length elements (e.g. `()-[e*1..3]->() where all(e, labels() has 'Label')`).
+
     Examples:
     
     # Basic node counting with graph-match (MUST include project clause):
@@ -206,10 +215,14 @@ def kusto_graph_query(graph_name:str, query: str, cluster_uri: str, database: st
         cluster_uri
     )
     
-    # Complex relationship matching:
+    # Relationship matching:
     kusto_graph_query(
         "MyGraph", 
-        "| graph-match (house)-[relationship]->(character) where labels(house) has 'House' and labels(character) has 'Character' project house.name, character.name | limit 10",
+        "| graph-match (house)-[relationship]->(character) 
+            where labels(house) has 'House' and labels(character) has 'Character' 
+            project house.name, character.firstName, character.lastName
+        | project house_name=house_name, character_full_name=character_firstName + ' ' + character_lastName
+        | limit 10",
         cluster_uri
     )
     
@@ -219,57 +232,6 @@ def kusto_graph_query(graph_name:str, query: str, cluster_uri: str, database: st
         "| graph-match (source)-[path*1..3]->(destination) project source, destination, path | take 100",
         cluster_uri
     )
-    
-    # Advanced security analysis - compromised user to sensitive resource:
-    kusto_graph_query(
-        "SecurityGraph",
-        '''| graph-match (compromisedUser)-->(initialDevice)-[hop*0..3]->(sensitiveResource)
-        where 
-            // Connect with our identity analysis
-            compromisedUser.id in (CompromisedAccounts)
-            // Connect with our asset analysis
-            and sensitiveResource.id in (SensitiveResources)
-        project
-            CompromisedUser = compromisedUser,
-            InitialDevice = initialDevice,
-            SensitiveResourceAccessed = sensitiveResource,
-            Path = hop,
-            // Report if user has legitimate permissions (additional context)
-            HasLegitimateAccess = compromisedUser in 
-                (PermissionChains | where ResourceId == sensitiveResource | project UserId)''',
-        cluster_uri
-    )
-    
-    # Complex permission analysis with group membership chains:
-    kusto_graph_query(
-        "IdentityGraph",
-        '''| graph-match (resource)<-[authorized_on*1..4]-(group)-[hasMember*1..255]->(user)
-        where user.NodeId == interestingUser and user.NodeType == "User" and hasMember.EdgeType == "has_member" and group.NodeType == "Group" and
-            authorized_on.EdgeType in ("authorized_on", "contains_resource")
-        project Username=user.NodeId, userFQDN=user.FQDN, resourceTenantId=resource.TenantId, resourceType=resource.NodeType, resourceName=resource.NodeId''',
-        cluster_uri
-    )
-    
-     # Complex permission analysis with group membership chains:
-    kusto_graph_query(
-        "IdentityGraph",
-        '''| graph-match (resource)<-[authorized_on*1..4]-(group)-[hasMember*1..255]->(user)
-        where user.NodeId == interestingUser and user.NodeType == "User" and hasMember.EdgeType == "has_member" and group.NodeType == "Group" and
-            authorized_on.EdgeType in ("authorized_on", "contains_resource")
-        project Username=user.NodeId, userFQDN=user.FQDN, resourceTenantId=resource.TenantId, resourceType=resource.NodeType, resourceName=resource.NodeId''',
-        cluster_uri
-    )
-    
-	# Complex pattern with variable length edges amd filtering
-    kusto_graph_query("NetworkGraph", 
-    		"| graph-match (source)-[path*1..5]->(destination) where_clause='all(path, bandwidth > 100) project user.name, resource.name, path_length = array_length(access) | limit 10",
-            cluster_uri
-	)
-    
-    Important: 
-    - graph-match queries MUST include a project clause
-    - Use graph-to-table for simple node/edge exploration
-    - Use labels() function in WHERE clauses of graph-match, not in the path pattern
     """
     query = f"graph('{graph_name}') {query}" # todo: this should properly choose between graph() and make-graph operator
     return _execute(query, cluster_uri, database=database)
@@ -309,7 +271,7 @@ def kusto_list_entities(cluster_uri: str, entity_type: str, database: str | None
     elif entity_type == "functions":
         return _execute(".show functions", cluster_uri, database=database)
     elif entity_type == "graphs":
-        return _execute(".show graphs", cluster_uri, database=database)
+        return _execute(".show graph_models", cluster_uri, database=database)
     return {}
 
 def kusto_describe_database(cluster_uri: str, database: str | None) -> Dict[str, Any]:
