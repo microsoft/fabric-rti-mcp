@@ -17,6 +17,7 @@ from fabric_rti_mcp.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
 
+
 def canonical_entity_type(entity_type: str) -> str:
     """
     Converts various entity type inputs to a canonical form.
@@ -34,10 +35,19 @@ def canonical_entity_type(entity_type: str) -> str:
     elif entity_type in ["database", "databases"]:
         return "database"
     else:
-        raise ValueError(f"Unknown entity type '{entity_type}'. Supported types: table, materialized-view, function, graph, database.")
+        raise ValueError(
+            f"Unknown entity type '{entity_type}'. "
+            "Supported types: table, materialized-view, function, graph, database."
+        )
+
 
 CONFIG = KustoConfig.from_env()
-_DEFAULT_DB_NAME = CONFIG.default_service.default_database if CONFIG.default_service else KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+_DEFAULT_DB_NAME = (
+    CONFIG.default_service.default_database
+    if CONFIG.default_service
+    else KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+)
+
 
 class KustoConnectionManager:
     def __init__(self) -> None:
@@ -186,55 +196,71 @@ def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) ->
     """
     return _execute(query, cluster_uri, database=database)
 
-def kusto_graph_query(graph_name:str, query: str, cluster_uri: str, database: str | None) -> Dict[str, Any]:
+
+def kusto_graph_query(graph_name: str, query: str, cluster_uri: str, database: str | None) -> Dict[str, Any]:
     """
-    Intelligently executes a graph query using snapshots if they exist, otherwise falls back to transient graphs.
+    Intelligently executes a graph query using snapshots if they exist,
+    otherwise falls back to transient graphs.
     If no database is provided, uses the default database.
 
     :param graph_name: Name of the graph to query.
-    :param query: The KQL query to execute after the graph() function. Must include proper project clause for graph-match queries.
+    :param query: The KQL query to execute after the graph() function.
+    Must include proper project clause for graph-match queries.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
     :return: List of dictionaries containing query results.
-    
+
     Critical:
-    * Graph queries must have a graph-match clause and a projection clause. Optionally they may contain a where clause.
-    * Graph entities are only accessible in the graph-match context. When leaving the context (sub-sequent '|'), the data is treated as a table, and graph-specific functions (like labels()) will not be available.
-    * Always prefer expressing everything with graph patterns. Avoid using graph-to-table operator unless you have no other way around it.
-    * There is no id() function on graph entities. If you need a unique identifier, make sure to check the schema and use an appropriate property.
-    * There is no `type` property on graph entities. Use `labels()` function to get the list of labels for a node or edge.
-    * Properties that are used outside the graph-match context are renamed to `_` instead of `.`. For example, `node.name` becomes `node_name`.
-    * For variable length paths, you can use `all` or `any` to enforce conditions on all/any edges in variable path length elements (e.g. `()-[e*1..3]->() where all(e, labels() has 'Label')`).
+    * Graph queries must have a graph-match clause and a projection clause.
+    Optionally they may contain a where clause.
+    * Graph entities are only accessible in the graph-match scope.
+        When leaving that scope (sub-sequent '|'), the data is treated as a table,
+        and graph-specific functions (like labels()) will not be available.
+    * Always prefer expressing everything with graph patterns.
+      Avoid using graph-to-table operator unless you have no other way around it.
+    * There is no id() function on graph entities. If you need a unique identifier,
+      make sure to check the schema and use an appropriate property.
+    * There is no `type` property on graph entities.
+      Use `labels()` function to get the list of labels for a node or edge.
+    * Properties that are used outside the graph-match context are renamed to `_` instead of `.`.
+      For example, `node.name` becomes `node_name`.
+    * For variable length paths, you can use `all` or `any` to enforce conditions on all/any edges
+      in variable path length elements (e.g. `()-[e*1..3]->() where all(e, labels() has 'Label')`).
 
     Examples:
-    
+
     # Basic node counting with graph-match (MUST include project clause):
     kusto_graph_query(
-        "MyGraph", 
-        "| graph-match (node) project labels=labels(node) | mv-expand label = labels | summarize count() by tostring(label)",
+        "MyGraph",
+        "| graph-match (node) project labels=labels(node)
+         | mv-expand label = labels
+         | summarize count() by tostring(label)",
         cluster_uri
     )
-    
+
     # Relationship matching:
     kusto_graph_query(
-        "MyGraph", 
-        "| graph-match (house)-[relationship]->(character) 
-            where labels(house) has 'House' and labels(character) has 'Character' 
+        "MyGraph",
+        "| graph-match (house)-[relationship]->(character)
+            where labels(house) has 'House' and labels(character) has 'Character'
             project house.name, character.firstName, character.lastName
         | project house_name=house_name, character_full_name=character_firstName + ' ' + character_lastName
         | limit 10",
         cluster_uri
     )
-    
+
     # Variable length path matching:
     kusto_graph_query(
-        "MyGraph", 
+        "MyGraph",
         "| graph-match (source)-[path*1..3]->(destination) project source, destination, path | take 100",
         cluster_uri
     )
     """
-    query = f"graph('{graph_name}') {query}" # todo: this should properly choose between graph() and make-graph operator
+    query = (
+        f"graph('{graph_name}') {query}"  # todo: this should properly choose between graph() and make-graph operator
+    )
     return _execute(query, cluster_uri, database=database)
+
 
 @destructive_operation
 def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
@@ -255,7 +281,8 @@ def kusto_list_entities(cluster_uri: str, entity_type: str, database: str | None
     Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
 
     :param entity_type: Type of entities to list: "databases", "tables", "materialized-views", "functions", "graphs".
-    :param database: The name of the database to list entities from. Required for all types except "databases" (which are top-level).
+    :param database: The name of the database to list entities from.
+    Required for all types except "databases" (which are top-level).
     :param cluster_uri: The URI of the Kusto cluster.
 
     :return: List of dictionaries containing entity information.
@@ -273,6 +300,7 @@ def kusto_list_entities(cluster_uri: str, entity_type: str, database: str | None
     elif entity_type == "graphs":
         return _execute(".show graph_models", cluster_uri, database=database)
     return {}
+
 
 def kusto_describe_database(cluster_uri: str, database: str | None) -> Dict[str, Any]:
     """
@@ -292,7 +320,9 @@ def kusto_describe_database(cluster_uri: str, database: str | None) -> Dict[str,
     )
 
 
-def kusto_describe_database_entity(entity_name: str, entity_type: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
+def kusto_describe_database_entity(
+    entity_name: str, entity_type: str, cluster_uri: str, database: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Retrieves the schema information for a specific entity (table, materialized view, function, graph)
     in the specified database. If no database is provided, uses the default database.
@@ -310,11 +340,19 @@ def kusto_describe_database_entity(entity_name: str, entity_type: str, cluster_u
     elif entity_type.lower() == "function":
         return _execute(f".show function {entity_name}", cluster_uri, database=database)
     elif entity_type.lower() == "materialized-view":
-        return _execute(f".show materialized-view {entity_name} | project Name, SourceTable, Query, LastRun, LastRunResult, IsHealthy, IsEnabled, DocString", cluster_uri, database=database)
+        return _execute(
+            f".show materialized-view {entity_name} "
+            "| project Name, SourceTable, Query, LastRun, LastRunResult, IsHealthy, IsEnabled, DocString",
+            cluster_uri,
+            database=database,
+        )
     elif entity_type.lower() == "graph":
-        return _execute(f".show graph_model {entity_name} details | project Name, Model", cluster_uri, database=database)
+        return _execute(
+            f".show graph_model {entity_name} details | project Name, Model", cluster_uri, database=database
+        )
     # Add more entity types as needed
     return {}
+
 
 def kusto_sample_entity(
     entity_name: str,
@@ -340,7 +378,6 @@ def kusto_sample_entity(
     if entity_type.lower() == "graph":
         # TODO: handle transient graphs properly
         return _execute(f"graph('{entity_name}') | sample {sample_size}", cluster_uri, database=database)
-    
 
     raise ValueError(f"Sampling not supported for entity type '{entity_type}'.")
 
