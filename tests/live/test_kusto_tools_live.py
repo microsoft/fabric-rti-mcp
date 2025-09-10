@@ -190,7 +190,8 @@ class KustoToolsLiveTester:
 
         expected_kusto_tools = [
             "kusto_known_services",
-            "kusto_query",
+            "kusto_kql_query",
+            "kusto_tsql_query",
             "kusto_command",
             "kusto_list_databases",
             "kusto_list_tables",
@@ -270,8 +271,8 @@ class KustoToolsLiveTester:
             raise
 
     async def test_simple_query(self) -> None:
-        """Test kusto_query tool with a simple query."""
-        print("\n🔍 Testing kusto_query...")
+        """Test kusto_kql_query tool with a simple query."""
+        print("\n🔍 Testing kusto_kql_query...")
         if not self.client:
             raise RuntimeError("Client not initialized")
 
@@ -282,7 +283,7 @@ class KustoToolsLiveTester:
         try:
             # Simple query to get current time
             result = await self.client.call_tool(
-                "kusto_query",
+                "kusto_kql_query",
                 {"query": "print now()", "cluster_uri": self.test_cluster_uri, "database": self.test_database},
             )
 
@@ -380,6 +381,42 @@ class KustoToolsLiveTester:
         except Exception as e:
             print(f"❌ Error testing table sample: {e}")
 
+    async def test_tsql_query(self) -> None:
+        """Test kusto_tsql_query tool with a simple T-SQL query."""
+        print("\n🧮 Testing kusto_tsql_query...")
+        if not self.client:
+            raise RuntimeError("Client not initialized")
+
+        if not self.test_cluster_uri:
+            print("⚠️  No KUSTO_CLUSTER_URI configured, skipping T-SQL query test")
+            return
+
+        try:
+            # Simple T-SQL query to return a scalar value
+            result = await self.client.call_tool(
+                "kusto_tsql_query",
+                {"query": "SELECT 1 AS value", "cluster_uri": self.test_cluster_uri, "database": self.test_database},
+            )
+
+            if result.get("success"):
+                query_results = result.get("result", {})
+                print(f"T-SQL query result: {json.dumps(query_results, indent=2)}")
+                parsed_data = KustoFormatter.parse(query_results)
+
+                if parsed_data and len(parsed_data) > 0:
+                    value = parsed_data[0].get("value", None)
+                    print(f"✅ T-SQL query succeeded, value: {value}")
+                    assert value == 1 or value == "1", f"Expected value 1, got {value}"
+                else:
+                    print("❌ No data returned from T-SQL query")
+                    raise AssertionError("No data returned from T-SQL query")
+            else:
+                print(f"❌ T-SQL query failed: {result}")
+                raise AssertionError(f"T-SQL query failed: {result}")
+
+        except Exception as e:
+            print(f"❌ Error testing T-SQL query: {e}")
+
     async def run_all_tests(self) -> None:
         """Run all available tests."""
         print("🚀 Starting Kusto tools live testing...")
@@ -394,6 +431,7 @@ class KustoToolsLiveTester:
             await self.test_simple_query()
             await self.test_list_tables()
             await self.test_table_sample()
+            await self.test_tsql_query()
 
             print("\n✅ All tests completed!")
 

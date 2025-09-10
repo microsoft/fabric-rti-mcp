@@ -46,7 +46,8 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 
 #### Eventhouse (Kusto) - 12 Tools:
 - **`kusto_known_services`** - List all available Kusto services configured in the MCP
-- **`kusto_query`** - Execute KQL queries on the specified database
+- **`kusto_kql_query`** - Execute KQL queries on the specified database
+- **`kusto_tsql_query`** - Execute T-SQL queries on the specified database
 - **`kusto_command`** - Execute Kusto management commands (destructive operations)
 - **`kusto_list_databases`** - List all databases in the Kusto cluster
 - **`kusto_list_tables`** - List all tables in a specified database

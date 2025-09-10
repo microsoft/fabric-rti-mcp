@@ -6,7 +6,7 @@ from azure.kusto.data import ClientRequestProperties
 from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
-from fabric_rti_mcp.kusto.kusto_service import kusto_command, kusto_query
+from fabric_rti_mcp.kusto.kusto_service import kusto_command, kusto_kql_query, kusto_tsql_query
 
 
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
@@ -30,7 +30,7 @@ def test_execute_basic_query(
     database = "test_db"
 
     # Act
-    result = kusto_query(query, sample_cluster_uri, database=database)
+    result = kusto_kql_query(query, sample_cluster_uri, database=database)
 
     # Assert
     mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
@@ -45,7 +45,7 @@ def test_execute_basic_query(
     crp = mock_client.execute.call_args[0][2]
     assert isinstance(crp, ClientRequestProperties)
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
-    assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
+    assert crp.client_request_id.startswith("KFRTI_MCP.kusto_kql_query:")  # type: ignore
     assert crp.has_option("request_readonly")
 
     # Verify result format
@@ -73,14 +73,14 @@ def test_execute_error_includes_correlation_id(
 
     # Act & Assert
     with pytest.raises(RuntimeError) as exc_info:
-        kusto_query(query, sample_cluster_uri, database=database)
+        kusto_kql_query(query, sample_cluster_uri, database=database)
 
     error_message = str(exc_info.value)
 
     # Verify the error message includes correlation ID and operation name
     assert "correlation ID:" in error_message
-    assert "KFRTI_MCP.kusto_query:" in error_message
-    assert "kusto_query" in error_message
+    assert "KFRTI_MCP.kusto_kql_query:" in error_message
+    assert "kusto_kql_query" in error_message
     assert "Kusto execution failed" in error_message
 
 
@@ -135,8 +135,54 @@ def test_successful_operations_do_not_log_correlation_id(
     query = "TestTable | take 10"
 
     # Act
-    kusto_query(query, sample_cluster_uri)
+    kusto_kql_query(query, sample_cluster_uri)
 
     # Assert - verify no info or debug logging occurs for successful operations
     assert not mock_logger.info.called
     assert not mock_logger.debug.called
+
+
+@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+def test_tsql_query_sets_query_language(
+    mock_get_kusto_connection: Mock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that kusto_tsql_query properly sets the query_language option to 'sql'."""
+    # Arrange
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    query = "SELECT * FROM TestTable"
+    database = "test_db"
+
+    # Act
+    result = kusto_tsql_query(query, sample_cluster_uri, database=database)
+
+    # Assert
+    mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
+    mock_client.execute.assert_called_once()
+
+    # Verify database and query
+    args = mock_client.execute.call_args[0]
+    assert args[0] == database
+    assert args[1] == query
+
+    # Verify ClientRequestProperties settings
+    crp = mock_client.execute.call_args[0][2]
+    assert isinstance(crp, ClientRequestProperties)
+    assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
+    assert crp.client_request_id.startswith("KFRTI_MCP.kusto_tsql_query:")  # type: ignore
+    assert crp.has_option("request_readonly")
+    # Verify that query_language is set to 'sql'
+    assert crp.has_option("query_language")
+    assert crp.get_option("query_language", "") == "sql"
+
+    # Verify result format
+    assert result["format"] == "columnar"
+    assert result["data"]["TestColumn"][0] == "TestValue"

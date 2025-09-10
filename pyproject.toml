@@ -22,7 +22,7 @@ dependencies = [
     "azure-kusto-data~=5.0.0",
     "azure-identity",
     "azure-kusto-ingest~=5.0.0",
-    "msal~=1.28.0"
+    "msal~=1.30.0"
 ]
 
 [project.optional-dependencies]

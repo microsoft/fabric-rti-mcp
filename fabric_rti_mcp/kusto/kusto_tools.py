@@ -10,7 +10,11 @@ def register_tools(mcp: FastMCP) -> None:
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(
-        kusto_service.kusto_query,
+        kusto_service.kusto_kql_query,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_tsql_query,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(

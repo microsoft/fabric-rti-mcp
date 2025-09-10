@@ -92,7 +92,9 @@ def destructive_operation(func: F) -> F:
     return wrapper  # type: ignore
 
 
-def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequestProperties:
+def _crp(
+    action: str, is_destructive: bool, ignore_readonly: bool, additional_properties: Optional[Dict[str, Any]] = None
+) -> ClientRequestProperties:
     crp: ClientRequestProperties = ClientRequestProperties()
     crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
@@ -107,6 +109,11 @@ def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequ
         timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         crp.set_option("servertimeout", timeout_str)
 
+    # Apply any additional properties provided by the user (can override global settings)
+    if additional_properties:
+        for key, value in additional_properties.items():
+            crp.set_option(key, value)
+
     return crp
 
 
@@ -115,6 +122,7 @@ def _execute(
     cluster_uri: str,
     readonly_override: bool = False,
     database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
@@ -122,7 +130,7 @@ def _execute(
     is_destructive = hasattr(caller_func, "_is_destructive")
 
     # Generate correlation ID for tracing
-    crp = _crp(action_name, is_destructive, readonly_override)
+    crp = _crp(action_name, is_destructive, readonly_override, client_request_properties)
     correlation_id = crp.client_request_id  # type: ignore
 
     try:
@@ -156,7 +164,7 @@ def kusto_known_services() -> List[Dict[str, str]]:
     return [asdict(service) for service in services]
 
 
-def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
+def kusto_kql_query(query: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
     """
     Executes a KQL query on the specified database. If no database is provided,
     it will use the default database.
@@ -167,6 +175,20 @@ def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) ->
     :return: The result of the query execution as a list of dictionaries (json).
     """
     return _execute(query, cluster_uri, database=database)
+
+
+def kusto_tsql_query(query: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Executes a T-SQL query on the specified database. If no database is provided,
+    it will use the default database.
+
+    :param query: The T-SQL query to execute.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :return: The result of the query execution as a list of dictionaries (json).
+    """
+    client_request_properties = {"query_language": "sql"}
+    return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
 @destructive_operation
