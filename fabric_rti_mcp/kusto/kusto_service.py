@@ -381,13 +381,13 @@ def kusto_sample_entity(
         sample_size_node = max(1, sample_size // 2)  # at least 5 of each
         sample_size_edge = max(1, sample_size - sample_size_node)  # at least 5 of each
         return _execute(
-            f"""let NodeSample = graph('{entity_name}') 
-| graph-to-table nodes 
+            f"""let NodeSample = graph('{entity_name}')
+| graph-to-table nodes
 | take {sample_size_node}
 | project PackedEntity=pack_all(), EntityType='Node';
-let EdgeSample = graph('{entity_name}') 
-| graph-to-table edges  
-| take {sample_size_edge} 
+let EdgeSample = graph('{entity_name}')
+| graph-to-table edges
+| take {sample_size_edge}
 | project PackedEntity=pack_all(), EntityType='Edge';
 NodeSample
 | union EdgeSample

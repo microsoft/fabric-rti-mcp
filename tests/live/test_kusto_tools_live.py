@@ -277,7 +277,8 @@ class KustoToolsLiveTester:
                     # Assert minimum count
                     assert (
                         len(parsed_data) >= min_expected_count
-                    ), f"Expected at least {min_expected_count} {entity_type}, got {len(parsed_data)}. Args: {json.dumps(call_args)}"
+                    ), f"Expected at least {min_expected_count} {entity_type}, "
+                    "got {len(parsed_data)}. Args: {json.dumps(call_args)}"
                     print(f"    ✅ Found {len(parsed_data)} {entity_type}")
 
                     # Check expected first value if specified
