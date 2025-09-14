@@ -249,7 +249,10 @@ def kusto_graph_query(graph_name: str, query: str, cluster_uri: str, database: s
     # Variable length path matching:
     kusto_graph_query(
         "MyGraph",
-        "| graph-match (source)-[path*1..3]->(destination) project source, destination, path | take 100",
+        "| graph-match (source)-[path*1..3]->(m)-[e]->(target)
+            where all(path, labels() has 'Label')
+            project source, destination, path, m, e, target
+        | take 100",
         cluster_uri
     )
     """
@@ -293,13 +296,13 @@ def kusto_list_entities(cluster_uri: str, entity_type: str, database: Optional[s
             database=KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
         )
     elif entity_type == "table":
-        return _execute(".show tables", cluster_uri, database=database)
+        return _execute(".show tables | project-away DatabaseName", cluster_uri, database=database)
     elif entity_type == "materialized-view":
         return _execute(".show materialized-views", cluster_uri, database=database)
     elif entity_type == "function":
         return _execute(".show functions", cluster_uri, database=database)
     elif entity_type == "graph":
-        return _execute(".show graph_models", cluster_uri, database=database)
+        return _execute(".show graph_models | project-away DatabaseName", cluster_uri, database=database)
     return {}
 
 
@@ -307,6 +310,9 @@ def kusto_describe_database(cluster_uri: str, database: str | None) -> Dict[str,
     """
     Retrieves schema information for all entities (tables, materialized views, functions, graphs)
     in the specified database.
+
+    In most cases, it would be useful to call kusto_sample_entity() to see *actual* data samples,
+    since schema information alone may not provide a complete picture of the data (e.g. dynamic columns, etc...)
 
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: The name of the database to get schema for.
