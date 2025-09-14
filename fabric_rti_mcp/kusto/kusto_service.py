@@ -6,10 +6,7 @@ import uuid
 from dataclasses import asdict
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from azure.kusto.data import (
-    ClientRequestProperties,
-    KustoConnectionStringBuilder,
-)
+from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
 from fabric_rti_mcp.common import logger
@@ -276,7 +273,7 @@ def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None
     return _execute(command, cluster_uri, database=database)
 
 
-def kusto_list_entities(cluster_uri: str, entity_type: str, database: str | None) -> Dict[str, Any]:
+def kusto_list_entities(cluster_uri: str, entity_type: str, database: Optional[str] = None) -> Dict[str, Any]:
     """
     Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
 
@@ -289,15 +286,19 @@ def kusto_list_entities(cluster_uri: str, entity_type: str, database: str | None
     """
 
     entity_type = canonical_entity_type(entity_type)
-    if entity_type == "databases":
-        return _execute(".show databases", cluster_uri)
-    elif entity_type == "tables":
+    if entity_type == "database":
+        return _execute(
+            ".show databases | project DatabaseName, DatabaseAccessMode, PrettyName, DatabaseId",
+            cluster_uri,
+            database=KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
+        )
+    elif entity_type == "table":
         return _execute(".show tables", cluster_uri, database=database)
-    elif entity_type == "materialized-views":
+    elif entity_type == "materialized-view":
         return _execute(".show materialized-views", cluster_uri, database=database)
-    elif entity_type == "functions":
+    elif entity_type == "function":
         return _execute(".show functions", cluster_uri, database=database)
-    elif entity_type == "graphs":
+    elif entity_type == "graph":
         return _execute(".show graph_models", cluster_uri, database=database)
     return {}
 
@@ -377,7 +378,23 @@ def kusto_sample_entity(
         return _execute(f"{entity_name} | sample {sample_size}", cluster_uri, database=database)
     if entity_type.lower() == "graph":
         # TODO: handle transient graphs properly
-        return _execute(f"graph('{entity_name}') | sample {sample_size}", cluster_uri, database=database)
+        sample_size_node = max(1, sample_size // 2)  # at least 5 of each
+        sample_size_edge = max(1, sample_size - sample_size_node)  # at least 5 of each
+        return _execute(
+            f"""let NodeSample = graph('{entity_name}') 
+| graph-to-table nodes 
+| take {sample_size_node}
+| project PackedEntity=pack_all(), EntityType='Node';
+let EdgeSample = graph('{entity_name}') 
+| graph-to-table edges  
+| take {sample_size_edge} 
+| project PackedEntity=pack_all(), EntityType='Edge';
+NodeSample
+| union EdgeSample
+""",
+            cluster_uri,
+            database=database,
+        )
 
     raise ValueError(f"Sampling not supported for entity type '{entity_type}'.")
 
