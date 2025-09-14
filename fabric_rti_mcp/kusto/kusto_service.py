@@ -6,10 +6,7 @@ import uuid
 from dataclasses import asdict
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from azure.kusto.data import (
-    ClientRequestProperties,
-    KustoConnectionStringBuilder,
-)
+from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
 from fabric_rti_mcp.common import logger
@@ -17,8 +14,36 @@ from fabric_rti_mcp.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
 
-_DEFAULT_DB_NAME = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+
+def canonical_entity_type(entity_type: str) -> str:
+    """
+    Converts various entity type inputs to a canonical form.
+    For example, "materialized-view" and "materialized view" both map to "materialized-view".
+    """
+    entity_type = entity_type.strip().lower()
+    if entity_type in ["materialized view", "materialized-view", "mv"]:
+        return "materialized-view"
+    elif entity_type in ["table", "tables"]:
+        return "table"
+    elif entity_type in ["function", "functions"]:
+        return "function"
+    elif entity_type in ["graph", "graphs", "graph model", "graph-model"]:
+        return "graph"
+    elif entity_type in ["database", "databases"]:
+        return "database"
+    else:
+        raise ValueError(
+            f"Unknown entity type '{entity_type}'. "
+            "Supported types: table, materialized-view, function, graph, database."
+        )
+
+
 CONFIG = KustoConfig.from_env()
+_DEFAULT_DB_NAME = (
+    CONFIG.default_service.default_database
+    if CONFIG.default_service
+    else KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+)
 
 
 class KustoConnectionManager:
@@ -169,6 +194,74 @@ def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) ->
     return _execute(query, cluster_uri, database=database)
 
 
+def kusto_graph_query(graph_name: str, query: str, cluster_uri: str, database: str | None) -> Dict[str, Any]:
+    """
+    Intelligently executes a graph query using snapshots if they exist,
+    otherwise falls back to transient graphs.
+    If no database is provided, uses the default database.
+
+    :param graph_name: Name of the graph to query.
+    :param query: The KQL query to execute after the graph() function.
+    Must include proper project clause for graph-match queries.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :return: List of dictionaries containing query results.
+
+    Critical:
+    * Graph queries must have a graph-match clause and a projection clause.
+    Optionally they may contain a where clause.
+    * Graph entities are only accessible in the graph-match scope.
+        When leaving that scope (sub-sequent '|'), the data is treated as a table,
+        and graph-specific functions (like labels()) will not be available.
+    * Always prefer expressing everything with graph patterns.
+      Avoid using graph-to-table operator unless you have no other way around it.
+    * There is no id() function on graph entities. If you need a unique identifier,
+      make sure to check the schema and use an appropriate property.
+    * There is no `type` property on graph entities.
+      Use `labels()` function to get the list of labels for a node or edge.
+    * Properties that are used outside the graph-match context are renamed to `_` instead of `.`.
+      For example, `node.name` becomes `node_name`.
+    * For variable length paths, you can use `all` or `any` to enforce conditions on all/any edges
+      in variable path length elements (e.g. `()-[e*1..3]->() where all(e, labels() has 'Label')`).
+
+    Examples:
+
+    # Basic node counting with graph-match (MUST include project clause):
+    kusto_graph_query(
+        "MyGraph",
+        "| graph-match (node) project labels=labels(node)
+         | mv-expand label = labels
+         | summarize count() by tostring(label)",
+        cluster_uri
+    )
+
+    # Relationship matching:
+    kusto_graph_query(
+        "MyGraph",
+        "| graph-match (house)-[relationship]->(character)
+            where labels(house) has 'House' and labels(character) has 'Character'
+            project house.name, character.firstName, character.lastName
+        | project house_name=house_name, character_full_name=character_firstName + ' ' + character_lastName
+        | limit 10",
+        cluster_uri
+    )
+
+    # Variable length path matching:
+    kusto_graph_query(
+        "MyGraph",
+        "| graph-match (source)-[path*1..3]->(m)-[e]->(target)
+            where all(path, labels() has 'Label')
+            project source, destination, path, m, e, target
+        | take 100",
+        cluster_uri
+    )
+    """
+    query = (
+        f"graph('{graph_name}') {query}"  # todo: this should properly choose between graph() and make-graph operator
+    )
+    return _execute(query, cluster_uri, database=database)
+
+
 @destructive_operation
 def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
     """
@@ -183,115 +276,133 @@ def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None
     return _execute(command, cluster_uri, database=database)
 
 
-def kusto_list_databases(cluster_uri: str) -> Dict[str, Any]:
+def kusto_list_entities(cluster_uri: str, entity_type: str, database: Optional[str] = None) -> Dict[str, Any]:
     """
-    Retrieves a list of all databases in the Kusto cluster.
+    Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
+
+    :param entity_type: Type of entities to list: "databases", "tables", "materialized-views", "functions", "graphs".
+    :param database: The name of the database to list entities from.
+    Required for all types except "databases" (which are top-level).
+    :param cluster_uri: The URI of the Kusto cluster.
+
+    :return: List of dictionaries containing entity information.
+    """
+
+    entity_type = canonical_entity_type(entity_type)
+    if entity_type == "database":
+        return _execute(
+            ".show databases | project DatabaseName, DatabaseAccessMode, PrettyName, DatabaseId",
+            cluster_uri,
+            database=KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
+        )
+    elif entity_type == "table":
+        return _execute(".show tables | project-away DatabaseName", cluster_uri, database=database)
+    elif entity_type == "materialized-view":
+        return _execute(".show materialized-views", cluster_uri, database=database)
+    elif entity_type == "function":
+        return _execute(".show functions", cluster_uri, database=database)
+    elif entity_type == "graph":
+        return _execute(".show graph_models | project-away DatabaseName", cluster_uri, database=database)
+    return {}
+
+
+def kusto_describe_database(cluster_uri: str, database: str | None) -> Dict[str, Any]:
+    """
+    Retrieves schema information for all entities (tables, materialized views, functions, graphs)
+    in the specified database.
+
+    In most cases, it would be useful to call kusto_sample_entity() to see *actual* data samples,
+    since schema information alone may not provide a complete picture of the data (e.g. dynamic columns, etc...)
 
     :param cluster_uri: The URI of the Kusto cluster.
-    :return: List of dictionaries containing database information.
-    """
-    return _execute(".show databases", cluster_uri)
-
-
-def kusto_list_tables(cluster_uri: str, database: str) -> Dict[str, Any]:
-    """
-    Retrieves a list of all tables in the specified database.
-
-    :param cluster_uri: The URI of the Kusto cluster.
-    :param database: The name of the database to list tables from.
-    :return: List of dictionaries containing table names, cslschema and a docstring.
-    """
-    return _execute(".show database cslschema | project-away DatabaseName", cluster_uri, database=database)
-
-
-def kusto_get_entities_schema(cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Retrieves schema information for all entities (tables, materialized views, functions)
-    in the specified database. If no database is provided, uses the default database.
-
-    :param cluster_uri: The URI of the Kusto cluster.
-    :param database: Optional database name. If not provided, uses the default database.
+    :param database: The name of the database to get schema for.
     :return: List of dictionaries containing entity schema information.
     """
     return _execute(
         ".show databases entities with (showObfuscatedStrings=true) "
         f"| where DatabaseName == '{database or _DEFAULT_DB_NAME}' "
-        "| project EntityName, EntityType, Folder, DocString",
+        "| project EntityName, EntityType, Folder, DocString, CslInputSchema, Content, CslOutputSchema",
         cluster_uri,
         database=database,
     )
 
 
-def kusto_get_table_schema(table_name: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Retrieves the schema information for a specific table in the specified database.
-    If no database is provided, uses the default database.
-
-    :param table_name: Name of the table to get schema for.
-    :param cluster_uri: The URI of the Kusto cluster.
-    :param database: Optional database name. If not provided, uses the default database.
-    :return: List of dictionaries containing table schema information.
-    """
-    return _execute(f".show table {table_name} cslschema", cluster_uri, database=database)
-
-
-def kusto_get_function_schema(
-    function_name: str,
-    cluster_uri: str,
-    database: Optional[str] = None,
+def kusto_describe_database_entity(
+    entity_name: str, entity_type: str, cluster_uri: str, database: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Retrieves schema information for a specific function, including parameters and output schema.
-    If no database is provided, uses the default database.
+    Retrieves the schema information for a specific entity (table, materialized view, function, graph)
+    in the specified database. If no database is provided, uses the default database.
 
-    :param function_name: Name of the function to get schema for.
+    :param entity_name: Name of the entity to get schema for.
+    :param entity_type: Type of the entity (table, materialized view, function, graph).
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
-    :return: List of dictionaries containing function schema information.
+    :return: List of dictionaries containing entity schema information.
     """
-    return _execute(f".show function {function_name}", cluster_uri, database=database)
+
+    entity_type = canonical_entity_type(entity_type)
+    if entity_type.lower() == "table":
+        return _execute(f".show table {entity_name} cslschema", cluster_uri, database=database)
+    elif entity_type.lower() == "function":
+        return _execute(f".show function {entity_name}", cluster_uri, database=database)
+    elif entity_type.lower() == "materialized-view":
+        return _execute(
+            f".show materialized-view {entity_name} "
+            "| project Name, SourceTable, Query, LastRun, LastRunResult, IsHealthy, IsEnabled, DocString",
+            cluster_uri,
+            database=database,
+        )
+    elif entity_type.lower() == "graph":
+        return _execute(
+            f".show graph_model {entity_name} details | project Name, Model", cluster_uri, database=database
+        )
+    # Add more entity types as needed
+    return {}
 
 
-def kusto_sample_table_data(
-    table_name: str,
-    cluster_uri: str,
-    sample_size: int = 10,
-    database: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Retrieves a random sample of records from the specified table.
-    If no database is provided, uses the default database.
-
-    :param table_name: Name of the table to sample data from.
-    :param cluster_uri: The URI of the Kusto cluster.
-    :param sample_size: Number of records to sample. Defaults to 10.
-    :param database: Optional database name. If not provided, uses the default database.
-    :return: List of dictionaries containing sampled records.
-    """
-    return _execute(f"{table_name} | sample {sample_size}", cluster_uri, database=database)
-
-
-def kusto_sample_function_data(
-    function_call_with_params: str,
+def kusto_sample_entity(
+    entity_name: str,
+    entity_type: str,
     cluster_uri: str,
     sample_size: int = 10,
     database: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Retrieves a random sample of records from the result of a function call.
+    Retrieves a data sample from the specified entity.
     If no database is provided, uses the default database.
 
-    :param function_call_with_params: Function call string with parameters.
+    :param entity_name: Name of the entity to sample data from.
+    :param entity_type: Type of the entity (table, materialized-view, function, graph).
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of records to sample. Defaults to 10.
     :param database: Optional database name. If not provided, uses the default database.
     :return: List of dictionaries containing sampled records.
     """
-    return _execute(
-        f"{function_call_with_params} | sample {sample_size}",
-        cluster_uri,
-        database=database,
-    )
+    entity_type = canonical_entity_type(entity_type)
+    if entity_type.lower() in ["table", "materialized-view", "function"]:
+        return _execute(f"{entity_name} | sample {sample_size}", cluster_uri, database=database)
+    if entity_type.lower() == "graph":
+        # TODO: handle transient graphs properly
+        sample_size_node = max(1, sample_size // 2)  # at least 5 of each
+        sample_size_edge = max(1, sample_size - sample_size_node)  # at least 5 of each
+        return _execute(
+            f"""let NodeSample = graph('{entity_name}')
+| graph-to-table nodes
+| take {sample_size_node}
+| project PackedEntity=pack_all(), EntityType='Node';
+let EdgeSample = graph('{entity_name}')
+| graph-to-table edges
+| take {sample_size_edge}
+| project PackedEntity=pack_all(), EntityType='Edge';
+NodeSample
+| union EdgeSample
+""",
+            cluster_uri,
+            database=database,
+        )
+
+    raise ValueError(f"Sampling not supported for entity type '{entity_type}'.")
 
 
 @destructive_operation
