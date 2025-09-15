@@ -49,9 +49,8 @@ def test_execute_basic_query(
     assert crp.has_option("request_readonly")
 
     # Verify result format
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert result[0]["TestColumn"] == "TestValue"
+    assert result["format"] == "columnar"
+    assert result["data"]["TestColumn"][0] == "TestValue"
 
 
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")

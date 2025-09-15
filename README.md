@@ -102,8 +102,7 @@ The process should end with the below settings in your `settings.json` or your `
                 ],
                 "env": {
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples",
-                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate"
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples"
                 }
             }
         }
@@ -139,8 +138,7 @@ The process should end with the below settings in your `settings.json` or your `
                 ],
                 "env": {
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples",
-                    "AZ_OPENAI_EMBEDDING_ENDPOINT": "https://your-openai-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate"
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples"
                 }
             }
         }
