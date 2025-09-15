@@ -345,6 +345,47 @@ class KustoToolsLiveTester:
         except Exception as e:
             print(f"❌ Error testing query: {e}")
 
+    async def test_sql_query_with_crp(self) -> None:
+        """Test kusto_query tool with SQL query using client request properties."""
+        print("\n🔍 Testing kusto_query with SQL syntax...")
+        if not self.client:
+            raise RuntimeError("Client not initialized")
+
+        if not self.test_cluster_uri:
+            print("⚠️  No KUSTO_CLUSTER_URI configured, skipping SQL query test")
+            return
+
+        try:
+            # SQL query to count StormEvents records
+            result = await self.client.call_tool(
+                "kusto_query",
+                {
+                    "query": "SELECT COUNT(*) AS cnt FROM StormEvents",
+                    "cluster_uri": self.test_cluster_uri,
+                    "database": self.test_database,
+                    "client_request_properties": {"query_language": "sql"},
+                },
+            )
+
+            if result.get("success"):
+                # Use the new parser to convert to canonical format
+                query_results = result.get("result", {})
+                print(f"SQL Query result: {json.dumps(query_results, indent=2)}")
+                parsed_data = KustoFormatter.parse(query_results)
+
+                if parsed_data and len(parsed_data) > 0:
+                    # Get the count value from the first row
+                    count_value = parsed_data[0].get("cnt", 0)
+                    print(f"✅ SQL Query succeeded, StormEvents count: {count_value}")
+                    assert count_value > 0, f"Expected count > 0, got {count_value}"
+                else:
+                    print("❌ No data returned from SQL query")
+            else:
+                print(f"❌ SQL Query failed: {result}")
+
+        except Exception as e:
+            print(f"❌ Error testing SQL query: {e}")
+
     async def test_describe_database(self) -> None:
         """Test kusto_describe_database tool."""
         print("\n📋 Testing kusto_describe_database...")
@@ -548,6 +589,7 @@ class KustoToolsLiveTester:
             await self.test_known_services()
             await self.test_list_entities()
             await self.test_simple_query()
+            await self.test_sql_query_with_crp()
             await self.test_describe_database()
             await self.test_describe_database_entity()
             await self.test_sample_entity()

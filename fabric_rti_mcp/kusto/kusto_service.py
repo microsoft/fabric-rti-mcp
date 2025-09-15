@@ -117,7 +117,9 @@ def destructive_operation(func: F) -> F:
     return wrapper  # type: ignore
 
 
-def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequestProperties:
+def _crp(
+    action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: Optional[Dict[str, Any]] = None
+) -> ClientRequestProperties:
     crp: ClientRequestProperties = ClientRequestProperties()
     crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
@@ -132,6 +134,12 @@ def _crp(action: str, is_destructive: bool, ignore_readonly: bool) -> ClientRequ
         timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         crp.set_option("servertimeout", timeout_str)
 
+    # Apply any additional client request properties provided by the user
+    # User properties can override global settings
+    if client_request_properties:
+        for key, value in client_request_properties.items():
+            crp.set_option(key, value)
+
     return crp
 
 
@@ -140,14 +148,15 @@ def _execute(
     cluster_uri: str,
     readonly_override: bool = False,
     database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
     caller_func = caller_frame.f_globals.get(action_name)  # type: ignore
     is_destructive = hasattr(caller_func, "_is_destructive")
 
-    # Generate correlation ID for tracing
-    crp = _crp(action_name, is_destructive, readonly_override)
+    # Generate correlation ID for tracing and merge with any custom properties
+    crp = _crp(action_name, is_destructive, readonly_override, client_request_properties)
     correlation_id = crp.client_request_id  # type: ignore
 
     try:
@@ -181,7 +190,12 @@ def kusto_known_services() -> List[Dict[str, str]]:
     return [asdict(service) for service in services]
 
 
-def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
+def kusto_query(
+    query: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Executes a KQL query on the specified database. If no database is provided,
     it will use the default database.
@@ -189,12 +203,19 @@ def kusto_query(query: str, cluster_uri: str, database: Optional[str] = None) ->
     :param query: The KQL query to execute.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: The result of the query execution as a list of dictionaries (json).
     """
-    return _execute(query, cluster_uri, database=database)
+    return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
-def kusto_graph_query(graph_name: str, query: str, cluster_uri: str, database: str | None) -> Dict[str, Any]:
+def kusto_graph_query(
+    graph_name: str,
+    query: str,
+    cluster_uri: str,
+    database: str | None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Intelligently executes a graph query using snapshots if they exist,
     otherwise falls back to transient graphs.
@@ -205,6 +226,7 @@ def kusto_graph_query(graph_name: str, query: str, cluster_uri: str, database: s
     Must include proper project clause for graph-match queries.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing query results.
 
     Critical:
@@ -259,11 +281,16 @@ def kusto_graph_query(graph_name: str, query: str, cluster_uri: str, database: s
     query = (
         f"graph('{graph_name}') {query}"  # todo: this should properly choose between graph() and make-graph operator
     )
-    return _execute(query, cluster_uri, database=database)
+    return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
 @destructive_operation
-def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None) -> Dict[str, Any]:
+def kusto_command(
+    command: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
     it will use the default database.
@@ -271,12 +298,18 @@ def kusto_command(command: str, cluster_uri: str, database: Optional[str] = None
     :param command: The kusto management command to execute.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: The result of the command execution as a list of dictionaries (json).
     """
-    return _execute(command, cluster_uri, database=database)
+    return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
-def kusto_list_entities(cluster_uri: str, entity_type: str, database: Optional[str] = None) -> Dict[str, Any]:
+def kusto_list_entities(
+    cluster_uri: str,
+    entity_type: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
 
@@ -284,6 +317,7 @@ def kusto_list_entities(cluster_uri: str, entity_type: str, database: Optional[s
     :param database: The name of the database to list entities from.
     Required for all types except "databases" (which are top-level).
     :param cluster_uri: The URI of the Kusto cluster.
+    :param client_request_properties: Optional dictionary of additional client request properties.
 
     :return: List of dictionaries containing entity information.
     """
@@ -294,19 +328,39 @@ def kusto_list_entities(cluster_uri: str, entity_type: str, database: Optional[s
             ".show databases | project DatabaseName, DatabaseAccessMode, PrettyName, DatabaseId",
             cluster_uri,
             database=KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
+            client_request_properties=client_request_properties,
         )
     elif entity_type == "table":
-        return _execute(".show tables | project-away DatabaseName", cluster_uri, database=database)
+        return _execute(
+            ".show tables | project-away DatabaseName",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     elif entity_type == "materialized-view":
-        return _execute(".show materialized-views", cluster_uri, database=database)
+        return _execute(
+            ".show materialized-views",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     elif entity_type == "function":
-        return _execute(".show functions", cluster_uri, database=database)
+        return _execute(
+            ".show functions", cluster_uri, database=database, client_request_properties=client_request_properties
+        )
     elif entity_type == "graph":
-        return _execute(".show graph_models | project-away DatabaseName", cluster_uri, database=database)
+        return _execute(
+            ".show graph_models | project-away DatabaseName",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     return {}
 
 
-def kusto_describe_database(cluster_uri: str, database: str | None) -> Dict[str, Any]:
+def kusto_describe_database(
+    cluster_uri: str, database: str | None, client_request_properties: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
     Retrieves schema information for all entities (tables, materialized views, functions, graphs)
     in the specified database.
@@ -316,6 +370,7 @@ def kusto_describe_database(cluster_uri: str, database: str | None) -> Dict[str,
 
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: The name of the database to get schema for.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing entity schema information.
     """
     return _execute(
@@ -324,11 +379,16 @@ def kusto_describe_database(cluster_uri: str, database: str | None) -> Dict[str,
         "| project EntityName, EntityType, Folder, DocString, CslInputSchema, Content, CslOutputSchema",
         cluster_uri,
         database=database,
+        client_request_properties=client_request_properties,
     )
 
 
 def kusto_describe_database_entity(
-    entity_name: str, entity_type: str, cluster_uri: str, database: Optional[str] = None
+    entity_name: str,
+    entity_type: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Retrieves the schema information for a specific entity (table, materialized view, function, graph)
@@ -338,24 +398,39 @@ def kusto_describe_database_entity(
     :param entity_type: Type of the entity (table, materialized view, function, graph).
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing entity schema information.
     """
 
     entity_type = canonical_entity_type(entity_type)
     if entity_type.lower() == "table":
-        return _execute(f".show table {entity_name} cslschema", cluster_uri, database=database)
+        return _execute(
+            f".show table {entity_name} cslschema",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     elif entity_type.lower() == "function":
-        return _execute(f".show function {entity_name}", cluster_uri, database=database)
+        return _execute(
+            f".show function {entity_name}",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     elif entity_type.lower() == "materialized-view":
         return _execute(
             f".show materialized-view {entity_name} "
             "| project Name, SourceTable, Query, LastRun, LastRunResult, IsHealthy, IsEnabled, DocString",
             cluster_uri,
             database=database,
+            client_request_properties=client_request_properties,
         )
     elif entity_type.lower() == "graph":
         return _execute(
-            f".show graph_model {entity_name} details | project Name, Model", cluster_uri, database=database
+            f".show graph_model {entity_name} details | project Name, Model",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
         )
     # Add more entity types as needed
     return {}
@@ -367,6 +442,7 @@ def kusto_sample_entity(
     cluster_uri: str,
     sample_size: int = 10,
     database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Retrieves a data sample from the specified entity.
@@ -377,11 +453,17 @@ def kusto_sample_entity(
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of records to sample. Defaults to 10.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing sampled records.
     """
     entity_type = canonical_entity_type(entity_type)
     if entity_type.lower() in ["table", "materialized-view", "function"]:
-        return _execute(f"{entity_name} | sample {sample_size}", cluster_uri, database=database)
+        return _execute(
+            f"{entity_name} | sample {sample_size}",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     if entity_type.lower() == "graph":
         # TODO: handle transient graphs properly
         sample_size_node = max(1, sample_size // 2)  # at least 5 of each
@@ -400,6 +482,7 @@ NodeSample
 """,
             cluster_uri,
             database=database,
+            client_request_properties=client_request_properties,
         )
 
     raise ValueError(f"Sampling not supported for entity type '{entity_type}'.")
@@ -411,6 +494,7 @@ def kusto_ingest_inline_into_table(
     data_comma_separator: str,
     cluster_uri: str,
     database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Ingests inline CSV data into a specified table. The data should be provided as a comma-separated string.
@@ -420,12 +504,14 @@ def kusto_ingest_inline_into_table(
     :param data_comma_separator: Comma-separated data string to ingest.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing the ingestion result.
     """
     return _execute(
         f".ingest inline into table {table_name} <| {data_comma_separator}",
         cluster_uri,
         database=database,
+        client_request_properties=client_request_properties,
     )
 
 
@@ -436,6 +522,7 @@ def kusto_get_shots(
     sample_size: int = 3,
     database: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
@@ -451,6 +538,7 @@ def kusto_get_shots(
     :param embedding_endpoint: Optional endpoint for the embedding model to use. If not provided, uses the
                              AZ_OPENAI_EMBEDDING_ENDPOINT environment variable. If no valid endpoint is set,
                              this function should not be called.
+    :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing the shots records.
     """
     # Use provided endpoint, or fall back to environment variable, or use default
@@ -465,4 +553,4 @@ def kusto_get_shots(
         | project similarity, EmbeddingText, AugmentedText
     """
 
-    return _execute(kql_query, cluster_uri, database=database)
+    return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
