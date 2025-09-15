@@ -104,9 +104,10 @@ def test_execute_with_custom_client_request_properties(
     assert crp.has_option("custom_property")
 
     # Verify result format
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert result[0]["TestColumn"] == "TestValue"
+    assert isinstance(result, dict)
+    assert result["format"] == "columnar"
+    assert "data" in result
+    assert result["data"]["TestColumn"] == ["TestValue"]
 
 
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
@@ -143,9 +144,10 @@ def test_execute_without_client_request_properties_preserves_behavior(
     assert crp.has_option("request_readonly")
 
     # Verify result format
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert result[0]["TestColumn"] == "TestValue"
+    assert isinstance(result, dict)
+    assert result["format"] == "columnar"
+    assert "data" in result
+    assert result["data"]["TestColumn"] == ["TestValue"]
 
 
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
@@ -196,9 +198,10 @@ def test_destructive_operation_with_custom_client_request_properties(
     assert crp.has_option("async_mode")
 
     # Verify result format
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert result[0]["TestColumn"] == "TestValue"
+    assert isinstance(result, dict)
+    assert result["format"] == "columnar"
+    assert "data" in result
+    assert result["data"]["TestColumn"] == ["TestValue"]
 
 
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")

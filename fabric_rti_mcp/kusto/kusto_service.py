@@ -118,10 +118,7 @@ def destructive_operation(func: F) -> F:
 
 
 def _crp(
-    action: str, 
-    is_destructive: bool, 
-    ignore_readonly: bool, 
-    client_request_properties: Optional[Dict[str, Any]] = None
+    action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: Optional[Dict[str, Any]] = None
 ) -> ClientRequestProperties:
     crp: ClientRequestProperties = ClientRequestProperties()
     crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
@@ -194,10 +191,10 @@ def kusto_known_services() -> List[Dict[str, str]]:
 
 
 def kusto_query(
-    query: str, 
-    cluster_uri: str, 
-    database: Optional[str] = None, 
-    client_request_properties: Optional[Dict[str, Any]] = None
+    query: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Executes a KQL query on the specified database. If no database is provided,
@@ -213,11 +210,11 @@ def kusto_query(
 
 
 def kusto_graph_query(
-    graph_name: str, 
-    query: str, 
-    cluster_uri: str, 
-    database: str | None, 
-    client_request_properties: Optional[Dict[str, Any]] = None
+    graph_name: str,
+    query: str,
+    cluster_uri: str,
+    database: str | None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Intelligently executes a graph query using snapshots if they exist,
@@ -289,10 +286,10 @@ def kusto_graph_query(
 
 @destructive_operation
 def kusto_command(
-    command: str, 
-    cluster_uri: str, 
-    database: Optional[str] = None, 
-    client_request_properties: Optional[Dict[str, Any]] = None
+    command: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
@@ -308,10 +305,10 @@ def kusto_command(
 
 
 def kusto_list_entities(
-    cluster_uri: str, 
-    entity_type: str, 
-    database: Optional[str] = None, 
-    client_request_properties: Optional[Dict[str, Any]] = None
+    cluster_uri: str,
+    entity_type: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
@@ -334,20 +331,35 @@ def kusto_list_entities(
             client_request_properties=client_request_properties,
         )
     elif entity_type == "table":
-        return _execute(".show tables | project-away DatabaseName", cluster_uri, database=database, client_request_properties=client_request_properties)
+        return _execute(
+            ".show tables | project-away DatabaseName",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     elif entity_type == "materialized-view":
-        return _execute(".show materialized-views", cluster_uri, database=database, client_request_properties=client_request_properties)
+        return _execute(
+            ".show materialized-views",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     elif entity_type == "function":
-        return _execute(".show functions", cluster_uri, database=database, client_request_properties=client_request_properties)
+        return _execute(
+            ".show functions", cluster_uri, database=database, client_request_properties=client_request_properties
+        )
     elif entity_type == "graph":
-        return _execute(".show graph_models | project-away DatabaseName", cluster_uri, database=database, client_request_properties=client_request_properties)
+        return _execute(
+            ".show graph_models | project-away DatabaseName",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     return {}
 
 
 def kusto_describe_database(
-    cluster_uri: str, 
-    database: str | None, 
-    client_request_properties: Optional[Dict[str, Any]] = None
+    cluster_uri: str, database: str | None, client_request_properties: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Retrieves schema information for all entities (tables, materialized views, functions, graphs)
@@ -372,11 +384,11 @@ def kusto_describe_database(
 
 
 def kusto_describe_database_entity(
-    entity_name: str, 
-    entity_type: str, 
-    cluster_uri: str, 
-    database: Optional[str] = None, 
-    client_request_properties: Optional[Dict[str, Any]] = None
+    entity_name: str,
+    entity_type: str,
+    cluster_uri: str,
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Retrieves the schema information for a specific entity (table, materialized view, function, graph)
@@ -392,9 +404,19 @@ def kusto_describe_database_entity(
 
     entity_type = canonical_entity_type(entity_type)
     if entity_type.lower() == "table":
-        return _execute(f".show table {entity_name} cslschema", cluster_uri, database=database, client_request_properties=client_request_properties)
+        return _execute(
+            f".show table {entity_name} cslschema",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     elif entity_type.lower() == "function":
-        return _execute(f".show function {entity_name}", cluster_uri, database=database, client_request_properties=client_request_properties)
+        return _execute(
+            f".show function {entity_name}",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     elif entity_type.lower() == "materialized-view":
         return _execute(
             f".show materialized-view {entity_name} "
@@ -405,7 +427,10 @@ def kusto_describe_database_entity(
         )
     elif entity_type.lower() == "graph":
         return _execute(
-            f".show graph_model {entity_name} details | project Name, Model", cluster_uri, database=database, client_request_properties=client_request_properties
+            f".show graph_model {entity_name} details | project Name, Model",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
         )
     # Add more entity types as needed
     return {}
@@ -433,7 +458,12 @@ def kusto_sample_entity(
     """
     entity_type = canonical_entity_type(entity_type)
     if entity_type.lower() in ["table", "materialized-view", "function"]:
-        return _execute(f"{entity_name} | sample {sample_size}", cluster_uri, database=database, client_request_properties=client_request_properties)
+        return _execute(
+            f"{entity_name} | sample {sample_size}",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
     if entity_type.lower() == "graph":
         # TODO: handle transient graphs properly
         sample_size_node = max(1, sample_size // 2)  # at least 5 of each
