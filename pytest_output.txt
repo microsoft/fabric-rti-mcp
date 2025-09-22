@@ -1,0 +1,63 @@
+..................FF.....                                                [100%]
+================================== FAILURES ===================================
+____________ TestParsingFunctionality.test_parse_empty_data_cases _____________
+
+self = <test_kusto_formatter.TestParsingFunctionality object at 0x0000029DDDECCB90>
+
+    def test_parse_empty_data_cases(self) -> None:
+        """Test parsing with various empty data cases."""
+        # Test empty JSON
+>       assert KustoFormatter.parse({"format": "json", "data": []}) == []
+
+tests\unit\kusto\test_kusto_formatter.py:310: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+fabric_rti_mcp\kusto\kusto_formatter.py:147: in parse
+    return KustoFormatter._parse_json(data)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+data = []
+
+    @staticmethod
+    def _parse_json(data: Any) -> list[dict[str, Any]]:
+        """Parse JSON format data (already in canonical format)"""
+        if not data or (not isinstance(data, list) and not isinstance(data, dict)):  # type: ignore
+>           raise ValueError("Invalid JSON format")
+E           ValueError: Invalid JSON format
+
+fabric_rti_mcp\kusto\kusto_formatter.py:163: ValueError
+__________ TestParsingFunctionality.test_parse_malformed_data_cases ___________
+
+self = <test_kusto_formatter.TestParsingFunctionality object at 0x0000029DDDECCAA0>
+
+    def test_parse_malformed_data_cases(self) -> None:
+        """Test parsing with malformed data returns empty list."""
+        # Test invalid json should raise
+        try:
+            KustoFormatter.parse({"format": "json", "data": "not a list"})
+            assert False, "Expected ValueError to be raised"
+        except ValueError as e:
+            assert "Invalid JSON format" in str(e)
+    
+        # Test None is a noop
+>       assert KustoFormatter.parse({"format": "csv", "data": None}) is None
+
+tests\unit\kusto\test_kusto_formatter.py:334: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+fabric_rti_mcp\kusto\kusto_formatter.py:149: in parse
+    return KustoFormatter._parse_csv(data if isinstance(data, str) else "")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+data = ''
+
+    @staticmethod
+    def _parse_csv(data: str) -> list[dict[str, Any]]:
+        """Parse CSV format data back to canonical JSON"""
+        if not data or not isinstance(data, str):  # type: ignore
+>           raise ValueError("Invalid CSV format")
+E           ValueError: Invalid CSV format
+
+fabric_rti_mcp\kusto\kusto_formatter.py:170: ValueError
+=========================== short test summary info ===========================
+FAILED tests/unit/kusto/test_kusto_formatter.py::TestParsingFunctionality::test_parse_empty_data_cases
+FAILED tests/unit/kusto/test_kusto_formatter.py::TestParsingFunctionality::test_parse_malformed_data_cases
+2 failed, 23 passed in 3.75s

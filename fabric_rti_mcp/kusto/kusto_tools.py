@@ -18,31 +18,23 @@ def register_tools(mcp: FastMCP) -> None:
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
     mcp.add_tool(
-        kusto_service.kusto_list_databases,
+        kusto_service.kusto_list_entities,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(
-        kusto_service.kusto_list_tables,
+        kusto_service.kusto_describe_database,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(
-        kusto_service.kusto_get_entities_schema,
+        kusto_service.kusto_describe_database_entity,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(
-        kusto_service.kusto_get_table_schema,
+        kusto_service.kusto_graph_query,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(
-        kusto_service.kusto_get_function_schema,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_sample_table_data,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        kusto_service.kusto_sample_function_data,
+        kusto_service.kusto_sample_entity,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(

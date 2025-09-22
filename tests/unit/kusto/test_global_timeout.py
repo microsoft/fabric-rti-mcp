@@ -31,18 +31,17 @@ def test_config_no_timeout_env() -> None:
 
 
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
-@patch("fabric_rti_mcp.kusto.kusto_service.format_results")
-def test_global_timeout_applied_to_query(mock_format_results: Mock, mock_get_connection: Mock) -> None:
+def test_global_timeout_applied_to_query(mock_get_connection: Mock) -> None:
     """Test that global timeout is applied to Kusto queries."""
     # Mock connection
     mock_connection = Mock()
     mock_connection.default_database = "TestDB"
     mock_client = Mock()
+    mock_result = Mock()
+    mock_result.primary_results = None
+    mock_client.execute.return_value = mock_result
     mock_connection.query_client = mock_client
     mock_get_connection.return_value = mock_connection
-
-    # Mock format_results to return expected result
-    mock_format_results.return_value = [{"test": "result"}]
 
     # Mock the kusto config with timeout
     with patch("fabric_rti_mcp.kusto.kusto_service.CONFIG") as mock_config:
@@ -62,18 +61,19 @@ def test_global_timeout_applied_to_query(mock_format_results: Mock, mock_get_con
 
 
 @patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
-@patch("fabric_rti_mcp.kusto.kusto_service.format_results")
-def test_no_timeout_when_not_configured(mock_format_results: Mock, mock_get_connection: Mock) -> None:
+def test_no_timeout_when_not_configured(mock_get_connection: Mock) -> None:
     """Test that no timeout is set when not configured."""
     # Mock connection
     mock_connection = Mock()
     mock_connection.default_database = "TestDB"
     mock_client = Mock()
+    mock_result = Mock()
+    mock_result.primary_results = None
+    mock_client.execute.return_value = mock_result
     mock_connection.query_client = mock_client
     mock_get_connection.return_value = mock_connection
 
-    # Mock format_results to return expected result
-    mock_format_results.return_value = [{"test": "result"}]
+    # Mock format_results_as_json to return expected result
 
     # Mock the kusto config without timeout
     with patch("fabric_rti_mcp.kusto.kusto_service.CONFIG") as mock_config:
