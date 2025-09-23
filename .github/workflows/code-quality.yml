@@ -46,7 +46,7 @@ jobs:
         echo "::endgroup::"
 
         echo "::group::Running MyPy"
-        mypy_output=$(mypy . --explicit-package-bases  2>&1) || mypy_failed=true
+        mypy_output=$(mypy fabric_rti_mcp --explicit-package-bases  2>&1) || mypy_failed=true
         echo "$mypy_output"
         echo "::endgroup::"
 

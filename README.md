@@ -339,6 +339,49 @@ The MCP Server seamlessly integrates with your host operating system's authentic
 
 If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials.
 
+## HTTP Mode Configuration for MCP Server
+
+When the MCP server is running locally to the agent in HTTP mode or is deployed to Azure, the following environment variables are used to define and enable HTTP mode. You can find practical examples of this setup in the `tests/live/test_kusto_tools_live_http.py` file:
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `FABRIC_RTI_TRANSPORT` | Transport mode for the server | `stdio` | `http` |
+| `FABRIC_RTI_HTTP_HOST` | Host address for HTTP server | `127.0.0.1` | `0.0.0.0` |
+| `FABRIC_RTI_HTTP_PORT` | Port for HTTP server | `3000` | `8080` |
+| `FABRIC_RTI_HTTP_PATH` | HTTP path for MCP endpoint | `/mcp` | `/mcp` |
+| `FABRIC_RTI_STATELESS_HTTP` | Whether to use stateless HTTP mode | `false` | `true` |
+
+HTTP clients connecting to the server need to include the appropriate authentication token in the request headers:
+
+```python
+# Example from test_kusto_tools_live_http.py
+auth_header = f"Bearer {token.token}"
+
+headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+    "Authorization": auth_header,
+}
+```
+
+### OBO Flow Authentication
+
+If your scenario involves a user token with a non-Kusto audience and you need to exchange it for a Kusto audience token using the OBO flow, the Fabric RTI MCP Server  can handle this exchange automatically by setting the following environment variables:
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `USE_OBO_FLOW` | Enable OBO flow for token exchange | `false` | `true` |
+| `FABRIC_RTI_MCP_AZURE_TENANT_ID` | `72f988bf-86f1-41af-91ab-2d7cd011db47` (Microsoft) | `72f988bf-86f1-41af-91ab-2d7cd011db47` |
+| `FABRIC_RTI_MCP_ENTRA_APP_CLIENT_ID` | Entra App (AAD) Client ID | Your client ID |
+| `FABRIC_RTI_MCP_USER_MANAGED_IDENTITY_CLIENT_ID` | User Managed Identity Client ID | Your UMI client ID |
+
+This flow is typically used in OAuth scenarios where a gateway like Azure API Management (APIM) is involved (example: https://github.com/ai-microsoft/adsmcp-apim-dual-validation?tab=readme-ov-file). The user authenticates via Entra ID, and APIM forwards the token to the MCP server. The token audience is not Kusto, so the MCP server must perform an OBO token exchange to get a token with the Kusto audience.
+To support this setup, your Microsoft Entra App must be configured to use Federated Credentials following the official guide: https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation. This enables the app to exchange tokens (OBO).
+Additionally, the Entra app must be granted Azure Data Explorer API permissions to successfully acquire an OBO token with the Kusto audience.
+
+### Remote Deployment 
+The MCP server can be deployed using the method of your choice. For example, you can follow the guide at https://github.com/Azure-Samples/mcp-sdk-functions-hosting-python/blob/main/ExistingServer.md to deploy the MCP server to an Azure Function App.
+
 ## 🛡️ Security Note
 
 Your credentials are always handled securely through the official [Azure Identity SDK](https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/identity/Azure.Identity/README.md) - **we never store or manage tokens directly**.

@@ -6,6 +6,7 @@ from fabric_rti_mcp.kusto import kusto_service
 
 
 def register_tools(mcp: FastMCP) -> None:
+<<<<<<< HEAD
     """Register all Kusto tools with the MCP server using modern decorator pattern."""
 
     @mcp.tool()
@@ -70,3 +71,45 @@ def register_tools(mcp: FastMCP) -> None:
         return kusto_service.kusto_get_shots(
             prompt, shots_table_name, cluster_uri, sample_size, database, embedding_endpoint
         )
+=======
+    mcp.add_tool(
+        kusto_service.kusto_known_services,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_query,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_command,
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_list_entities,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_describe_database,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_describe_database_entity,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_graph_query,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_sample_entity,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_ingest_inline_into_table,
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_get_shots,
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+    )
+>>>>>>> origin/main
