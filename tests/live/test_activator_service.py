@@ -184,7 +184,7 @@ def verify_artifact_in_list(workspace_id: str, artifact_id: str) -> None:
     print()
     
     try:
-        artifacts_list = DEFAULT_ACTIVATOR_SERVICE.activator_list_artefacts(workspace_id=workspace_id)
+        artifacts_list = DEFAULT_ACTIVATOR_SERVICE.activator_list_artifacts(workspace_id=workspace_id)
         
         print(f"✅ Successfully retrieved artifacts list")
         print(f"Found {len(artifacts_list)} activator artifacts in workspace")
@@ -220,7 +220,7 @@ def verify_artifact_in_list(workspace_id: str, artifact_id: str) -> None:
 
 def test_activator_triggers_sequence(workspace_id: str, kql_cluster_url: str, kql_database: str, kql_query: str):
     """
-    Manual integration test for activator_create_trigger_on_kql_source.
+    Manual integration test for create_activator_trigger_on_kql_source.
     This test creates two triggers in sequence:
     1. First trigger with email alerts (creates new artifact)
     2. Second trigger with teams alerts (adds to the created artifact)

@@ -62,27 +62,6 @@ def add_health_endpoint(mcp: FastMCP) -> None:
     mcp.custom_route("/health", methods=["GET"])(health_check)
 
 
-# Health check function defined at module level
-async def health_check(request: Request) -> JSONResponse:
-    """Health check endpoint."""
-    current_time = datetime.now(timezone.utc)
-    logger.info(f"Server health check at {current_time}")
-    return JSONResponse(
-        {
-            "status": "healthy",
-            "current_time_utc": current_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "server": "fabric-rti-mcp",
-            "start_time_utc": server_start_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        }
-    )
-
-
-def add_health_endpoint(mcp: FastMCP) -> None:
-    """Add health endpoint for Kubernetes liveness probes."""
-    # Register the pre-defined health check function
-    mcp.custom_route("/health", methods=["GET"])(health_check)
-
-
 def main() -> None:
     """Main entry point for the server."""
     try:

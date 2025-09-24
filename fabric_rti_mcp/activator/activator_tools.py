@@ -9,7 +9,7 @@ def register_tools(mcp: FastMCP) -> None:
 
     # Read-only tools (queries, list operations)
     mcp.add_tool(
-        DEFAULT_ACTIVATOR_SERVICE.activator_list_artefacts,
+        DEFAULT_ACTIVATOR_SERVICE.activator_list_artifacts,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
 
