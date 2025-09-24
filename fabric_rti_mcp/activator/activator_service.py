@@ -7,7 +7,7 @@ from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
 from fabric_rti_mcp.activator.activator_entity_generators import *
 
 # Microsoft Fabric API configuration
-
+FABRIC_BASE_URL = "https://fabric.microsoft.com"
 DEFAULT_TIMEOUT = 30
 FABRIC_CONFIG = GlobalFabricRTIConfig.from_env()
 
@@ -293,7 +293,7 @@ class ActivatorService:
             raise Exception(f"Failed to update artifact: {result.get('error')}")
         
         # augment result with a url back to the artifact
-        result["url"] = f"https://fabric.microsoft.com/groups/{workspace_id}/reflexes/{artifact_id}"
+        result["url"] = f"{FABRIC_BASE_URL}/groups/{workspace_id}/reflexes/{artifact_id}"
         
         return result
 
@@ -312,7 +312,7 @@ class ActivatorService:
 
         if not result.get("error"):
             # augment result with a url back to the artifact
-            result["url"] = f"https://fabric.microsoft.com/groups/{workspace_id}/reflexes/{result.get('id', '')}"
+            result["url"] = f"{FABRIC_BASE_URL}/groups/{workspace_id}/reflexes/{result.get('id', '')}"
         
         return result
 
