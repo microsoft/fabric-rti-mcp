@@ -3,6 +3,7 @@
 
 import sys
 
+
 def test_import(module_name, description):
     """Test importing a module."""
     try:
@@ -13,6 +14,7 @@ def test_import(module_name, description):
     except Exception as e:
         print(f"✗ {description} import error: {e}")
         return False
+
 
 # Test basic imports first
 test_import("logging", "logging")

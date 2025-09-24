@@ -15,7 +15,7 @@ platform_payload = "ewogICIkc2NoZW1hIjogImh0dHBzOi8vZGV2ZWxvcGVyLm1pY3Jvc29mdC5j
 
 print("=== EVENTSTREAM.JSON ===")
 try:
-    decoded = base64.b64decode(eventstream_payload).decode('utf-8')
+    decoded = base64.b64decode(eventstream_payload).decode("utf-8")
     parsed = json.loads(decoded)
     print(json.dumps(parsed, indent=2))
 except Exception as e:
@@ -23,7 +23,7 @@ except Exception as e:
 
 print("\n=== EVENTSTREAMPROPERTIES.JSON ===")
 try:
-    decoded = base64.b64decode(properties_payload).decode('utf-8')
+    decoded = base64.b64decode(properties_payload).decode("utf-8")
     parsed = json.loads(decoded)
     print(json.dumps(parsed, indent=2))
 except Exception as e:
@@ -31,7 +31,7 @@ except Exception as e:
 
 print("\n=== .PLATFORM ===")
 try:
-    decoded = base64.b64decode(platform_payload).decode('utf-8')
+    decoded = base64.b64decode(platform_payload).decode("utf-8")
     parsed = json.loads(decoded)
     print(json.dumps(parsed, indent=2))
 except Exception as e:
