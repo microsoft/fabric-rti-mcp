@@ -50,7 +50,7 @@ class ActivatorService:
         """Get the connection from the cache."""
         return self._connection_cache.get_connection()
 
-    def activator_list_artefacts(self, workspace_id: str) -> List[Dict[str, Any]]:
+    def activator_list_artifacts(self, workspace_id: str) -> List[Dict[str, Any]]:
         """
         List all Activator artifacts in a workspace.
         
@@ -77,8 +77,9 @@ class ActivatorService:
         alert_headline: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Create a simple activator trigger on a KQL source.
-        
+        Create a simple activator trigger on a KQL source. Users may wish to use this tool to get automatically notified about some condition they are interested in.
+        The Kusto table can be explored using the Kusto tools, to help make sure the trigger being created has the correct column names etc.
+
         :param workspace_id: The workspace ID (UUID)
         :param trigger_name: Name of the trigger
         :param kql_cluster_url: The KQL cluster URL
@@ -87,7 +88,7 @@ class ActivatorService:
         :param alert_recipient: Email address of the alert recipient
         :param alert_type: Type of alert - "teams" or "email" (defaults to "teams")
         :param polling_frequency_in_minutes: Polling frequency in minutes. Must be one of: 5, 15, 60, 180, 360, 720, 1440 (defaults to 5)
-        :param artifact_id: If specified, the trigger will be created in the specified Activator artefact. If left blank, a new Activator artefact will be created.
+        :param artifact_id: If specified, the trigger will be created in the specified Activator artifact. If left blank, a new Activator artifact will be created.
         :param alert_message: Optional alert message for the trigger
         :param alert_headline: Optional alert headline for the trigger
         :return: Created trigger details, including a URL back to the trigger
@@ -133,8 +134,7 @@ class ActivatorService:
         alert_headline: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Common logic for creating activator triggers with any source type. If you don't already know some basic information about the Kust table schema etc, do a little
-        exploration using the Kusto tools first.
+        Common logic for creating activator triggers with any source type. 
         
         :param workspace_id: The workspace ID (UUID)
         :param trigger_name: Name of the trigger
@@ -292,7 +292,7 @@ class ActivatorService:
         if result.get("error"):
             raise Exception(f"Failed to update artifact: {result.get('error')}")
         
-        # augment result with a url back to the artefact
+        # augment result with a url back to the artifact
         result["url"] = f"https://fabric.microsoft.com/groups/{workspace_id}/reflexes/{artifact_id}"
         
         return result
@@ -311,7 +311,7 @@ class ActivatorService:
         result = run_async_operation(connection.execute_operation_and_return_error_in_dict("POST", endpoint, full_payload))
 
         if not result.get("error"):
-            # augment result with a url back to the artefact
+            # augment result with a url back to the artifact
             result["url"] = f"https://fabric.microsoft.com/groups/{workspace_id}/reflexes/{result.get('id', '')}"
         
         return result
