@@ -4,13 +4,11 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fabric_rti_mcp.common import GlobalFabricRTIConfig
 from fabric_rti_mcp.utils.fabric_api_http_client import DEFAULT_FABRIC_HTTP_CLIENT_CACHE
 
 # Microsoft Fabric API configuration
 
 DEFAULT_TIMEOUT = 30
-FABRIC_CONFIG = GlobalFabricRTIConfig.from_env()
 
 def eventstream_create(
     workspace_id: str,
