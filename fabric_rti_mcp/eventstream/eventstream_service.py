@@ -4,38 +4,13 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
-from fabric_rti_mcp.utils import FabricConnection, run_async_operation
+from fabric_rti_mcp.common import GlobalFabricRTIConfig
+from fabric_rti_mcp.eventstream.eventstream_connection import DEFAULT_FABRIC_HTTP_CLIENT_CACHE
 
 # Microsoft Fabric API configuration
 
 DEFAULT_TIMEOUT = 30
 FABRIC_CONFIG = GlobalFabricRTIConfig.from_env()
-
-
-class EventstreamConnectionCache:
-    """Simple connection cache for Eventstream API clients using Azure Identity."""
-
-    def __init__(self) -> None:
-        self._connection: Optional[FabricConnection] = None
-
-    def get_connection(self) -> FabricConnection:
-        """Get or create an Eventstream connection using the configured API base URL."""
-        if self._connection is None:
-            api_base = FABRIC_CONFIG.fabric_api_base
-            self._connection = FabricConnection(api_base, service_name="Eventstream")
-            logger.info(f"Created Eventstream connection for API base: {api_base}")
-
-        return self._connection
-
-
-EVENTSTREAM_CONNECTION_CACHE = EventstreamConnectionCache()
-
-
-def get_eventstream_connection() -> FabricConnection:
-    """Get or create an Eventstream connection using the configured API base URL."""
-    return EVENTSTREAM_CONNECTION_CACHE.get_connection()
-
 
 def eventstream_create(
     workspace_id: str,
@@ -98,8 +73,7 @@ def eventstream_create(
 
     endpoint = f"/workspaces/{workspace_id}/items"
 
-    connection = get_eventstream_connection()
-    result = run_async_operation(connection.execute_operation_and_return_error_in_dict("POST", endpoint, payload))
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("POST", endpoint, payload)
     return [result]
 
 
@@ -114,8 +88,7 @@ def eventstream_get(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    connection = get_eventstream_connection()
-    result = run_async_operation(connection.execute_operation_and_return_error_in_dict("GET", endpoint))
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("GET", endpoint)
     return [result]
 
 
@@ -127,10 +100,27 @@ def eventstream_list(workspace_id: str) -> List[Dict[str, Any]]:
     :param workspace_id: The workspace ID (UUID)
     :return: List of eventstream items
     """
-    connection = get_eventstream_connection()
-    
-    result = run_async_operation(connection.list_artifacts_of_type(workspace_id, "Eventstream"))
-    return result
+    endpoint = f"/workspaces/{workspace_id}/items"
+
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("GET", endpoint)
+
+    # Filter only Eventstream items if the result contains a list
+    if isinstance(result, dict) and "value" in result and isinstance(result["value"], list):
+        eventstreams: List[Dict[str, Any]] = [
+            item
+            for item in result["value"]  # type: ignore
+            if isinstance(item, dict) and item.get("type") == "Eventstream"  # type: ignore
+        ]
+        return eventstreams
+    elif isinstance(result, list):
+        eventstreams = [
+            item
+            for item in result  # type: ignore
+            if isinstance(item, dict) and item.get("type") == "Eventstream"  # type: ignore
+        ]
+        return eventstreams
+
+    return [result]
 
 
 def eventstream_delete(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
@@ -144,8 +134,7 @@ def eventstream_delete(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    connection = get_eventstream_connection()
-    result = run_async_operation(connection.execute_operation_and_return_error_in_dict("DELETE", endpoint))
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("DELETE", endpoint)
     return [result]
 
 
@@ -171,8 +160,7 @@ def eventstream_update(workspace_id: str, item_id: str, definition: Dict[str, An
 
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    connection = get_eventstream_connection()
-    result = run_async_operation(connection.execute_operation_and_return_error_in_dict("PUT", endpoint, payload))
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("PUT", endpoint, payload)
     return [result]
 
 
@@ -187,8 +175,7 @@ def eventstream_get_definition(workspace_id: str, item_id: str) -> List[Dict[str
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}/getDefinition"
 
-    connection = get_eventstream_connection()
-    result = run_async_operation(connection.execute_operation_and_return_error_in_dict("POST", endpoint))
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("POST", endpoint)
     return [result]
 
 

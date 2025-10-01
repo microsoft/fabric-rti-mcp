@@ -11,7 +11,7 @@ class FabricAPIHttpClient:
     """
     Generic Azure Identity-based HTTP client for Microsoft Fabric APIs.
     Handles authentication transparently using Azure credential providers.
-    Can be used for any Fabric service public APIs
+    Can be used for any Fabric service (Eventstream, Activator, Kusto, etc.).
     """
 
     def __init__(self, api_base_url: Optional[str] = None):
@@ -46,6 +46,10 @@ class FabricAPIHttpClient:
         )
 
     def _get_access_token(self) -> str:
+        """
+        Get a valid access token for Fabric API.
+        Handles token caching and refresh automatically.
+        """
         try:
             # Get token from Azure credential
             token = self.credential.get_token(self.token_scope)
@@ -60,7 +64,10 @@ class FabricAPIHttpClient:
             logger.error(f"Failed to get Fabric API access token: {e}")
             raise Exception(f"Authentication failed: {e}")
 
-    def _get_headers(self) -> Dict[str, str]:
+    def get_headers(self) -> Dict[str, str]:
+        """
+        Get HTTP headers with valid authentication for Fabric API requests.
+        """
         access_token = self._get_access_token()
         return {
             "Authorization": f"Bearer {access_token}",
@@ -69,6 +76,10 @@ class FabricAPIHttpClient:
         }
 
     def _run_async_operation(self, coro: Coroutine[Any, Any, Any]) -> Any:
+        """
+        Helper function to run async operations in sync context.
+        Handles event loop management gracefully.
+        """
         try:
             # Try to get the existing event loop
             asyncio.get_running_loop()
@@ -108,7 +119,7 @@ class FabricAPIHttpClient:
             Dict containing the API response
         """
         url = f"{self.api_base_url}{endpoint}"
-        headers = self._get_headers()
+        headers = self.get_headers()
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -168,16 +179,23 @@ class FabricAPIHttpClient:
 
 class FabricHttpClientCache:
     """Generic connection cache for Fabric API clients using Azure Identity."""
-    
-    _connection: Optional[FabricAPIHttpClient] = None
 
-    @classmethod
-    def get_client(cls) -> FabricAPIHttpClient:
+    def __init__(self) -> None:
+        """
+        Initialize the cache.
+        """
+        self._connection: Optional[FabricAPIHttpClient] = None
+
+    def get_connection(self) -> FabricAPIHttpClient:
         """Get or create a Fabric API connection using the configured API base URL."""
-        if cls._connection is None:
+        if self._connection is None:
             config = GlobalFabricRTIConfig.from_env()
             api_base = config.fabric_api_base
-            cls._connection = FabricAPIHttpClient(api_base)
+            self._connection = FabricAPIHttpClient(api_base)
             logger.info(f"Created Fabric API connection for API base: {api_base}")
 
-        return cls._connection
+        return self._connection
+
+
+# Default cache instance for reuse across the application
+DEFAULT_FABRIC_HTTP_CLIENT_CACHE = FabricHttpClientCache()
