@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fabric_rti_mcp.common import GlobalFabricRTIConfig
-from fabric_rti_mcp.eventstream.eventstream_connection import DEFAULT_FABRIC_HTTP_CLIENT_CACHE
+from fabric_rti_mcp.utils.fabric_api_http_client import DEFAULT_FABRIC_HTTP_CLIENT_CACHE
 
 # Microsoft Fabric API configuration
 
@@ -73,7 +73,7 @@ def eventstream_create(
 
     endpoint = f"/workspaces/{workspace_id}/items"
 
-    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("POST", endpoint, payload)
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_client().make_request("POST", endpoint, payload)
     return [result]
 
 
@@ -88,7 +88,7 @@ def eventstream_get(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("GET", endpoint)
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_client().make_request("GET", endpoint)
     return [result]
 
 
@@ -102,7 +102,7 @@ def eventstream_list(workspace_id: str) -> List[Dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items"
 
-    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("GET", endpoint)
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_client().make_request("GET", endpoint)
 
     # Filter only Eventstream items if the result contains a list
     if isinstance(result, dict) and "value" in result and isinstance(result["value"], list):
@@ -134,7 +134,7 @@ def eventstream_delete(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("DELETE", endpoint)
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_client().make_request("DELETE", endpoint)
     return [result]
 
 
@@ -160,7 +160,7 @@ def eventstream_update(workspace_id: str, item_id: str, definition: Dict[str, An
 
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("PUT", endpoint, payload)
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_client().make_request("PUT", endpoint, payload)
     return [result]
 
 
@@ -175,7 +175,7 @@ def eventstream_get_definition(workspace_id: str, item_id: str) -> List[Dict[str
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}/getDefinition"
 
-    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_connection().make_request("POST", endpoint)
+    result = DEFAULT_FABRIC_HTTP_CLIENT_CACHE.get_client().make_request("POST", endpoint)
     return [result]
 
 

@@ -11,7 +11,7 @@ class FabricAPIHttpClient:
     """
     Generic Azure Identity-based HTTP client for Microsoft Fabric APIs.
     Handles authentication transparently using Azure credential providers.
-    Can be used for any Fabric service (Eventstream, Activator, Kusto, etc.).
+    Can be used for any Fabric service public APIs
     """
 
     def __init__(self, api_base_url: Optional[str] = None):
@@ -46,10 +46,6 @@ class FabricAPIHttpClient:
         )
 
     def _get_access_token(self) -> str:
-        """
-        Get a valid access token for Fabric API.
-        Handles token caching and refresh automatically.
-        """
         try:
             # Get token from Azure credential
             token = self.credential.get_token(self.token_scope)
@@ -64,10 +60,7 @@ class FabricAPIHttpClient:
             logger.error(f"Failed to get Fabric API access token: {e}")
             raise Exception(f"Authentication failed: {e}")
 
-    def get_headers(self) -> Dict[str, str]:
-        """
-        Get HTTP headers with valid authentication for Fabric API requests.
-        """
+    def _get_headers(self) -> Dict[str, str]:
         access_token = self._get_access_token()
         return {
             "Authorization": f"Bearer {access_token}",
@@ -76,10 +69,6 @@ class FabricAPIHttpClient:
         }
 
     def _run_async_operation(self, coro: Coroutine[Any, Any, Any]) -> Any:
-        """
-        Helper function to run async operations in sync context.
-        Handles event loop management gracefully.
-        """
         try:
             # Try to get the existing event loop
             asyncio.get_running_loop()
@@ -119,7 +108,7 @@ class FabricAPIHttpClient:
             Dict containing the API response
         """
         url = f"{self.api_base_url}{endpoint}"
-        headers = self.get_headers()
+        headers = self._get_headers()
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -186,7 +175,7 @@ class FabricHttpClientCache:
         """
         self._connection: Optional[FabricAPIHttpClient] = None
 
-    def get_connection(self) -> FabricAPIHttpClient:
+    def get_client(self) -> FabricAPIHttpClient:
         """Get or create a Fabric API connection using the configured API base URL."""
         if self._connection is None:
             config = GlobalFabricRTIConfig.from_env()
