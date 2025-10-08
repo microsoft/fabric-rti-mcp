@@ -79,6 +79,9 @@ def create_kql_source_entity(
     
     kql_source_id = str(uuid.uuid4())
 
+    # Strip newlines from KQL query as the API does not handle it properly
+    kql_query = kql_query.replace("\n", " ").replace(" ", " ")
+
     source: Dict[str, Any] = {
             "uniqueIdentifier": kql_source_id,
             "payload": {

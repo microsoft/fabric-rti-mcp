@@ -1,115 +1,127 @@
 import base64
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from fabric_rti_mcp.utils import FabricConnection, run_async_operation
+from pydantic import BaseModel, Field
+
+from fabric_rti_mcp.utils.fabric_api_http_client import FabricHttpClientCache
 from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
 from fabric_rti_mcp.activator.activator_entity_generators import *
 
 # Microsoft Fabric API configuration
-FABRIC_BASE_URL = "https://fabric.microsoft.com"
-DEFAULT_TIMEOUT = 30
 FABRIC_CONFIG = GlobalFabricRTIConfig.from_env()
 
 
-class ActivatorConnectionCache:
-    """Simple connection cache for Activator API clients using Azure Identity."""
-
-    def __init__(self) -> None:
-        self._connection: Optional[FabricConnection] = None
-
-    def get_connection(self) -> FabricConnection:
-        """Get or create an Activator connection using the configured API base URL."""
-        if self._connection is None:
-            api_base = FABRIC_CONFIG.fabric_api_base
-            self._connection = FabricConnection(api_base, service_name="Activator")
-            logger.info(f"Created Activator connection for API base: {api_base}")
-
-        return self._connection
+# Pydantic models for source types
+class SourceBase(BaseModel):
+    """Base class for all activator source types."""
+    source_type: str = Field(..., description="The type of source (e.g., 'kql', 'eventstream')")
 
 
-ACTIVATOR_CONNECTION_CACHE = ActivatorConnectionCache()
+class KqlSource(SourceBase):
+    """KQL source configuration for activator triggers."""
+    source_type: str = Field(default="kql", description="Source type identifier")
+    cluster_url: str = Field(..., description="The KQL cluster URL") 
+    database: str = Field(..., description="The KQL database name")
+    query: str = Field(..., description="The KQL query to monitor. The query MUST be appropriate for the schema of the underlying data, otherwise the alert will not function correctly")
+    polling_frequency_minutes: int = Field(
+        default=5, 
+        description="Polling frequency in minutes. Must be one of: 5, 15, 60, 180, 360, 720, 1440 (defaults to 5)",
+        ge=1,
+        le=1440
+    )
+
+    class Config:
+        extra = "forbid"
 
 
-def get_activator_connection() -> FabricConnection:
-    """Get or create an Activator connection using the configured API base URL."""
-    return ACTIVATOR_CONNECTION_CACHE.get_connection()
+# Union type for all supported source types (extensible for future source types)
+TriggerSource = Union[KqlSource]
+
 
 class ActivatorService:
     """Service class for Fabric Activator operations."""
-    
-    def __init__(self, connection_cache: Optional[ActivatorConnectionCache] = None) -> None:
-        """
-        Initialize the ActivatorService with a connection cache.
-        
-        :param connection_cache: Optional connection cache instance. If None, uses the global cache.
-        """
-        self._connection_cache = connection_cache or ACTIVATOR_CONNECTION_CACHE
-    
-    def _get_connection(self) -> FabricConnection:
-        """Get the connection from the cache."""
-        return self._connection_cache.get_connection()
 
     def activator_list_artifacts(self, workspace_id: str) -> List[Dict[str, Any]]:
         """
-        List all Activator artifacts in a workspace.
+        Use this tool to list all Activator artifacts in a workspace.
         
         :param workspace_id: The workspace ID (UUID)
         :return: List of activator artifacts
         """
-        connection = self._get_connection()
+        endpoint = f"/workspaces/{workspace_id}/items"
+        result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
         
-        result = run_async_operation(connection.list_artifacts_of_type(workspace_id, "Reflex"))
-        return result
+        # Filter only Reflex (Activator) items if the result contains a list
+        if isinstance(result, dict) and "value" in result and isinstance(result["value"], list):
+            activators = [
+                item
+                for item in result["value"]
+                if isinstance(item, dict) and item.get("type") == "Reflex"
+            ]
+            return activators
+        elif isinstance(result, list):
+            activators = [
+                item
+                for item in result
+                if isinstance(item, dict) and item.get("type") == "Reflex"
+            ]
+            return activators
+            
+        return [result]
 
-    def activator_create_trigger_on_kql_source(
+    def activator_create_trigger(
         self,
         workspace_id: str,
         trigger_name: str,
-        kql_cluster_url: str,
-        kql_query: str,
-        kql_database: str,
+        source: TriggerSource,
         alert_recipient: str,
+        alert_message: str,
+        alert_headline: str,
         alert_type: str = "teams",
-        polling_frequency_in_minutes: int = 5,
-        artifact_id: Optional[str] = None,
-        alert_message: Optional[str] = None,
-        alert_headline: Optional[str] = None
+        artifact_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Create a simple activator trigger on a KQL source. Users may wish to use this tool to get automatically notified about some condition they are interested in.
-        The Kusto table can be explored using the Kusto tools, to help make sure the trigger being created has the correct column names etc.
-
+        Use this tool create an alert that will fire when the source generates data.
+        
         :param workspace_id: The workspace ID (UUID)
         :param trigger_name: Name of the trigger
-        :param kql_cluster_url: The KQL cluster URL
-        :param kql_query: The KQL query to monitor. DO NOT put new lines into the KQL query -- the API will fail if so.
-        :param kql_database: The KQL database name
+        :param source: Source configuration (e.g., KqlSource)
         :param alert_recipient: Email address of the alert recipient
         :param alert_type: Type of alert - "teams" or "email" (defaults to "teams")
-        :param polling_frequency_in_minutes: Polling frequency in minutes. Must be one of: 5, 15, 60, 180, 360, 720, 1440 (defaults to 5)
+        :param alert_message: Alert message for the trigger
+        :param alert_headline: Alert headline for the trigger
         :param artifact_id: If specified, the trigger will be created in the specified Activator artifact. If left blank, a new Activator artifact will be created.
-        :param alert_message: Optional alert message for the trigger
-        :param alert_headline: Optional alert headline for the trigger
-        :return: Created trigger details, including a URL back to the trigger
+        :return: Created trigger details:
+            * url: URL back to the trigger in Fabric UI for further management
+            * id: Artifact ID if a new one was created
+            * displayName: Name of newly created trigger
+
+        Critical:
+        * This API call will NOT tell the caller if a KQL query is used which does not match the source data schema, so any KQL query should be double-checked upfront.
         """
         (container_entity, container_guid) = create_container_entity(trigger_name)
-        (kql_source_entity, source_guid) = create_kql_source_entity(
-            trigger_name,
-            polling_frequency_minutes=polling_frequency_in_minutes,
-            kql_query=kql_query,
-            database=kql_database,
-            cluster_hostname=kql_cluster_url,
-            container_id=container_guid,
-            workspace_id=workspace_id
-        )
+        
+        # Handle different source types
+        if isinstance(source, KqlSource):
+            (source_entity, source_guid) = create_kql_source_entity(
+                trigger_name,
+                polling_frequency_minutes=source.polling_frequency_minutes,
+                kql_query=source.query,
+                database=source.database,
+                cluster_hostname=source.cluster_url,
+                container_id=container_guid,
+                workspace_id=workspace_id
+            )
+        else:
+            raise ValueError(f"Unsupported source type: {type(source)}")
 
         return self._create_trigger_with_source(
             workspace_id=workspace_id,
             trigger_name=trigger_name,
             container_entity=container_entity,
             container_guid=container_guid,
-            source_entity=kql_source_entity,
+            source_entity=source_entity,
             source_guid=source_guid,
             alert_recipient=alert_recipient,
             alert_type=alert_type,
@@ -117,7 +129,6 @@ class ActivatorService:
             alert_message=alert_message,
             alert_headline=alert_headline
         )
-
 
     def _create_trigger_with_source(
         self,
@@ -129,32 +140,16 @@ class ActivatorService:
         source_guid: str,
         alert_recipient: str,
         alert_type: str,
-        artifact_id: Optional[str] = None,
-        alert_message: Optional[str] = None,
-        alert_headline: Optional[str] = None
+        alert_message: str,
+        alert_headline: str,
+        artifact_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Common logic for creating activator triggers with any source type. 
-        
-        :param workspace_id: The workspace ID (UUID)
-        :param trigger_name: Name of the trigger
-        :param container_entity: The container entity
-        :param container_guid: The container GUID
-        :param source_entity: The source entity (KQL, Event Stream, etc.)
-        :param source_guid: The source GUID
-        :param alert_recipient: Email address of the alert recipient
-        :param alert_type: Type of alert - "teams" or "email"
-        :param artifact_id: Optional artifact ID to associate with the trigger
-        :param alert_message: Optional alert message for the trigger
-        :param alert_headline: Optional alert headline for the trigger
-        :return: Created trigger details, including a URL back to the trigger. Users can follow this URL to use more powerful Activator functionality, stop their trigger or see a history of its behaviour.
-        """
         event_and_rule_entities = create_simple_event_rule_entities(
             trigger_name,
             container_id=container_guid,
             source_id=source_guid,
-            message=alert_message or "Alert from Activator trigger",
-            headline=alert_headline or f"Alert from {trigger_name}",
+            message=alert_message,
+            headline=alert_headline,
             alert_recipient=alert_recipient,
             alert_type=alert_type,
         )
@@ -168,14 +163,6 @@ class ActivatorService:
             return self._add_trigger_to_existing_artifact(workspace_id, artifact_id, full_entity_list)
 
     def _add_trigger_to_existing_artifact(self, workspace_id: str, artifact_id: str, entity_list: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Add a trigger to an existing activator artifact.
-        
-        :param workspace_id: The workspace ID (UUID)
-        :param artifact_id: The existing artifact ID to add the trigger to
-        :param entity_list: The list of entities to add to the existing artifact
-        :return: Updated artifact details
-        """
         try:
             # Step 1: Get existing payload
             existing_payload_result = self._get_existing_payload(workspace_id, artifact_id)
@@ -189,20 +176,10 @@ class ActivatorService:
             return {"error": str(e)}
 
     def _get_existing_payload(self, workspace_id: str, artifact_id: str) -> Dict[str, Any]:
-        """
-        Get the existing payload from an activator artifact.
-        
-        :param workspace_id: The workspace ID (UUID)
-        :param artifact_id: The existing artifact ID
-        :return: The raw API response
-        :raises: Exception if unable to get existing payload
-        """
-        connection = self._get_connection()
-        
         # Get the existing artifact definition
         get_definition_endpoint = f"/workspaces/{workspace_id}/reflexes/{artifact_id}/getDefinition"
-        existing_definition_response = run_async_operation(
-            connection.execute_operation_and_return_error_in_dict("POST", get_definition_endpoint, {})
+        existing_definition_response = FabricHttpClientCache.get_client().make_request(
+            "POST", get_definition_endpoint, {}
         )
         
         if existing_definition_response.get("error"):
@@ -211,14 +188,6 @@ class ActivatorService:
         return existing_definition_response
 
     def _create_combined_entities(self, new_entities: List[Dict[str, Any]], api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Create combined entities from new entities and API response.
-        
-        :param new_entities: The list of new entities to add
-        :param api_response: The API response containing definition parts
-        :return: Combined list of entities
-        :raises: Exception if unable to decode existing entities
-        """
         # Extract the ReflexEntities.json part from the API response
         existing_definition = api_response.get("definition", {})
         existing_parts = existing_definition.get("parts", [])
@@ -246,18 +215,6 @@ class ActivatorService:
         return combined_entities
 
     def _update_item(self, workspace_id: str, artifact_id: str, combined_entities: List[Dict[str, Any]], existing_payload_result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Update an activator artifact with combined entities.
-        
-        :param workspace_id: The workspace ID (UUID)
-        :param artifact_id: The artifact ID to update
-        :param combined_entities: The combined list of entities
-        :param existing_payload_result: The existing payload result from API
-        :return: Updated artifact details
-        :raises: Exception if unable to update the artifact
-        """
-        connection = self._get_connection()
-        
         # Get the existing parts structure (we need this to preserve other parts like .platform)
         existing_definition = existing_payload_result.get("definition", {})
         existing_parts = existing_definition.get("parts", [])
@@ -285,34 +242,24 @@ class ActivatorService:
         
         # Update the existing artifact
         update_endpoint = f"/workspaces/{workspace_id}/reflexes/{artifact_id}/updateDefinition"
-        result = run_async_operation(
-            connection.execute_operation_and_return_error_in_dict("POST", update_endpoint, update_payload)
-        )
+        result = FabricHttpClientCache.get_client().make_request("POST", update_endpoint, update_payload)
         
         if result.get("error"):
             raise Exception(f"Failed to update artifact: {result.get('error')}")
         
         # augment result with a url back to the artifact
-        result["url"] = f"{FABRIC_BASE_URL}/groups/{workspace_id}/reflexes/{artifact_id}"
+        result["url"] = f"{FABRIC_CONFIG.fabric_base_url}/groups/{workspace_id}/reflexes/{artifact_id}"
         
         return result
 
     def _create_new_artifact(self, workspace_id: str, full_payload: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Create a new activator artifact.
-        
-        :param workspace_id: The workspace ID (UUID)
-        :param full_payload: The complete payload for creating the artifact
-        :return: Created artifact details
-        """
         endpoint = f"/workspaces/{workspace_id}/reflexes"
 
-        connection = self._get_connection()
-        result = run_async_operation(connection.execute_operation_and_return_error_in_dict("POST", endpoint, full_payload))
+        result = FabricHttpClientCache.get_client().make_request("POST", endpoint, full_payload)
 
         if not result.get("error"):
             # augment result with a url back to the artifact
-            result["url"] = f"{FABRIC_BASE_URL}/groups/{workspace_id}/reflexes/{result.get('id', '')}"
+            result["url"] = f"{FABRIC_CONFIG.fabric_base_url}/groups/{workspace_id}/reflexes/{result.get('id', '')}"
         
         return result
 

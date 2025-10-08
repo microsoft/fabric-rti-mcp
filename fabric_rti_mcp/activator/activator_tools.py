@@ -15,6 +15,6 @@ def register_tools(mcp: FastMCP) -> None:
 
     # Destructive tools (create, update, delete operations)
     mcp.add_tool(
-        DEFAULT_ACTIVATOR_SERVICE.activator_create_trigger_on_kql_source,
+        DEFAULT_ACTIVATOR_SERVICE.activator_create_trigger,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )

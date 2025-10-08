@@ -10,7 +10,7 @@ from typing import Dict, Any
 # Add the project root to the path so we can import the service
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from fabric_rti_mcp.activator.activator_service import DEFAULT_ACTIVATOR_SERVICE
+from fabric_rti_mcp.activator.activator_service import DEFAULT_ACTIVATOR_SERVICE, KqlSource
 
 
 def create_email_trigger_new_artifact(
@@ -56,15 +56,20 @@ def create_email_trigger_new_artifact(
     print()
     
     try:
-        email_result = DEFAULT_ACTIVATOR_SERVICE.activator_create_trigger_on_kql_source(
+        # Create KQL source model
+        kql_source = KqlSource(
+            cluster_url=kql_cluster_url,
+            database=kql_database,
+            query=kql_query,
+            polling_frequency_minutes=polling_frequency_in_minutes
+        )
+        
+        email_result = DEFAULT_ACTIVATOR_SERVICE.activator_create_trigger(
             workspace_id=workspace_id,
             trigger_name=email_trigger_name,
-            kql_cluster_url=kql_cluster_url,
-            kql_query=kql_query,
-            kql_database=kql_database,
+            source=kql_source,
             alert_recipient=alert_recipient,
             alert_type="email",
-            polling_frequency_in_minutes=polling_frequency_in_minutes,
             artifact_id=None,  # Create new artifact
             alert_message=email_alert_message,
             alert_headline=email_alert_headline
@@ -139,15 +144,20 @@ def create_teams_trigger_existing_artifact(
     print()
     
     try:
-        teams_result = DEFAULT_ACTIVATOR_SERVICE.activator_create_trigger_on_kql_source(
+        # Create KQL source model
+        kql_source = KqlSource(
+            cluster_url=kql_cluster_url,
+            database=kql_database,
+            query=kql_query,
+            polling_frequency_minutes=polling_frequency_in_minutes
+        )
+        
+        teams_result = DEFAULT_ACTIVATOR_SERVICE.activator_create_trigger(
             workspace_id=workspace_id,
             trigger_name=teams_trigger_name,
-            kql_cluster_url=kql_cluster_url,
-            kql_query=kql_query,
-            kql_database=kql_database,
+            source=kql_source,
             alert_recipient=alert_recipient,
             alert_type="teams",
-            polling_frequency_in_minutes=polling_frequency_in_minutes,
             artifact_id=artifact_id,  # Add to existing artifact
             alert_message=teams_alert_message,
             alert_headline=teams_alert_headline
