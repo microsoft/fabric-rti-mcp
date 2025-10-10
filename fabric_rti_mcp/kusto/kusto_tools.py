@@ -1,4 +1,5 @@
 from fastmcp import FastMCP
+
 from fabric_rti_mcp.kusto import kusto_service
 
 

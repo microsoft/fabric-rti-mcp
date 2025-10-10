@@ -1,23 +1,17 @@
 """
 Eventstream Builder Service for Microsoft Fabric RTI MCP
-Provides session-based, step-by-step events            next_steps=[
-                "Add sources using eventstream_add_sample_data_source or eventstream_add_custom_endpoint_source",
-                "Add derived streams using eventstream_add_derived_stream (auto-connects to default stream if only one exists)",
-                "Add destinations using eventstream_add_eventhouse_destination or eventstream_add_custom_endpoint_destination",
-                "Validate with eventstream_validate_definition",
-                "Create with eventstream_create_from_definition"
-            ]onstruction functionality.
+Provides session-based, step-by-step eventstream construction functionality.
 """
 
-import json
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Union
+from typing import Any, Dict, List, Optional
 
 from fabric_rti_mcp.common import logger
 
 # Global session storage
 _builder_sessions: Dict[str, Dict[str, Any]] = {}
+
 
 def _generate_session_id() -> str:
     """Generate a unique session ID."""
@@ -38,18 +32,18 @@ def _update_session(session_id: str, updates: Dict[str, Any]) -> None:
 def _generate_sequential_name(base_name: str, existing_names: List[str]) -> str:
     """
     Generate a sequential name that doesn't conflict with existing names.
-    
+
     :param base_name: The base name to use (e.g., "TestMCP80-source")
     :param existing_names: List of existing names to check against
     :return: Sequential name (base_name, base_name-2, base_name-3, etc.)
     """
     if base_name not in existing_names:
         return base_name
-    
+
     counter = 2
     while f"{base_name}-{counter}" in existing_names:
         counter += 1
-    
+
     return f"{base_name}-{counter}"
 
 
@@ -58,31 +52,24 @@ def _create_basic_definition(name: str, description: Optional[str] = None) -> Di
     Create a basic eventstream definition template for the interactive builder workflow.
     This creates a structure with a default stream that gets populated through builder methods.
     Note: name and description are NOT included here as they belong in the outer HTTP payload.
-    
+
     :param name: Name of the eventstream being built (used for default stream naming)
     :param description: Optional description of the eventstream (used for session metadata only)
     :return: Eventstream definition template with default stream ready for builder population
     """
     return {
         "sources": [],
-        "streams": [
-            {
-                "name": f"{name}-stream",
-                "type": "DefaultStream",
-                "properties": {},
-                "inputNodes": []
-            }
-        ],
+        "streams": [{"name": f"{name}-stream", "type": "DefaultStream", "properties": {}, "inputNodes": []}],
         "destinations": [],
         "operators": [],
-        "compatibilityLevel": "1.0"
+        "compatibilityLevel": "1.0",
     }
 
 
 def eventstream_start_definition(name: str, description: Optional[str] = None) -> Dict[str, Any]:
     """
     Start a new eventstream definition builder session.
-    
+
     :param name: Name of the eventstream to create
     :param description: Optional description of the eventstream
     :return: Session information and next steps
@@ -90,7 +77,7 @@ def eventstream_start_definition(name: str, description: Optional[str] = None) -
     try:
         session_id = _generate_session_id()
         definition = _create_basic_definition(name, description)
-        
+
         session_data = {
             "session_id": session_id,
             "name": name,
@@ -98,25 +85,27 @@ def eventstream_start_definition(name: str, description: Optional[str] = None) -
             "definition": definition,
             "created_at": datetime.now().isoformat(),
             "last_updated": datetime.now().isoformat(),
-            "status": "building"
+            "status": "building",
         }
-        
+
         _builder_sessions[session_id] = session_data
-        
+
         logger.info(f"Started eventstream builder session: {session_id}")
-        
+
         return {
             "session_id": session_id,
             "name": name,
             "description": description,
             "status": "ready",
             "next_steps": [
-                "Add sources using eventstream_add_sample_data_source or eventstream_add_custom_endpoint_source",
-                "Add derived streams using eventstream_add_derived_stream (default stream auto-created as '{name}-stream')",
-                "Add destinations using eventstream_add_eventhouse_destination or eventstream_add_custom_endpoint_destination",
+                "Add sources using eventstream_add_sample_data_source or " "eventstream_add_custom_endpoint_source",
+                "Add derived streams using eventstream_add_derived_stream "
+                "(default stream auto-created as '{name}-stream')",
+                "Add destinations using eventstream_add_eventhouse_destination or "
+                "eventstream_add_custom_endpoint_destination",
                 "Validate with eventstream_validate_definition",
-                "Create with eventstream_create_from_definition"
-            ]
+                "Create with eventstream_create_from_definition",
+            ],
         }
     except Exception as e:
         logger.error(f"Error starting eventstream definition: {str(e)}")
@@ -126,55 +115,50 @@ def eventstream_start_definition(name: str, description: Optional[str] = None) -
 def eventstream_get_current_definition(session_id: str) -> Dict[str, Any]:
     """
     Get the current eventstream definition.
-    
+
     :param session_id: Builder session ID
     :return: Current definition
     """
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     return {
         "session_id": session_id,
         "name": session["name"],
         "description": session["description"],
         "definition": session["definition"],
         "status": session["status"],
-        "last_updated": session["last_updated"]
+        "last_updated": session["last_updated"],
     }
 
 
 def eventstream_clear_definition(session_id: str) -> Dict[str, str]:
     """
     Clear the current eventstream definition and start over.
-    
+
     :param session_id: Builder session ID
     :return: Confirmation of clearing
     """
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     # Reset definition while keeping session metadata
     session["definition"] = _create_basic_definition(session["name"], session["description"])
     session["last_updated"] = datetime.now().isoformat()
-    
+
     logger.info(f"Cleared eventstream definition for session: {session_id}")
-    
-    return {
-        "status": "cleared",
-        "message": f"Definition cleared for session {session_id}"
-    }
+
+    return {"status": "cleared", "message": f"Definition cleared for session {session_id}"}
 
 
 def eventstream_add_sample_data_source(
-    session_id: str, 
-    sample_type: str = "Bicycles",
-    source_name: Optional[str] = None
+    session_id: str, sample_type: str = "Bicycles", source_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Add a sample data source to the eventstream definition.
-    
+
     :param session_id: Builder session ID
     :param sample_type: Type of sample data (Bicycles, Stock, etc.)
     :param source_name: Name for the source (auto-generated if not provided)
@@ -183,40 +167,32 @@ def eventstream_add_sample_data_source(
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     # Auto-generate source name if not provided
     if source_name is None:
         source_name = f"{sample_type.lower()}-source"
-    
-    source_config = {
-        "name": source_name,
-        "type": "SampleData",
-        "properties": {
-            "type": sample_type
-        }
-    }
-    
+
+    source_config = {"name": source_name, "type": "SampleData", "properties": {"type": sample_type}}
+
     session["definition"]["sources"].append(source_config)
     session["last_updated"] = datetime.now().isoformat()
-    
+
     logger.info(f"Added sample data source '{source_name}' to session {session_id}")
 
     return {
         "session_id": session_id,
         "source_added": source_name,
         "source_type": "SampleData",
-        "sources_count": len(session["definition"]["sources"])
+        "sources_count": len(session["definition"]["sources"]),
     }
 
 
 def eventstream_add_custom_endpoint_source(
-    session_id: str,
-    source_name: Optional[str] = None,
-    endpoint_url: Optional[str] = None
+    session_id: str, source_name: Optional[str] = None, endpoint_url: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Add a custom endpoint source to the eventstream definition.
-    
+
     :param session_id: Builder session ID
     :param source_name: Name for the source (auto-generated if not provided)
     :param endpoint_url: Custom endpoint URL (deprecated - use data connections instead)
@@ -225,40 +201,34 @@ def eventstream_add_custom_endpoint_source(
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     # Auto-generate source name if not provided using sequential numbering
     if source_name is None:
         base_name = f"{session['name']}-source"
         existing_source_names = [s["name"] for s in session["definition"]["sources"]]
         source_name = _generate_sequential_name(base_name, existing_source_names)
-    
-    source_config = {
-        "name": source_name,
-        "type": "CustomEndpoint",
-        "properties": {}
-    }
-    
+
+    source_config = {"name": source_name, "type": "CustomEndpoint", "properties": {}}
+
     session["definition"]["sources"].append(source_config)
     session["last_updated"] = datetime.now().isoformat()
-    
+
     logger.info(f"Added custom endpoint source '{source_name}' to session {session_id}")
 
     return {
         "session_id": session_id,
         "source_added": source_name,
         "source_type": "CustomEndpoint",
-        "sources_count": len(session["definition"]["sources"])
+        "sources_count": len(session["definition"]["sources"]),
     }
 
 
 def eventstream_add_derived_stream(
-    session_id: str,
-    stream_name: str,
-    input_nodes: Optional[List[str]] = None
+    session_id: str, stream_name: str, input_nodes: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Add a derived stream to the eventstream definition.
-    
+
     :param session_id: Builder session ID
     :param stream_name: Name for the stream
     :param input_nodes: List of node names (sources, operators, or other streams) that feed this stream.
@@ -268,12 +238,12 @@ def eventstream_add_derived_stream(
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     # Get available nodes for validation and auto-connection
     source_names = [s["name"] for s in session["definition"]["sources"]]
     operator_names = [o["name"] for o in session["definition"]["operators"]]
     stream_names = [s["name"] for s in session["definition"]["streams"]]
-    
+
     # Smart default: if input_nodes not provided or empty and only one stream exists, use it
     if not input_nodes:  # This handles both None and empty list []
         # Auto-connect logic: if only one stream and no operators, connect to that stream
@@ -281,37 +251,33 @@ def eventstream_add_derived_stream(
             input_nodes = stream_names.copy()  # Use copy to avoid reference issues
             logger.info(f"Auto-connecting derived stream '{stream_name}' to default stream '{stream_names[0]}'")
         else:
-            raise ValueError(f"input_nodes must be specified when multiple streams/operators exist. Available: streams={stream_names}, operators={operator_names}")
-    
+            raise ValueError(
+                f"input_nodes must be specified when multiple streams/operators exist. "
+                f"Available: streams={stream_names}, operators={operator_names}"
+            )
+
     # Validate that input nodes exist (can be sources, operators, or streams)
     for node in input_nodes:
         if node not in source_names and node not in operator_names and node not in stream_names:
             raise ValueError(f"Input node '{node}' not found in sources, operators, or streams")
-    
+
     stream_config = {
         "name": stream_name,
         "type": "DerivedStream",
-        "properties": {
-            "inputSerialization": {
-                "type": "Json",
-                "properties": {
-                    "encoding": "UTF8"
-                }
-            }
-        },
-        "inputNodes": [{"name": node} for node in input_nodes]
+        "properties": {"inputSerialization": {"type": "Json", "properties": {"encoding": "UTF8"}}},
+        "inputNodes": [{"name": node} for node in input_nodes],
     }
-    
+
     session["definition"]["streams"].append(stream_config)
     session["last_updated"] = datetime.now().isoformat()
-    
+
     logger.info(f"Added derived stream '{stream_name}' to session {session_id}")
 
     return {
         "session_id": session_id,
         "stream_added": stream_name,
         "stream_type": "DerivedStream",
-        "streams_count": len(session["definition"]["streams"])
+        "streams_count": len(session["definition"]["streams"]),
     }
 
 
@@ -324,11 +290,11 @@ def eventstream_add_eventhouse_destination(
     input_streams: List[str],
     destination_name: Optional[str] = None,
     data_ingestion_mode: str = "ProcessedIngestion",
-    encoding: str = "UTF8"
+    encoding: str = "UTF8",
 ) -> Dict[str, Any]:
     """
     Add an Eventhouse destination to the eventstream definition.
-    
+
     :param session_id: Builder session ID
     :param workspace_id: Fabric workspace ID
     :param item_id: Eventhouse item ID
@@ -343,17 +309,17 @@ def eventstream_add_eventhouse_destination(
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     # Auto-generate destination name if not provided
     if destination_name is None:
         destination_name = f"{session['name']}-eventhouse-destination"
-    
+
     # Validate that input streams exist
     stream_names = [s["name"] for s in session["definition"]["streams"]]
     for stream in input_streams:
         if stream not in stream_names:
             raise ValueError(f"Stream '{stream}' not found in definition")
-    
+
     destination_config = {
         "name": destination_name,
         "type": "Eventhouse",
@@ -363,26 +329,21 @@ def eventstream_add_eventhouse_destination(
             "itemId": item_id,
             "databaseName": database_name,
             "tableName": table_name,
-            "inputSerialization": {
-                "type": "Json",
-                "properties": {
-                    "encoding": encoding
-                }
-            }
+            "inputSerialization": {"type": "Json", "properties": {"encoding": encoding}},
         },
-        "inputNodes": [{"name": stream} for stream in input_streams]
+        "inputNodes": [{"name": stream} for stream in input_streams],
     }
-    
+
     session["definition"]["destinations"].append(destination_config)
     session["last_updated"] = datetime.now().isoformat()
-    
+
     logger.info(f"Added Eventhouse destination '{destination_name}' to session {session_id}")
-    
+
     return {
         "session_id": session_id,
         "destination_added": destination_name,
         "destination_type": "Eventhouse",
-        "destinations_count": len(session["definition"]["destinations"])
+        "destinations_count": len(session["definition"]["destinations"]),
     }
 
 
@@ -392,11 +353,11 @@ def eventstream_add_custom_endpoint_destination(
     destination_name: Optional[str] = None,
     endpoint_url: Optional[str] = None,
     method: str = "POST",
-    headers: Optional[Dict[str, str]] = None
+    headers: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Add a custom endpoint destination to the eventstream definition.
-    
+
     :param session_id: Builder session ID
     :param input_streams: List of stream names that feed this destination
     :param destination_name: Name for the destination (auto-generated if not provided)
@@ -408,68 +369,68 @@ def eventstream_add_custom_endpoint_destination(
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     # Auto-generate destination name if not provided using sequential numbering
     if destination_name is None:
         base_name = f"{session['name']}-destination"
         existing_destination_names = [d["name"] for d in session["definition"]["destinations"]]
         destination_name = _generate_sequential_name(base_name, existing_destination_names)
-    
+
     # Validate that input streams exist
     stream_names = [s["name"] for s in session["definition"]["streams"]]
     for stream in input_streams:
         if stream not in stream_names:
             raise ValueError(f"Stream '{stream}' not found in definition")
-    
+
     destination_config = {
         "name": destination_name,
         "type": "CustomEndpoint",
         "properties": {},
-        "inputNodes": [{"name": stream} for stream in input_streams]
+        "inputNodes": [{"name": stream} for stream in input_streams],
     }
-    
+
     session["definition"]["destinations"].append(destination_config)
     session["last_updated"] = datetime.now().isoformat()
-    
+
     logger.info(f"Added custom endpoint destination '{destination_name}' to session {session_id}")
-    
+
     return {
         "session_id": session_id,
         "destination_added": destination_name,
         "destination_type": "CustomEndpoint",
-        "destinations_count": len(session["definition"]["destinations"])
+        "destinations_count": len(session["definition"]["destinations"]),
     }
 
 
 def eventstream_validate_definition(session_id: str) -> Dict[str, Any]:
     """
     Validate the current eventstream definition.
-    
+
     :param session_id: Builder session ID
     :return: Validation results
     """
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     definition = session["definition"]
     errors = []
     warnings = []
-    
+
     # Basic validation
     if not definition.get("sources"):
         errors.append("At least one source is required")
-    
+
     if not definition.get("streams"):
         warnings.append("No streams defined - consider adding at least one stream")
-    
+
     if not definition.get("destinations"):
         warnings.append("No destinations defined - data will not be persisted")
-    
+
     # Get name mappings for validation
     source_names = [s["name"] for s in definition.get("sources", [])]
     stream_names = [s["name"] for s in definition.get("streams", [])]
-    
+
     # Stream validation
     for stream in definition.get("streams", []):
         if stream.get("type") == "DefaultStream":
@@ -477,20 +438,20 @@ def eventstream_validate_definition(session_id: str) -> Dict[str, Any]:
                 source_name = input_node.get("name")
                 if source_name not in source_names:
                     errors.append(f"Stream '{stream['name']}' references unknown source '{source_name}'")
-    
+
     # Destination validation
     for dest in definition.get("destinations", []):
         for input_node in dest.get("inputNodes", []):
             stream_name = input_node.get("name")
             if stream_name not in stream_names:
                 errors.append(f"Destination '{dest['name']}' references unknown stream '{stream_name}'")
-    
+
     is_valid = len(errors) == 0
     session["status"] = "valid" if is_valid else "invalid"
     session["last_updated"] = datetime.now().isoformat()
-    
+
     logger.info(f"Validated definition for session {session_id}: {'valid' if is_valid else 'invalid'}")
-    
+
     return {
         "session_id": session_id,
         "is_valid": is_valid,
@@ -500,15 +461,15 @@ def eventstream_validate_definition(session_id: str) -> Dict[str, Any]:
             "sources": len(definition.get("sources", [])),
             "streams": len(definition.get("streams", [])),
             "destinations": len(definition.get("destinations", [])),
-            "operators": len(definition.get("operators", []))
-        }
+            "operators": len(definition.get("operators", [])),
+        },
     }
 
 
 def eventstream_create_from_definition(session_id: str, workspace_id: str) -> Dict[str, Any]:
     """
     Create an eventstream in Fabric from the current definition.
-    
+
     :param session_id: Builder session ID
     :param workspace_id: Target Fabric workspace ID
     :return: Creation results
@@ -516,28 +477,28 @@ def eventstream_create_from_definition(session_id: str, workspace_id: str) -> Di
     session = _get_session(session_id)
     if not session:
         raise ValueError(f"Session {session_id} not found")
-    
+
     # Validate definition first
     validation_result = eventstream_validate_definition(session_id)
     if not validation_result["is_valid"]:
         raise ValueError(f"Definition is invalid: {', '.join(validation_result['errors'])}")
-    
+
     try:
         # Import here to avoid circular imports at module level
         from fabric_rti_mcp.eventstream.eventstream_service import eventstream_create as _eventstream_create
-        
+
         # Create the eventstream using the base service
         result = _eventstream_create(
             workspace_id=workspace_id,
             eventstream_name=session["name"],
             eventstream_id=None,  # Auto-generate
             definition=session["definition"],
-            description=session["description"]
+            description=session["description"],
         )
-        
+
         # Mark session as completed
         session["status"] = "created"
-        
+
         # Handle different response types safely
         if result and len(result) > 0:
             result_data = result[0]
@@ -558,16 +519,16 @@ def eventstream_create_from_definition(session_id: str, workspace_id: str) -> Di
         else:
             session["created_item_id"] = None
             logger.info(f"Created eventstream from session {session_id}: Success (empty response)")
-            
+
         session["last_updated"] = datetime.now().isoformat()
-        
+
         return {
             "session_id": session_id,
             "status": "created",
             "eventstream": result[0] if result and len(result) > 0 else {"success": True},
-            "workspace_id": workspace_id
+            "workspace_id": workspace_id,
         }
-        
+
     except Exception as e:
         logger.error(f"Error creating eventstream from session {session_id}: {str(e)}")
         session["status"] = "error"
@@ -578,7 +539,7 @@ def eventstream_create_from_definition(session_id: str, workspace_id: str) -> Di
 def eventstream_list_available_components() -> Dict[str, List[str]]:
     """
     List available components for building eventstreams.
-    
+
     :return: Available components
     """
     return {
@@ -592,32 +553,10 @@ def eventstream_list_available_components() -> Dict[str, List[str]]:
             "ConfluentCloud",
             "FabricWorkspaceItemEvents",
             "FabricJobEvents",
-            "FabricOneLakeEvents"
+            "FabricOneLakeEvents",
         ],
-        "streams": [
-            "DefaultStream",
-            "DerivedStream"
-        ],
-        "destinations": [
-            "Eventhouse", 
-            "CustomEndpoint",
-            "Lakehouse"
-        ],
-        "operators": [
-            "Filter",
-            "Join",
-            "ManageFields",
-            "Aggregate",
-            "GroupBy",
-            "Union",
-            "Expand"
-        ],
-        "sample_data_types": [
-            "Bicycles",
-            "Buses",
-            "SemanticModelLogs",
-            "SP500Stocks",
-            "StockMarket",            
-            "YellowTaxi"            
-        ]
+        "streams": ["DefaultStream", "DerivedStream"],
+        "destinations": ["Eventhouse", "CustomEndpoint", "Lakehouse"],
+        "operators": ["Filter", "Join", "ManageFields", "Aggregate", "GroupBy", "Union", "Expand"],
+        "sample_data_types": ["Bicycles", "Buses", "SemanticModelLogs", "SP500Stocks", "StockMarket", "YellowTaxi"],
     }
