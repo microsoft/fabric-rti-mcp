@@ -13,7 +13,7 @@ from fabric_rti_mcp import __version__
 from fabric_rti_mcp.authentication.auth_middleware import add_auth_middleware
 from fabric_rti_mcp.common import global_config as config
 from fabric_rti_mcp.common import logger
-from fabric_rti_mcp.config.obo_config import obo_config
+from fabric_rti_mcp.activator import activator_tools
 from fabric_rti_mcp.eventstream import eventstream_tools
 from fabric_rti_mcp.kusto import kusto_config, kusto_tools
 
@@ -37,6 +37,7 @@ def register_tools(mcp: FastMCP) -> None:
 
     kusto_tools.register_tools(mcp)
     eventstream_tools.register_tools(mcp)
+    activator_tools.register_tools(mcp)
 
 
 # Health check function defined at module level
