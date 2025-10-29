@@ -45,3 +45,8 @@ def register_tools(mcp: FastMCP) -> None:
         kusto_service.kusto_get_shots,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
     )
+
+    mcp.add_tool(
+        kusto_service.anomaly_diffpatterns_query,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
