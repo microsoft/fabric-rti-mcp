@@ -24,8 +24,12 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - List Eventstreams in workspaces
 - Get Eventstream details and definitions
 
+**Activator**: Create and manage Microsoft Fabric [Activator](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/data-activator/data-activator-introduction) triggers for real-time alerting:
+- Create new triggers with KQL source monitoring
+- Set up email and Teams notifications when a condition occurs
+- List Activator artifacts in workspaces
+
 ## 🚧 Coming soon
-- **Activator**
 - **Other RTI items**
 
 ### 🔍 Example Prompts
@@ -40,6 +44,11 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 **Eventstream Management:**
 - "List all Eventstreams in my workspace"
 - "Show me the details of my IoT data Eventstream"
+
+**Activator Alerts:**
+- "Using the StormEvents table, notify me via email when there is a flood in Illinois"
+- "Create a teams alert to notify me when my success rate drops below 95%"
+- "List all Activator artifacts in my workspace"
 
 
 ### Available tools 
@@ -62,6 +71,10 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - **`list_eventstreams`** - List all Eventstreams in your Fabric workspace
 - **`get_eventstream`** - Get detailed information about a specific Eventstream
 - **`get_eventstream_definition`** - Retrieve complete JSON definition of an Eventstream
+
+#### Activator - 2 Tools:
+- **`activator_list_artifacts`** - List all Activator artifacts in a Fabric workspace
+- **`activator_create_trigger`** - Create new Activator triggers with KQL source monitoring and email/Teams alerts
 
 ## Getting Started
 
