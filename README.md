@@ -134,9 +134,9 @@ The process should end with the below settings in your `settings.json` or your `
                     "microsoft-fabric-rti-mcp"
                 ],
                 "env": {
-                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", //optionally provide cluster URI
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples", //optionally provide database
-                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1" //optionally provide Fabric API endpoint
+                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples",
+                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
                 }
             }
         }
@@ -171,9 +171,9 @@ The process should end with the below settings in your `settings.json` or your `
                     "fabric_rti_mcp.server"
                 ],
                 "env": {
-                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", //optionally provide cluster URI
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples", //optionally provide database
-                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1" //optionally provide Fabric API endpoint
+                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples",
+                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
                 }
             }
         }
@@ -231,58 +231,6 @@ The VS Code client includes:
 - 🗣️ **Natural language prompts** - English commands for MCP operations  
 - ⚙️ **API configuration** - Runtime control of Fabric API endpoints
 - 📊 **JSON output** - Formatted results for analysis
-
-## 🏗️ Architecture
-
-The Fabric RTI MCP Server is designed with a clean, modular architecture:
-
-### MCP Server Core
-```
-fabric_rti_mcp/
-├── kusto/                    # Eventhouse (Kusto) integration
-│   ├── kusto_service.py      # Core Kusto operations
-│   ├── kusto_tools.py        # MCP tool definitions
-│   └── kusto_connection.py   # Connection management
-├── eventstream/              # Eventstream integration  
-│   ├── eventstream_service.py # Core Eventstream operations
-│   └── eventstream_tools.py  # MCP tool definitions
-├── server.py                 # Main MCP server entry point
-└── common.py                 # Shared utilities
-```
-
-### Standalone Tools
-```
-tools/
-└── eventstream_client/       # Standalone Eventstream tools
-    ├── ai_agent_openai.py    # AI agent for Eventstream management
-    ├── config.py             # Configuration management
-    ├── demo_agent.py         # Demo and example scripts
-    └── run_agent.py          # Agent runner
-```
-
-### Testing & Client Tools
-```
-tests/                        # Test scripts and validation
-├── validate_final.py         # Final validation for PR readiness
-└── test_kusto_service.py     # Kusto service unit tests
-
-eventstream_test/             # Test utilities and examples
-├── test_api_config.py        # Test Fabric API configuration
-├── test_eventstream_client.py # Test Eventstream MCP client
-├── test_mcp_connection.py    # Test MCP server connection
-├── vscode_mcp_client.py      # VS Code MCP client with interactive auth
-└── vscode-mcp-client.ipynb   # Jupyter notebook examples
-```
-
-> **Note**: The `tools/` directory contains standalone utilities that can be used independently of the MCP server for direct Fabric integration and automation. The `eventstream_test/` directory contains testing utilities and client examples.
-
-### Key Design Principles
-
-- 🔧 **Modular**: Each service (Kusto, Eventstream) is self-contained
-- 🔄 **Async/Sync Bridge**: Seamless integration between async operations and MCP's sync interface
-- 🎯 **Clean Separation**: MCP server code separate from standalone tools
-- 🛡️ **Type Safe**: Comprehensive type annotations throughout
-- ⚡ **Performance**: Connection caching and efficient resource management
 
 
 ## ⚙️ Configuration
@@ -408,13 +356,6 @@ provided by the bot. You will only need to do this once across all repos using o
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-- ✅ **Complete documentation** - Users can easily understand and use both services
-- ✅ **Clean codebase** - No dead code or architectural debt
-
-**This integration and cleanup effort has been a COMPLETE SUCCESS!** 🎉🚀
-
-The project is **ready for feature branch push and production deployment**.
 
 ## 📚 Documentation
 
