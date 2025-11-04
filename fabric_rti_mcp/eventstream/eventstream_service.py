@@ -1,98 +1,14 @@
-import asyncio
 import base64
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Coroutine, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
-from fabric_rti_mcp.eventstream.eventstream_connection import EventstreamConnection
+from fabric_rti_mcp.utils.fabric_api_http_client import FabricHttpClientCache
 
 # Microsoft Fabric API configuration
 
 DEFAULT_TIMEOUT = 30
-FABRIC_CONFIG = GlobalFabricRTIConfig.from_env()
-
-
-class EventstreamConnectionCache:
-    """Simple connection cache for Eventstream API clients using Azure Identity."""
-
-    def __init__(self) -> None:
-        self._connection: Optional[EventstreamConnection] = None
-
-    def get_connection(self) -> EventstreamConnection:
-        """Get or create an Eventstream connection using the configured API base URL."""
-        if self._connection is None:
-            api_base = FABRIC_CONFIG.fabric_api_base
-            self._connection = EventstreamConnection(api_base)
-            logger.info(f"Created Eventstream connection for API base: {api_base}")
-
-        return self._connection
-
-
-EVENTSTREAM_CONNECTION_CACHE = EventstreamConnectionCache()
-
-
-def get_eventstream_connection() -> EventstreamConnection:
-    """Get or create an Eventstream connection using the configured API base URL."""
-    return EVENTSTREAM_CONNECTION_CACHE.get_connection()
-
-
-def _run_async_operation(coro: Coroutine[Any, Any, Any]) -> Any:
-    """
-    Helper function to run async operations in sync context.
-    Handles event loop management gracefully.
-    """
-    try:
-        # Try to get the existing event loop
-        asyncio.get_running_loop()
-        # If we're already in an event loop, we need to run in a thread
-        import concurrent.futures
-
-        def run_in_thread() -> Any:
-            # Create a new event loop for this thread
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                return new_loop.run_until_complete(coro)
-            finally:
-                new_loop.close()
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_in_thread)
-            return future.result()
-
-    except RuntimeError:
-        # No event loop running, we can use asyncio.run
-        return asyncio.run(coro)
-
-
-async def _execute_eventstream_operation(
-    method: str,
-    endpoint: str,
-    payload: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    """
-    Base execution method for Eventstream operations using Azure Identity.
-    No longer requires explicit authorization token - handled transparently.
-
-    :param method: HTTP method (GET, POST, PUT, DELETE)
-    :param endpoint: API endpoint relative to the configured API base
-    :param payload: Optional request payload
-    :return: API response as dictionary
-    """
-    # Get connection with automatic Azure authentication
-    connection = get_eventstream_connection()
-
-    try:
-        # Make authenticated request
-        result = await connection.make_request(method, endpoint, payload, DEFAULT_TIMEOUT)
-        return result
-
-    except Exception as e:
-        logger.error(f"Error executing Eventstream operation: {e}")
-        return {"error": True, "message": str(e)}
-
 
 def eventstream_create(
     workspace_id: str,
@@ -155,7 +71,7 @@ def eventstream_create(
 
     endpoint = f"/workspaces/{workspace_id}/items"
 
-    result = _run_async_operation(_execute_eventstream_operation("POST", endpoint, payload))
+    result = FabricHttpClientCache.get_client().make_request("POST", endpoint, payload)
     return [result]
 
 
@@ -170,7 +86,7 @@ def eventstream_get(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = _run_async_operation(_execute_eventstream_operation("GET", endpoint))
+    result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
     return [result]
 
 
@@ -184,7 +100,7 @@ def eventstream_list(workspace_id: str) -> List[Dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items"
 
-    result = _run_async_operation(_execute_eventstream_operation("GET", endpoint))
+    result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
 
     # Filter only Eventstream items if the result contains a list
     if isinstance(result, dict) and "value" in result and isinstance(result["value"], list):
@@ -216,7 +132,7 @@ def eventstream_delete(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = _run_async_operation(_execute_eventstream_operation("DELETE", endpoint))
+    result = FabricHttpClientCache.get_client().make_request("DELETE", endpoint)
     return [result]
 
 
@@ -242,7 +158,7 @@ def eventstream_update(workspace_id: str, item_id: str, definition: Dict[str, An
 
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = _run_async_operation(_execute_eventstream_operation("PUT", endpoint, payload))
+    result = FabricHttpClientCache.get_client().make_request("PUT", endpoint, payload)
     return [result]
 
 
@@ -257,7 +173,7 @@ def eventstream_get_definition(workspace_id: str, item_id: str) -> List[Dict[str
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}/getDefinition"
 
-    result = _run_async_operation(_execute_eventstream_operation("POST", endpoint))
+    result = FabricHttpClientCache.get_client().make_request("POST", endpoint)
     return [result]
 
 

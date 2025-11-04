@@ -29,8 +29,12 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - Update existing Eventstreams
 - Delete Eventstreams
 
+**Activator**: Create and manage Microsoft Fabric [Activator](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/data-activator/data-activator-introduction) triggers for real-time alerting:
+- Create new triggers with KQL source monitoring
+- Set up email and Teams notifications when a condition occurs
+- List Activator artifacts in workspaces
+
 ## 🚧 Coming soon
-- **Activator**
 - **Other RTI items**
 
 ### 🔍 Example Prompts
@@ -48,7 +52,12 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - "Create a new Eventstream for processing sensor data"
 - "Update my existing Eventstream to add a new destination"
 
-### Available Tools 
+**Activator Alerts:**
+- "Using the StormEvents table, notify me via email when there is a flood in Illinois"
+- "Create a teams alert to notify me when my success rate drops below 95%"
+- "List all Activator artifacts in my workspace"
+
+### Available tools
 
 #### Eventhouse (Kusto) - 12 Tools:
 - **`kusto_known_services`** - List all available Kusto services configured in the MCP
@@ -82,6 +91,10 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - **Validation**: `eventstream_validate_definition`, `eventstream_create_from_definition`, `eventstream_list_available_components`
 
 > **💡 Pro Tip**: All tools work with natural language! Just describe what you want to do and the AI agent will use the appropriate tools automatically.
+
+#### Activator - 2 Tools:
+- **`activator_list_artifacts`** - List all Activator artifacts in a Fabric workspace
+- **`activator_create_trigger`** - Create new Activator triggers with KQL source monitoring and email/Teams alerts
 
 ## Getting Started
 
@@ -121,14 +134,9 @@ The process should end with the below settings in your `settings.json` or your `
                     "microsoft-fabric-rti-mcp"
                 ],
                 "env": {
-<<<<<<< HEAD
-                    "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
-                    "KUSTO_DATABASE": "Datasets", //optionally provide database
+                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", //optionally provide cluster URI
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples", //optionally provide database
                     "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1" //optionally provide Fabric API endpoint
-=======
-                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples"
->>>>>>> origin/main
                 }
             }
         }
@@ -163,14 +171,9 @@ The process should end with the below settings in your `settings.json` or your `
                     "fabric_rti_mcp.server"
                 ],
                 "env": {
-<<<<<<< HEAD
-                    "KUSTO_SERVICE_URI": "https://cluster.westus.kusto.windows.net/", //optionally provide cluster URI
-                    "KUSTO_DATABASE": "Datasets", //optionally provide database
+                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/", //optionally provide cluster URI
+                    "KUSTO_SERVICE_DEFAULT_DB": "Samples", //optionally provide database
                     "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1" //optionally provide Fabric API endpoint
-=======
-                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples"
->>>>>>> origin/main
                 }
             }
         }
@@ -300,6 +303,7 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
+| `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
 
 ### Embedding Endpoint Configuration
 
