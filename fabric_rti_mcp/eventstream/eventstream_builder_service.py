@@ -98,11 +98,9 @@ def eventstream_start_definition(name: str, description: Optional[str] = None) -
             "description": description,
             "status": "ready",
             "next_steps": [
-                "Add sources using eventstream_add_sample_data_source or " "eventstream_add_custom_endpoint_source",
-                "Add derived streams using eventstream_add_derived_stream "
-                "(default stream auto-created as '{name}-stream')",
-                "Add destinations using eventstream_add_eventhouse_destination or "
-                "eventstream_add_custom_endpoint_destination",
+                "Add sources using eventstream_add_sample_data_source or eventstream_add_custom_endpoint_source",
+                "Add derived streams using eventstream_add_derived_stream (default stream auto-created as '{name}-stream')",
+                "Add destinations using eventstream_add_eventhouse_destination or eventstream_add_custom_endpoint_destination",
                 "Validate with eventstream_validate_definition",
                 "Create with eventstream_create_from_definition",
             ],
@@ -252,8 +250,7 @@ def eventstream_add_derived_stream(
             logger.info(f"Auto-connecting derived stream '{stream_name}' to default stream '{stream_names[0]}'")
         else:
             raise ValueError(
-                f"input_nodes must be specified when multiple streams/operators exist. "
-                f"Available: streams={stream_names}, operators={operator_names}"
+                f"input_nodes must be specified when multiple streams/operators exist. Available: streams={stream_names}, operators={operator_names}"
             )
 
     # Validate that input nodes exist (can be sources, operators, or streams)
