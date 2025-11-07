@@ -79,6 +79,13 @@ def create_kql_source_entity(
     
     kql_source_id = str(uuid.uuid4())
 
+    # Extract hostname from URL if provided
+    # Strip https://, http://, and trailing /
+    if cluster_hostname:
+        hostname = cluster_hostname.replace("https://", "")
+        hostname = hostname.replace("http://", "")
+        cluster_hostname = hostname.rstrip("/")
+    
     # Strip newlines from KQL query as the API does not handle it properly
     kql_query = kql_query.replace("\n", " ").replace(" ", " ")
 
