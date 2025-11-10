@@ -554,3 +554,55 @@ def kusto_get_shots(
     """
 
     return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+def anomaly_diffpatterns_query(
+    cluster_uri: str,
+    table_name: str,
+    first_set_condition: str,
+    second_set_condition: str,
+    threshold: str = "~", # "~" means use default (0.05). Otherwise a string representing a float between 0.015 and 1.0
+    project_columns: Optional[List[str]] = None,  # New optional parameter
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Executes a KQL query that compares first data set vs. second data set patterns
+    using the diffpatterns operator.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param table_name: The Kusto table to query.    
+    :param first_set_condition: A KQL filter expression defining the first dataset 
+        (e.g., "Timestamp between (datetime(2025-01-01) .. datetime(2025-01-07))").
+    :param second_set_condition: A KQL filter expression defining the second dataset
+        (e.g., "Timestamp between (datetime(2025-02-01) .. datetime(2025-02-07))").
+    :param threshold: A real between 0.015–1.0, or "~" to use the default (0.05). 
+        Controls the sensitivity of the diffpatterns operator.
+    :param project_columns: Optional list of column names to include in the query. 
+        If provided, only these columns plus the extended 'AB' column are used in diffpatterns.        
+    :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
+    :return: The result of the query execution as a list of dictionaries (json).
+    """
+
+    if threshold == "~":
+        threshold = "'~'"
+
+    query = f"""
+    {table_name}
+    | where ({first_set_condition}) or ({second_set_condition})
+    | extend AB = iff({second_set_condition}, 'Anomaly', 'Baseline')
+    """
+
+    if project_columns:
+        # Ensure 'AB' is always included
+        columns = ", ".join(project_columns + ["AB"])
+        query += f"\n| project {columns}"
+
+    query += f"\n| evaluate diffpatterns(AB, 'Anomaly', 'Baseline', '~', {threshold})"
+
+    return _execute(
+        query,
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+    )
