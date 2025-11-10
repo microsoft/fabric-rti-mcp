@@ -25,6 +25,7 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
+    max_result_rows = "KUSTO_MAX_RESULT_ROWS"
 
     @staticmethod
     def all() -> List[str]:
@@ -37,6 +38,7 @@ class KustoEnvVarNames:
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
+            KustoEnvVarNames.max_result_rows,
         ]
 
 
@@ -56,6 +58,10 @@ class KustoConfig:
     allow_unknown_services: bool = True
     # Global timeout for all Kusto operations in seconds
     timeout_seconds: Optional[int] = None
+    # Maximum number of rows to return from query results.
+    # Default is 10000 to stay well within Azure AI Agents 1MB limit.
+    # Set to 0 to disable truncation (not recommended for AI agents).
+    max_result_rows: int = 10000
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -86,6 +92,16 @@ class KustoConfig:
                 # Ignore invalid timeout values
                 pass
 
+        # Parse max result rows configuration
+        max_result_rows = 10000  # Default to 10k rows
+        max_rows_env = os.getenv(KustoEnvVarNames.max_result_rows)
+        if max_rows_env:
+            try:
+                max_result_rows = int(max_rows_env)
+            except ValueError:
+                # Ignore invalid values, keep default
+                pass
+
         if known_services_string:
             try:
                 known_services_json = json.loads(known_services_string)
@@ -100,6 +116,7 @@ class KustoConfig:
             eager_connect,
             allow_unknown_services,
             timeout_seconds,
+            max_result_rows,
         )
 
     @staticmethod

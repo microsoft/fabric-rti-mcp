@@ -202,12 +202,37 @@ None - the server will work with default settings for demo purposes.
 |----------|---------|-------------|---------|---------|
 | `KUSTO_SERVICE_URI` | Kusto | Default Kusto cluster URI | None | `https://mycluster.westus.kusto.windows.net` |
 | `KUSTO_SERVICE_DEFAULT_DB` | Kusto | Default database name for Kusto queries | `NetDefaultDB` | `MyDatabase` |
+| `KUSTO_MAX_RESULT_ROWS` | Kusto | Maximum number of rows to return from queries (prevents Azure AI Agents 1MB output limit errors) | `10000` | `5000` |
 | `AZ_OPENAI_EMBEDDING_ENDPOINT` | Kusto | Azure OpenAI embedding endpoint for semantic search in `kusto_get_shots` | None | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate` |
 | `KUSTO_KNOWN_SERVICES` | Kusto | JSON array of preconfigured Kusto services | None | `[{"service_uri":"https://cluster1.kusto.windows.net","default_database":"DB1","description":"Prod"}]` |
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
+
+### Result Truncation
+
+The `KUSTO_MAX_RESULT_ROWS` setting helps prevent output size limit errors when using AI agents. When a query returns more rows than this limit:
+
+- **Automatic Truncation**: Results are automatically truncated to the configured limit
+- **Metadata Added**: The response includes `_truncated`, `_original_row_count`, `_returned_row_count`, and `_truncation_message` fields
+- **Warning Logged**: A warning is logged with the correlation ID for troubleshooting
+- **Best Practice**: Set this to match your AI agent's output limits (e.g., Azure AI Agents has a 1MB limit)
+- **Disable**: Set to `0` to disable truncation (not recommended for AI agents)
+
+**Example truncated response metadata:**
+```json
+{
+  "format": "columnar",
+  "data": { ... },
+  "_truncated": true,
+  "_original_row_count": 25000,
+  "_returned_row_count": 10000,
+  "_truncation_message": "Result truncated: showing 10000 of 25000 rows. Use '| take 10000' or '| limit 10000' in your query for better control."
+}
+```
+
+> **Tip**: For better control, use `| take N` or `| limit N` directly in your KQL queries instead of relying on automatic truncation.
 
 ### Embedding Endpoint Configuration
 
