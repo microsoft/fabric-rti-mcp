@@ -170,7 +170,38 @@ def _execute(
         database = database.strip()
 
         result_set = client.execute(database, query, crp)
-        return asdict(KustoFormatter.to_columnar(result_set))
+        formatted_result = asdict(KustoFormatter.to_columnar(result_set))
+        
+        # Apply result row limit to prevent Azure AI Agents 1MB output limit errors
+        max_rows = CONFIG.max_result_rows
+        if max_rows > 0 and "data" in formatted_result and isinstance(formatted_result["data"], dict):
+            data = formatted_result["data"]
+            # Get the first column to check row count
+            if data:
+                first_column = next(iter(data.values()), [])
+                row_count = len(first_column) if isinstance(first_column, list) else 0
+                
+                if row_count > max_rows:
+                    # Truncate all columns to max_rows
+                    truncated_data = {col: vals[:max_rows] if isinstance(vals, list) else vals 
+                                     for col, vals in data.items()}
+                    formatted_result["data"] = truncated_data
+                    
+                    # Add truncation warning as metadata
+                    formatted_result["_truncated"] = True
+                    formatted_result["_original_row_count"] = row_count
+                    formatted_result["_returned_row_count"] = max_rows
+                    formatted_result["_truncation_message"] = (
+                        f"Result truncated: showing {max_rows} of {row_count} rows. "
+                        f"Use '| take {max_rows}' or '| limit {max_rows}' in your query for better control."
+                    )
+                    
+                    logger.warning(
+                        f"Query result truncated from {row_count} to {max_rows} rows "
+                        f"to prevent exceeding output size limits (correlation ID: {correlation_id})"
+                    )
+        
+        return formatted_result
 
     except Exception as e:
         error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"
