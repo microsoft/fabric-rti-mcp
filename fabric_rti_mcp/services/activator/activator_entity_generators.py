@@ -109,7 +109,7 @@ def create_kql_source_entity(
         cluster_hostname = hostname.rstrip("/")
 
     # Strip newlines from KQL query as the API does not handle it properly
-    kql_query = kql_query.replace("\n", " ").replace(" ", " ")
+    kql_query = " ".join(kql_query.replace("\n", " ").split())
 
     source: dict[str, Any] = {
         "uniqueIdentifier": kql_source_id,
