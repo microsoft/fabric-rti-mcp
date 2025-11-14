@@ -6,10 +6,10 @@ from azure.kusto.data import ClientRequestProperties
 from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
-from fabric_rti_mcp.kusto.kusto_service import kusto_command, kusto_query
+from fabric_rti_mcp.services.kusto.kusto_service import kusto_command, kusto_query
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_execute_basic_query(
     mock_get_kusto_connection: Mock,
     sample_cluster_uri: str,
@@ -53,7 +53,7 @@ def test_execute_basic_query(
     assert result["data"]["TestColumn"][0] == "TestValue"
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_execute_with_custom_client_request_properties(
     mock_get_kusto_connection: Mock,
     sample_cluster_uri: str,
@@ -110,7 +110,7 @@ def test_execute_with_custom_client_request_properties(
     assert result["data"]["TestColumn"] == ["TestValue"]
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_execute_without_client_request_properties_preserves_behavior(
     mock_get_kusto_connection: Mock,
     sample_cluster_uri: str,
@@ -150,7 +150,7 @@ def test_execute_without_client_request_properties_preserves_behavior(
     assert result["data"]["TestColumn"] == ["TestValue"]
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_destructive_operation_with_custom_client_request_properties(
     mock_get_kusto_connection: Mock,
     sample_cluster_uri: str,
@@ -204,7 +204,7 @@ def test_destructive_operation_with_custom_client_request_properties(
     assert result["data"]["TestColumn"] == ["TestValue"]
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_execute_error_includes_correlation_id(
     mock_get_kusto_connection: Mock,
     sample_cluster_uri: str,
@@ -235,7 +235,7 @@ def test_execute_error_includes_correlation_id(
     assert "Kusto execution failed" in error_message
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_execute_json_parse_error_includes_correlation_id(
     mock_get_kusto_connection: Mock,
     sample_cluster_uri: str,
@@ -265,8 +265,8 @@ def test_execute_json_parse_error_includes_correlation_id(
     assert "Expecting value" in error_message
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.logger")
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.logger")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_successful_operations_do_not_log_correlation_id(
     mock_get_kusto_connection: Mock,
     mock_logger: Mock,

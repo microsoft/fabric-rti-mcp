@@ -1,7 +1,6 @@
 import argparse
 import os
 from dataclasses import dataclass
-from typing import List
 
 
 class FabricRtiMcpOBOFlowEnvVarNames:
@@ -50,9 +49,9 @@ class FabricRtiMcpOBOFlowAuthConfig:
         )
 
     @staticmethod
-    def existing_env_vars() -> List[str]:
+    def existing_env_vars() -> list[str]:
         """Return a list of environment variable names that are currently set."""
-        result: List[str] = []
+        result: list[str] = []
         env_vars = [
             FabricRtiMcpOBOFlowEnvVarNames.azure_tenant_id,
             FabricRtiMcpOBOFlowEnvVarNames.entra_app_client_id,

@@ -4,6 +4,10 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "cSpell.words": [
-        "Eventstream"
-    ]
+        "entra",
+        "Eventstream",
+        "fastmcp",
+        "streamable"
+    ],
+    "python-envs.pythonProjects": []
 }

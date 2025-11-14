@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
 
 try:
     from mcp import ClientSession, StdioServerParameters
