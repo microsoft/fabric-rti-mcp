@@ -11,11 +11,12 @@ from starlette.responses import JSONResponse
 
 from fabric_rti_mcp import __version__
 from fabric_rti_mcp.authentication.auth_middleware import add_auth_middleware
-from fabric_rti_mcp.common import global_config as config
-from fabric_rti_mcp.common import logger
-from fabric_rti_mcp.activator import activator_tools
-from fabric_rti_mcp.eventstream import eventstream_tools
-from fabric_rti_mcp.kusto import kusto_config, kusto_tools
+from fabric_rti_mcp.config import global_config as config
+from fabric_rti_mcp.config import logger
+from fabric_rti_mcp.config.obo import obo_config
+from fabric_rti_mcp.services.activator import activator_tools
+from fabric_rti_mcp.services.eventstream import eventstream_tools
+from fabric_rti_mcp.services.kusto import kusto_config, kusto_tools
 
 # Global variable to store server start time
 server_start_time = datetime.now(timezone.utc)

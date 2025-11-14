@@ -4,15 +4,15 @@ import functools
 import inspect
 import uuid
 from dataclasses import asdict
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
-from fabric_rti_mcp.common import logger
-from fabric_rti_mcp.kusto.kusto_config import KustoConfig
-from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
-from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.config import logger
+from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
+from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
+from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
 
 
 def canonical_entity_type(entity_type: str) -> str:
@@ -48,7 +48,7 @@ _DEFAULT_DB_NAME = (
 
 class KustoConnectionManager:
     def __init__(self) -> None:
-        self._cache: Dict[str, KustoConnection] = {}
+        self._cache: dict[str, KustoConnection] = {}
 
     def connect_to_all_known_services(self) -> None:
         """
@@ -118,7 +118,7 @@ def destructive_operation(func: F) -> F:
 
 
 def _crp(
-    action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: Optional[Dict[str, Any]] = None
+    action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: dict[str, Any] | None = None
 ) -> ClientRequestProperties:
     crp: ClientRequestProperties = ClientRequestProperties()
     crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
@@ -147,9 +147,9 @@ def _execute(
     query: str,
     cluster_uri: str,
     readonly_override: bool = False,
-    database: Optional[str] = None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
     caller_func = caller_frame.f_globals.get(action_name)  # type: ignore
@@ -179,7 +179,7 @@ def _execute(
 
 
 # NOTE: This is temporary. The intent is to not use environment variables for persistency.
-def kusto_known_services() -> List[Dict[str, str]]:
+def kusto_known_services() -> list[dict[str, str]]:
     """
     Retrieves a list of all Kusto services known to the MCP.
     Could be null if no services are configured.
@@ -193,9 +193,9 @@ def kusto_known_services() -> List[Dict[str, str]]:
 def kusto_query(
     query: str,
     cluster_uri: str,
-    database: Optional[str] = None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Executes a KQL query on the specified database. If no database is provided,
     it will use the default database.
@@ -214,8 +214,8 @@ def kusto_graph_query(
     query: str,
     cluster_uri: str,
     database: str | None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Intelligently executes a graph query using snapshots if they exist,
     otherwise falls back to transient graphs.
@@ -288,9 +288,9 @@ def kusto_graph_query(
 def kusto_command(
     command: str,
     cluster_uri: str,
-    database: Optional[str] = None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
     it will use the default database.
@@ -307,9 +307,9 @@ def kusto_command(
 def kusto_list_entities(
     cluster_uri: str,
     entity_type: str,
-    database: Optional[str] = None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
 
@@ -359,8 +359,8 @@ def kusto_list_entities(
 
 
 def kusto_describe_database(
-    cluster_uri: str, database: str | None, client_request_properties: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    cluster_uri: str, database: str | None, client_request_properties: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """
     Retrieves schema information for all entities (tables, materialized views, functions, graphs)
     in the specified database.
@@ -387,9 +387,9 @@ def kusto_describe_database_entity(
     entity_name: str,
     entity_type: str,
     cluster_uri: str,
-    database: Optional[str] = None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Retrieves the schema information for a specific entity (table, materialized view, function, graph)
     in the specified database. If no database is provided, uses the default database.
@@ -441,9 +441,9 @@ def kusto_sample_entity(
     entity_type: str,
     cluster_uri: str,
     sample_size: int = 10,
-    database: Optional[str] = None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Retrieves a data sample from the specified entity.
     If no database is provided, uses the default database.
@@ -493,9 +493,9 @@ def kusto_ingest_inline_into_table(
     table_name: str,
     data_comma_separator: str,
     cluster_uri: str,
-    database: Optional[str] = None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Ingests inline CSV data into a specified table. The data should be provided as a comma-separated string.
     If no database is provided, uses the default database.
@@ -520,10 +520,10 @@ def kusto_get_shots(
     shots_table_name: str,
     cluster_uri: str,
     sample_size: int = 3,
-    database: Optional[str] = None,
-    embedding_endpoint: Optional[str] = None,
-    client_request_properties: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    database: str | None = None,
+    embedding_endpoint: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
 

@@ -5,7 +5,7 @@ import pytest
 from azure.kusto.data import KustoClient
 from azure.kusto.data.response import KustoResponseDataSetV1
 
-from fabric_rti_mcp.kusto.kusto_connection import KustoConnection
+from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def mock_query_client() -> Mock:
 @pytest.fixture
 def mock_kusto_connection(mock_query_client: Mock) -> KustoConnection:
     """Mock KustoConnection with configured query client."""
-    with patch("fabric_rti_mcp.kusto.kusto_connection.KustoConnectionStringBuilder"):
+    with patch("fabric_rti_mcp.services.kusto.kusto_connection.KustoConnectionStringBuilder"):
         connection = KustoConnection("https://test.kusto.windows.net")
         connection.query_client = mock_query_client
         return connection
@@ -50,7 +50,7 @@ def mock_kusto_connection(mock_query_client: Mock) -> KustoConnection:
 @pytest.fixture
 def mock_kusto_cache(mock_kusto_connection: KustoConnection) -> Mock:
     """Mock the global KUSTO_CONNECTION_CACHE."""
-    with patch("fabric_rti_mcp.kusto.kusto_service.KUSTO_CONNECTION_CACHE") as cache:
+    with patch("fabric_rti_mcp.services.kusto.kusto_service.KUSTO_CONNECTION_CACHE") as cache:
         cache.__getitem__.return_value = mock_kusto_connection
         return cache
 

@@ -4,7 +4,6 @@ import argparse
 import logging
 import os
 from dataclasses import dataclass
-from typing import List
 
 logger = logging.getLogger("fabric-rti-mcp")
 
@@ -67,9 +66,9 @@ class GlobalFabricRTIConfig:
         )
 
     @staticmethod
-    def existing_env_vars() -> List[str]:
+    def existing_env_vars() -> list[str]:
         """Return a list of environment variable names that are currently set."""
-        result: List[str] = []
+        result: list[str] = []
         env_vars = [
             GlobalFabricRTIEnvVarNames.default_fabric_api_base,
             GlobalFabricRTIEnvVarNames.fabric_base_url,
