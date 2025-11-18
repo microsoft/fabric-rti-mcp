@@ -17,7 +17,7 @@ def eventstream_create(
     eventstream_id: str | None = None,
     definition: dict[str, Any] | None = None,
     description: str | None = None,
-) -> list[dict[str, Any]]:
+) -> list[dict[str, Any] | Any]:
     """
     Create an Eventstream item in Microsoft Fabric.
     Authentication is handled transparently using Azure Identity.

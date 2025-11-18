@@ -1,13 +1,9 @@
-"""
-Eventstream Builder Service for Microsoft Fabric RTI MCP
-Provides session-based, step-by-step eventstream construction functionality.
-"""
-
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fabric_rti_mcp.config import logger
+from fabric_rti_mcp.services.eventstream.eventstream_service import eventstream_create as _eventstream_create
 
 # Global session storage
 _builder_sessions: dict[str, dict[str, Any]] = {}
@@ -23,7 +19,7 @@ def _get_session(session_id: str) -> dict[str, Any] | None:
     return _builder_sessions.get(session_id)
 
 
-def _update_session(session_id: str, updates: dict[str, Any]) -> None:
+def _update_session(session_id: str, updates: dict[str, Any]) -> None:  # type: ignore
     """Update a builder session with new data."""
     if session_id in _builder_sessions:
         _builder_sessions[session_id].update(updates)
@@ -78,7 +74,7 @@ def eventstream_start_definition(name: str, description: str | None = None) -> d
         session_id = _generate_session_id()
         definition = _create_basic_definition(name, description)
 
-        session_data = {
+        session_data = {  # type: ignore
             "session_id": session_id,
             "name": name,
             "description": description,
@@ -99,8 +95,10 @@ def eventstream_start_definition(name: str, description: str | None = None) -> d
             "status": "ready",
             "next_steps": [
                 "Add sources using eventstream_add_sample_data_source or eventstream_add_custom_endpoint_source",
-                "Add derived streams using eventstream_add_derived_stream (default stream auto-created as '{name}-stream')",
-                "Add destinations using eventstream_add_eventhouse_destination or eventstream_add_custom_endpoint_destination",
+                "Add derived streams using eventstream_add_derived_stream "
+                "(default stream auto-created as '{name}-stream')",
+                "Add destinations using eventstream_add_eventhouse_destination or "
+                "eventstream_add_custom_endpoint_destination",
                 "Validate with eventstream_validate_definition",
                 "Create with eventstream_create_from_definition",
             ],
@@ -170,7 +168,7 @@ def eventstream_add_sample_data_source(
     if source_name is None:
         source_name = f"{sample_type.lower()}-source"
 
-    source_config = {"name": source_name, "type": "SampleData", "properties": {"type": sample_type}}
+    source_config = {"name": source_name, "type": "SampleData", "properties": {"type": sample_type}}  # type: ignore
 
     session["definition"]["sources"].append(source_config)
     session["last_updated"] = datetime.now().isoformat()
@@ -206,7 +204,7 @@ def eventstream_add_custom_endpoint_source(
         existing_source_names = [s["name"] for s in session["definition"]["sources"]]
         source_name = _generate_sequential_name(base_name, existing_source_names)
 
-    source_config = {"name": source_name, "type": "CustomEndpoint", "properties": {}}
+    source_config = {"name": source_name, "type": "CustomEndpoint", "properties": {}}  # type: ignore
 
     session["definition"]["sources"].append(source_config)
     session["last_updated"] = datetime.now().isoformat()
@@ -250,7 +248,8 @@ def eventstream_add_derived_stream(
             logger.info(f"Auto-connecting derived stream '{stream_name}' to default stream '{stream_names[0]}'")
         else:
             raise ValueError(
-                f"input_nodes must be specified when multiple streams/operators exist. Available: streams={stream_names}, operators={operator_names}"
+                "input_nodes must be specified when multiple streams/operators exist."
+                f"Available: streams={stream_names}, operators={operator_names}"
             )
 
     # Validate that input nodes exist (can be sources, operators, or streams)
@@ -258,7 +257,7 @@ def eventstream_add_derived_stream(
         if node not in source_names and node not in operator_names and node not in stream_names:
             raise ValueError(f"Input node '{node}' not found in sources, operators, or streams")
 
-    stream_config = {
+    stream_config = {  # type: ignore
         "name": stream_name,
         "type": "DerivedStream",
         "properties": {"inputSerialization": {"type": "Json", "properties": {"encoding": "UTF8"}}},
@@ -317,7 +316,7 @@ def eventstream_add_eventhouse_destination(
         if stream not in stream_names:
             raise ValueError(f"Stream '{stream}' not found in definition")
 
-    destination_config = {
+    destination_config = {  # type: ignore
         "name": destination_name,
         "type": "Eventhouse",
         "properties": {
@@ -379,7 +378,7 @@ def eventstream_add_custom_endpoint_destination(
         if stream not in stream_names:
             raise ValueError(f"Stream '{stream}' not found in definition")
 
-    destination_config = {
+    destination_config = {  # type: ignore
         "name": destination_name,
         "type": "CustomEndpoint",
         "properties": {},
@@ -481,9 +480,6 @@ def eventstream_create_from_definition(session_id: str, workspace_id: str) -> di
         raise ValueError(f"Definition is invalid: {', '.join(validation_result['errors'])}")
 
     try:
-        # Import here to avoid circular imports at module level
-        from fabric_rti_mcp.eventstream.eventstream_service import eventstream_create as _eventstream_create
-
         # Create the eventstream using the base service
         result = _eventstream_create(
             workspace_id=workspace_id,
@@ -500,6 +496,7 @@ def eventstream_create_from_definition(session_id: str, workspace_id: str) -> di
         if result and len(result) > 0:
             result_data = result[0]
             if isinstance(result_data, dict):
+                result_data = cast(dict[str, Any], result_data)
                 if result_data.get("error"):
                     # Handle API errors
                     error_msg = result_data.get("detail", result_data.get("message", "Unknown error"))

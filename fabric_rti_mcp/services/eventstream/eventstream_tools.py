@@ -1,17 +1,12 @@
-"""
-Eventstream tools registration for Microsoft Fabric RTI MCP
-Registers Eventstream-related tools with the MCP server
-"""
-
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from fabric_rti_mcp.service.eventstream import eventstream_builder_tools, eventstream_service
+from fabric_rti_mcp.services.eventstream import eventstream_builder_tools, eventstream_service
 
 
 def register_tools(mcp: FastMCP) -> None:
     """Register all Eventstream tools with the MCP server using ToolAnnotations pattern."""
-    
+
     # Read-only tools (queries, list operations)
     mcp.add_tool(
         eventstream_service.eventstream_list,
@@ -25,7 +20,7 @@ def register_tools(mcp: FastMCP) -> None:
         eventstream_service.eventstream_get_definition,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
-    
+
     # Destructive tools (create, update, delete operations)
     mcp.add_tool(
         eventstream_service.eventstream_create,
