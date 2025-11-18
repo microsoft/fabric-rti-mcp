@@ -1,7 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from fabric_rti_mcp.kusto import kusto_service
+from fabric_rti_mcp.services.kusto import kusto_service
 
 
 def register_tools(mcp: FastMCP) -> None:

@@ -29,7 +29,8 @@ Fabric RTI MCP is an MCP server that exposes Fabric RTI functionality as tools t
   2. Third-party library imports
   3. Project imports
 - Within each group, use alphabetical ordering
-- Use absolute imports for project modules
+- Use absolute imports for project modules (e.g. `package.submodule.module`), not relative imports (e.g. `..module`)
+- Never use wildcard imports (e.g. `from package import *`)
 
 Example:
 ```python
@@ -48,6 +49,8 @@ from fabric_rti_mcp.kusto import KustoService
 - Use type hints for all function parameters and return values
 - Use generics (TypeVar) when appropriate
 - Prefer composition of simple types over complex nested types
+- Prefer built-in/primitive container types (e.g. `list[str]`, `dict[str, Any]`) over `typing` aliases (e.g. `List[str]`, `Dict[str, Any]`)
+ - Prefer union syntax for optionals (e.g. `str | None`) over `Optional[str]`
 
 Example:
 ```python
@@ -78,6 +81,7 @@ def get_tasks_with_status(status_type: str, project_id: Optional[str] = None) ->
 ### Documentation
 * DO NOT add obvious comments that repeat the code. Instead, focus on explaining the "why" behind complex logic or design decisions.
 * DO NOT add top-level docstrings for modules or files. Focus on function / class docstrings instead.
+* DO NOT add any other module-level documentation; keep documentation scoped to functions, classes, and methods.
 * Be concise. Only document the bare minimum necessary to understand the code.
 
 ## Architecture & Design

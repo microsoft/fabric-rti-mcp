@@ -5,12 +5,12 @@ Provides session-based, step-by-step eventstream construction functionality.
 
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.config import logger
 
 # Global session storage
-_builder_sessions: Dict[str, Dict[str, Any]] = {}
+_builder_sessions: dict[str, dict[str, Any]] = {}
 
 
 def _generate_session_id() -> str:
@@ -18,18 +18,18 @@ def _generate_session_id() -> str:
     return str(uuid.uuid4())
 
 
-def _get_session(session_id: str) -> Optional[Dict[str, Any]]:
+def _get_session(session_id: str) -> dict[str, Any] | None:
     """Get a builder session by ID."""
     return _builder_sessions.get(session_id)
 
 
-def _update_session(session_id: str, updates: Dict[str, Any]) -> None:
+def _update_session(session_id: str, updates: dict[str, Any]) -> None:
     """Update a builder session with new data."""
     if session_id in _builder_sessions:
         _builder_sessions[session_id].update(updates)
 
 
-def _generate_sequential_name(base_name: str, existing_names: List[str]) -> str:
+def _generate_sequential_name(base_name: str, existing_names: list[str]) -> str:
     """
     Generate a sequential name that doesn't conflict with existing names.
 
@@ -47,7 +47,7 @@ def _generate_sequential_name(base_name: str, existing_names: List[str]) -> str:
     return f"{base_name}-{counter}"
 
 
-def _create_basic_definition(name: str, description: Optional[str] = None) -> Dict[str, Any]:
+def _create_basic_definition(name: str, description: str | None = None) -> dict[str, Any]:
     """
     Create a basic eventstream definition template for the interactive builder workflow.
     This creates a structure with a default stream that gets populated through builder methods.
@@ -66,7 +66,7 @@ def _create_basic_definition(name: str, description: Optional[str] = None) -> Di
     }
 
 
-def eventstream_start_definition(name: str, description: Optional[str] = None) -> Dict[str, Any]:
+def eventstream_start_definition(name: str, description: str | None = None) -> dict[str, Any]:
     """
     Start a new eventstream definition builder session.
 
@@ -110,7 +110,7 @@ def eventstream_start_definition(name: str, description: Optional[str] = None) -
         raise
 
 
-def eventstream_get_current_definition(session_id: str) -> Dict[str, Any]:
+def eventstream_get_current_definition(session_id: str) -> dict[str, Any]:
     """
     Get the current eventstream definition.
 
@@ -131,7 +131,7 @@ def eventstream_get_current_definition(session_id: str) -> Dict[str, Any]:
     }
 
 
-def eventstream_clear_definition(session_id: str) -> Dict[str, str]:
+def eventstream_clear_definition(session_id: str) -> dict[str, str]:
     """
     Clear the current eventstream definition and start over.
 
@@ -152,8 +152,8 @@ def eventstream_clear_definition(session_id: str) -> Dict[str, str]:
 
 
 def eventstream_add_sample_data_source(
-    session_id: str, sample_type: str = "Bicycles", source_name: Optional[str] = None
-) -> Dict[str, Any]:
+    session_id: str, sample_type: str = "Bicycles", source_name: str | None = None
+) -> dict[str, Any]:
     """
     Add a sample data source to the eventstream definition.
 
@@ -186,8 +186,8 @@ def eventstream_add_sample_data_source(
 
 
 def eventstream_add_custom_endpoint_source(
-    session_id: str, source_name: Optional[str] = None, endpoint_url: Optional[str] = None
-) -> Dict[str, Any]:
+    session_id: str, source_name: str | None = None, endpoint_url: str | None = None
+) -> dict[str, Any]:
     """
     Add a custom endpoint source to the eventstream definition.
 
@@ -222,8 +222,8 @@ def eventstream_add_custom_endpoint_source(
 
 
 def eventstream_add_derived_stream(
-    session_id: str, stream_name: str, input_nodes: Optional[List[str]] = None
-) -> Dict[str, Any]:
+    session_id: str, stream_name: str, input_nodes: list[str] | None = None
+) -> dict[str, Any]:
     """
     Add a derived stream to the eventstream definition.
 
@@ -284,11 +284,11 @@ def eventstream_add_eventhouse_destination(
     item_id: str,
     database_name: str,
     table_name: str,
-    input_streams: List[str],
-    destination_name: Optional[str] = None,
+    input_streams: list[str],
+    destination_name: str | None = None,
     data_ingestion_mode: str = "ProcessedIngestion",
     encoding: str = "UTF8",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Add an Eventhouse destination to the eventstream definition.
 
@@ -346,12 +346,12 @@ def eventstream_add_eventhouse_destination(
 
 def eventstream_add_custom_endpoint_destination(
     session_id: str,
-    input_streams: List[str],
-    destination_name: Optional[str] = None,
-    endpoint_url: Optional[str] = None,
+    input_streams: list[str],
+    destination_name: str | None = None,
+    endpoint_url: str | None = None,
     method: str = "POST",
-    headers: Optional[Dict[str, str]] = None,
-) -> Dict[str, Any]:
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """
     Add a custom endpoint destination to the eventstream definition.
 
@@ -399,7 +399,7 @@ def eventstream_add_custom_endpoint_destination(
     }
 
 
-def eventstream_validate_definition(session_id: str) -> Dict[str, Any]:
+def eventstream_validate_definition(session_id: str) -> dict[str, Any]:
     """
     Validate the current eventstream definition.
 
@@ -411,8 +411,8 @@ def eventstream_validate_definition(session_id: str) -> Dict[str, Any]:
         raise ValueError(f"Session {session_id} not found")
 
     definition = session["definition"]
-    errors = []
-    warnings = []
+    errors: list[str] = []
+    warnings: list[str] = []
 
     # Basic validation
     if not definition.get("sources"):
@@ -463,7 +463,7 @@ def eventstream_validate_definition(session_id: str) -> Dict[str, Any]:
     }
 
 
-def eventstream_create_from_definition(session_id: str, workspace_id: str) -> Dict[str, Any]:
+def eventstream_create_from_definition(session_id: str, workspace_id: str) -> dict[str, Any]:
     """
     Create an eventstream in Fabric from the current definition.
 
@@ -533,7 +533,7 @@ def eventstream_create_from_definition(session_id: str, workspace_id: str) -> Di
         raise
 
 
-def eventstream_list_available_components() -> Dict[str, List[str]]:
+def eventstream_list_available_components() -> dict[str, list[str]]:
     """
     List available components for building eventstreams.
 

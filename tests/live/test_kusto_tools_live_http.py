@@ -13,7 +13,7 @@ import requests
 from azure.identity import DefaultAzureCredential
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
 
 
 class HttpMcpClient:

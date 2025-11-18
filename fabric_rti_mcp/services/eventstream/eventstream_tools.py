@@ -6,7 +6,7 @@ Registers Eventstream-related tools with the MCP server
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from fabric_rti_mcp.eventstream import eventstream_builder_tools, eventstream_service
+from fabric_rti_mcp.service.eventstream import eventstream_builder_tools, eventstream_service
 
 
 def register_tools(mcp: FastMCP) -> None:

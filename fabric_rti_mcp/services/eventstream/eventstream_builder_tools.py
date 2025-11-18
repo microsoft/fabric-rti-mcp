@@ -1,19 +1,10 @@
-"""
-Eventstream Builder Tools Registration for Microsoft Fabric RTI MCP
-Registers all builder-related tools with the MCP server
-"""
-
-from typing import Dict, List, Optional
-
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from fabric_rti_mcp.eventstream import eventstream_builder_service
+from fabric_rti_mcp.services.eventstream import eventstream_builder_service
 
 
 def register_tools(mcp: FastMCP) -> None:
-    """Register all available Eventstream Builder tools with the MCP server using ToolAnnotations pattern."""
-
     # Session management tools (read-only for getting, potentially destructive for clearing)
     mcp.add_tool(
         eventstream_builder_service.eventstream_start_definition,

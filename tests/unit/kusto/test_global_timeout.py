@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch
 
 from azure.kusto.data import ClientRequestProperties
 
-from fabric_rti_mcp.kusto.kusto_config import KustoConfig
-from fabric_rti_mcp.kusto.kusto_service import kusto_query
+from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
+from fabric_rti_mcp.services.kusto.kusto_service import kusto_query
 
 
 def test_config_loads_timeout_from_env() -> None:
@@ -30,7 +30,7 @@ def test_config_no_timeout_env() -> None:
         assert test_config.timeout_seconds is None
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_global_timeout_applied_to_query(mock_get_connection: Mock) -> None:
     """Test that global timeout is applied to Kusto queries."""
     # Mock connection
@@ -44,7 +44,7 @@ def test_global_timeout_applied_to_query(mock_get_connection: Mock) -> None:
     mock_get_connection.return_value = mock_connection
 
     # Mock the kusto config with timeout
-    with patch("fabric_rti_mcp.kusto.kusto_service.CONFIG") as mock_config:
+    with patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG") as mock_config:
         mock_config.timeout_seconds = 600
         kusto_query("TestQuery", "https://test.kusto.windows.net")
 
@@ -60,7 +60,7 @@ def test_global_timeout_applied_to_query(mock_get_connection: Mock) -> None:
     assert crp._options.get("servertimeout") == expected_timeout
 
 
-@patch("fabric_rti_mcp.kusto.kusto_service.get_kusto_connection")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_no_timeout_when_not_configured(mock_get_connection: Mock) -> None:
     """Test that no timeout is set when not configured."""
     # Mock connection
@@ -76,7 +76,7 @@ def test_no_timeout_when_not_configured(mock_get_connection: Mock) -> None:
     # Mock format_results_as_json to return expected result
 
     # Mock the kusto config without timeout
-    with patch("fabric_rti_mcp.kusto.kusto_service.CONFIG") as mock_config:
+    with patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG") as mock_config:
         mock_config.timeout_seconds = None
         kusto_query("TestQuery", "https://test.kusto.windows.net")
 

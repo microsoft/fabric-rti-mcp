@@ -2,21 +2,22 @@ import base64
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fabric_rti_mcp.utils.fabric_api_http_client import FabricHttpClientCache
+from fabric_rti_mcp.fabric_api_http_client import FabricHttpClientCache
 
 # Microsoft Fabric API configuration
 
 DEFAULT_TIMEOUT = 30
 
+
 def eventstream_create(
     workspace_id: str,
-    eventstream_name: Optional[str] = None,
-    eventstream_id: Optional[str] = None,
-    definition: Optional[Dict[str, Any]] = None,
-    description: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    eventstream_name: str | None = None,
+    eventstream_id: str | None = None,
+    definition: dict[str, Any] | None = None,
+    description: str | None = None,
+) -> list[dict[str, Any]]:
     """
     Create an Eventstream item in Microsoft Fabric.
     Authentication is handled transparently using Azure Identity.
@@ -58,7 +59,7 @@ def eventstream_create(
     definition_json = json.dumps(definition)
     definition_b64 = base64.b64encode(definition_json.encode("utf-8")).decode("utf-8")
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "displayName": eventstream_name,
         "type": "Eventstream",
         "definition": {
@@ -75,7 +76,7 @@ def eventstream_create(
     return [result]
 
 
-def eventstream_get(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+def eventstream_get(workspace_id: str, item_id: str) -> list[dict[str, Any]]:
     """
     Get an Eventstream item by workspace and item ID.
     Authentication is handled transparently using Azure Identity.
@@ -90,7 +91,7 @@ def eventstream_get(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     return [result]
 
 
-def eventstream_list(workspace_id: str) -> List[Dict[str, Any]]:
+def eventstream_list(workspace_id: str) -> list[dict[str, Any]]:
     """
     List all Eventstream items in a workspace.
     Authentication is handled transparently using Azure Identity.
@@ -103,17 +104,10 @@ def eventstream_list(workspace_id: str) -> List[Dict[str, Any]]:
     result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
 
     # Filter only Eventstream items if the result contains a list
-    if isinstance(result, dict) and "value" in result and isinstance(result["value"], list):
-        eventstreams: List[Dict[str, Any]] = [
+    if "value" in result and isinstance(result["value"], list):
+        eventstreams: list[dict[str, Any]] = [
             item
             for item in result["value"]  # type: ignore
-            if isinstance(item, dict) and item.get("type") == "Eventstream"  # type: ignore
-        ]
-        return eventstreams
-    elif isinstance(result, list):
-        eventstreams = [
-            item
-            for item in result  # type: ignore
             if isinstance(item, dict) and item.get("type") == "Eventstream"  # type: ignore
         ]
         return eventstreams
@@ -121,7 +115,7 @@ def eventstream_list(workspace_id: str) -> List[Dict[str, Any]]:
     return [result]
 
 
-def eventstream_delete(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+def eventstream_delete(workspace_id: str, item_id: str) -> list[dict[str, Any]]:
     """
     Delete an Eventstream item by workspace and item ID.
     Authentication is handled transparently using Azure Identity.
@@ -136,7 +130,7 @@ def eventstream_delete(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     return [result]
 
 
-def eventstream_update(workspace_id: str, item_id: str, definition: Dict[str, Any]) -> List[Dict[str, Any]]:
+def eventstream_update(workspace_id: str, item_id: str, definition: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Update an Eventstream item by workspace and item ID.
     Authentication is handled transparently using Azure Identity.
@@ -150,7 +144,7 @@ def eventstream_update(workspace_id: str, item_id: str, definition: Dict[str, An
     definition_json = json.dumps(definition)
     definition_b64 = base64.b64encode(definition_json.encode("utf-8")).decode("utf-8")
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "definition": {
             "parts": [{"path": "eventstream.json", "payload": definition_b64, "payloadType": "InlineBase64"}]
         }
@@ -162,7 +156,7 @@ def eventstream_update(workspace_id: str, item_id: str, definition: Dict[str, An
     return [result]
 
 
-def eventstream_get_definition(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+def eventstream_get_definition(workspace_id: str, item_id: str) -> list[dict[str, Any]]:
     """
     Get the definition of an Eventstream item.
     Authentication is handled transparently using Azure Identity.
@@ -177,7 +171,7 @@ def eventstream_get_definition(workspace_id: str, item_id: str) -> List[Dict[str
     return [result]
 
 
-def _create_basic_eventstream_definition(name: str, stream_id: Optional[str] = None) -> Dict[str, Any]:
+def _create_basic_eventstream_definition(name: str, stream_id: str | None = None) -> dict[str, Any]:
     """
     Create a basic eventstream definition that can be extended later.
 
@@ -199,7 +193,7 @@ def _create_basic_eventstream_definition(name: str, stream_id: Optional[str] = N
     }
 
 
-def eventstream_create_simple(workspace_id: str, name: str, description: Optional[str] = None) -> List[Dict[str, Any]]:
+def eventstream_create_simple(workspace_id: str, name: str, description: str | None = None) -> list[dict[str, Any]]:
     """
     Simple eventstream creation - just provide workspace and name.
     Perfect for quick testing and getting started.

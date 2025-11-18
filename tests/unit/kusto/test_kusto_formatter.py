@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 from azure.kusto.data.response import KustoResponseDataSet
 
-from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
 
 
 class TestFormatResults:
@@ -279,7 +279,7 @@ class TestParsingFunctionality:
     def test_parse_with_KustoResponseFormat_object(self) -> None:
         """Test parsing with KustoResponseFormat object instead of dict."""
         # Arrange
-        from fabric_rti_mcp.kusto.kusto_formatter import KustoResponseFormat
+        from fabric_rti_mcp.services.kusto.kusto_formatter import KustoResponseFormat
 
         json_data = [{"Name": "Alice", "Age": 30}]
         response = KustoResponseFormat(format="json", data=json_data)
