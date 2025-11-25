@@ -1,0 +1,22 @@
+{
+    "version": "2.0",
+    "extensions": {
+        "http": {
+            "routePrefix": ""
+        }
+    },
+    "customHandler": {
+        "description": {
+            "defaultExecutablePath": "python3",
+            "workingDirectory": "",
+            "arguments": [
+                "-m", 
+                "fabric_rti_mcp.server", 
+                "--http", 
+                "--stateless-http"
+            ]
+        },
+        "enableForwardingHttpRequest": true,
+        "enableHttpProxyingRequest": true
+    }
+}

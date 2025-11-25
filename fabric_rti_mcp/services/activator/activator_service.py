@@ -79,7 +79,7 @@ class ActivatorService:
         alert_message: str,
         alert_headline: str,
         alert_type: str = "teams",
-        artifact_id: str | None = None,
+        artifact_id: str = None,  # type: ignore[assignment]
     ) -> dict[str, Any]:
         """
         Use this tool create an alert that will fire when the source generates data.
@@ -144,7 +144,7 @@ class ActivatorService:
         alert_type: str,
         alert_message: str,
         alert_headline: str,
-        artifact_id: str | None = None,
+        artifact_id: str = None,  # type: ignore[assignment]
     ) -> dict[str, Any]:
         event_and_rule_entities = activator_entity_generators.create_simple_event_rule_entities(
             trigger_name,

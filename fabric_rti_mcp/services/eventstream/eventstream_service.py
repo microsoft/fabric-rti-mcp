@@ -13,10 +13,10 @@ DEFAULT_TIMEOUT = 30
 
 def eventstream_create(
     workspace_id: str,
-    eventstream_name: str | None = None,
-    eventstream_id: str | None = None,
-    definition: dict[str, Any] | None = None,
-    description: str | None = None,
+    eventstream_name: str = None,  # type: ignore[assignment]
+    eventstream_id: str = None, # type: ignore[assignment]
+    definition: dict[str, Any] = None, # type: ignore[assignment]
+    description: str = None, # type: ignore[assignment]
 ) -> list[dict[str, Any] | Any]:
     """
     Create an Eventstream item in Microsoft Fabric.
@@ -171,7 +171,7 @@ def eventstream_get_definition(workspace_id: str, item_id: str) -> list[dict[str
     return [result]
 
 
-def _create_basic_eventstream_definition(name: str, stream_id: str | None = None) -> dict[str, Any]:
+def _create_basic_eventstream_definition(name: str, stream_id: str = None) -> dict[str, Any]: # type: ignore[assignment]
     """
     Create a basic eventstream definition that can be extended later.
 
@@ -193,7 +193,7 @@ def _create_basic_eventstream_definition(name: str, stream_id: str | None = None
     }
 
 
-def eventstream_create_simple(workspace_id: str, name: str, description: str | None = None) -> list[dict[str, Any]]:
+def eventstream_create_simple(workspace_id: str, name: str, description: str = None) -> list[dict[str, Any]]: # type: ignore[assignment]
     """
     Simple eventstream creation - just provide workspace and name.
     Perfect for quick testing and getting started.

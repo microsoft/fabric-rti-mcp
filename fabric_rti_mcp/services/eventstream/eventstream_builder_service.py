@@ -43,7 +43,7 @@ def _generate_sequential_name(base_name: str, existing_names: list[str]) -> str:
     return f"{base_name}-{counter}"
 
 
-def _create_basic_definition(name: str, description: str | None = None) -> dict[str, Any]:
+def _create_basic_definition(name: str, description: str = None) -> dict[str, Any]:  # type: ignore[assignment]
     """
     Create a basic eventstream definition template for the interactive builder workflow.
     This creates a structure with a default stream that gets populated through builder methods.
@@ -62,7 +62,7 @@ def _create_basic_definition(name: str, description: str | None = None) -> dict[
     }
 
 
-def eventstream_start_definition(name: str, description: str | None = None) -> dict[str, Any]:
+def eventstream_start_definition(name: str, description: str = None) -> dict[str, Any]:  # type: ignore[assignment]
     """
     Start a new eventstream definition builder session.
 
@@ -72,7 +72,7 @@ def eventstream_start_definition(name: str, description: str | None = None) -> d
     """
     try:
         session_id = _generate_session_id()
-        definition = _create_basic_definition(name, description)
+        definition = _create_basic_definition(name, description)  # type: ignore[arg-type]
 
         session_data = {  # type: ignore
             "session_id": session_id,
@@ -150,7 +150,7 @@ def eventstream_clear_definition(session_id: str) -> dict[str, str]:
 
 
 def eventstream_add_sample_data_source(
-    session_id: str, sample_type: str = "Bicycles", source_name: str | None = None
+    session_id: str, sample_type: str = "Bicycles", source_name: str = None  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Add a sample data source to the eventstream definition.
@@ -184,7 +184,7 @@ def eventstream_add_sample_data_source(
 
 
 def eventstream_add_custom_endpoint_source(
-    session_id: str, source_name: str | None = None, endpoint_url: str | None = None
+    session_id: str, source_name: str = None, endpoint_url: str = None  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Add a custom endpoint source to the eventstream definition.
@@ -220,7 +220,7 @@ def eventstream_add_custom_endpoint_source(
 
 
 def eventstream_add_derived_stream(
-    session_id: str, stream_name: str, input_nodes: list[str] | None = None
+    session_id: str, stream_name: str, input_nodes: list[str] = None  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Add a derived stream to the eventstream definition.
@@ -284,7 +284,7 @@ def eventstream_add_eventhouse_destination(
     database_name: str,
     table_name: str,
     input_streams: list[str],
-    destination_name: str | None = None,
+    destination_name: str = None,  # type: ignore[assignment]
     data_ingestion_mode: str = "ProcessedIngestion",
     encoding: str = "UTF8",
 ) -> dict[str, Any]:
@@ -346,10 +346,10 @@ def eventstream_add_eventhouse_destination(
 def eventstream_add_custom_endpoint_destination(
     session_id: str,
     input_streams: list[str],
-    destination_name: str | None = None,
-    endpoint_url: str | None = None,
+    destination_name: str = None,  # type: ignore[assignment]
+    endpoint_url: str = None,  # type: ignore[assignment]
     method: str = "POST",
-    headers: dict[str, str] | None = None,
+    headers: dict[str, str] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Add a custom endpoint destination to the eventstream definition.

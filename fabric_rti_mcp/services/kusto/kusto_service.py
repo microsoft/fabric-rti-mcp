@@ -147,8 +147,8 @@ def _execute(
     query: str,
     cluster_uri: str,
     readonly_override: bool = False,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None,  # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
@@ -193,8 +193,8 @@ def kusto_known_services() -> list[dict[str, str]]:
 def kusto_query(
     query: str,
     cluster_uri: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None, # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None, # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Executes a KQL query on the specified database. If no database is provided,
@@ -213,8 +213,8 @@ def kusto_graph_query(
     graph_name: str,
     query: str,
     cluster_uri: str,
-    database: str | None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None, # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None, # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Intelligently executes a graph query using snapshots if they exist,
@@ -288,8 +288,8 @@ def kusto_graph_query(
 def kusto_command(
     command: str,
     cluster_uri: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None, # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None, # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
@@ -307,8 +307,8 @@ def kusto_command(
 def kusto_list_entities(
     cluster_uri: str,
     entity_type: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None,  # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
@@ -359,7 +359,7 @@ def kusto_list_entities(
 
 
 def kusto_describe_database(
-    cluster_uri: str, database: str | None, client_request_properties: dict[str, Any] | None = None
+    cluster_uri: str, database: str = None, client_request_properties: dict[str, Any] = None # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Retrieves schema information for all entities (tables, materialized views, functions, graphs)
@@ -387,8 +387,8 @@ def kusto_describe_database_entity(
     entity_name: str,
     entity_type: str,
     cluster_uri: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None, # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None, # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Retrieves the schema information for a specific entity (table, materialized view, function, graph)
@@ -441,8 +441,8 @@ def kusto_sample_entity(
     entity_type: str,
     cluster_uri: str,
     sample_size: int = 10,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None,  # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Retrieves a data sample from the specified entity.
@@ -493,8 +493,8 @@ def kusto_ingest_inline_into_table(
     table_name: str,
     data_comma_separator: str,
     cluster_uri: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None,  # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Ingests inline CSV data into a specified table. The data should be provided as a comma-separated string.
@@ -520,9 +520,9 @@ def kusto_get_shots(
     shots_table_name: str,
     cluster_uri: str,
     sample_size: int = 3,
-    database: str | None = None,
-    embedding_endpoint: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
+    database: str = None,  # type: ignore[assignment]
+    embedding_endpoint: str = None,  # type: ignore[assignment]
+    client_request_properties: dict[str, Any] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
