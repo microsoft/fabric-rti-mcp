@@ -176,16 +176,3 @@ def map_get_definition(workspace_id: str, item_id: str) -> dict[str, Any]:
     result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
 
     return result
-
-
-def map_create_simple(workspace_id: str, name: str, description: str | None = None) -> dict[str, Any]:
-    """
-    Simple map creation - just provide workspace and name.
-    Perfect for quick testing and getting started.
-
-    :param workspace_id: The workspace ID (UUID)
-    :param name: Name for the new map
-    :param description: Optional description
-    :return: Created map details
-    """
-    return map_create(workspace_id=workspace_id, map_name=name, description=description)

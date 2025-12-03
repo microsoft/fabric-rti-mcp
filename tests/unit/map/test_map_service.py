@@ -50,25 +50,11 @@ def test_map_create(mock_http_client: MagicMock) -> None:
         },
     }
 
-    assert result == [{"id": "123"}]
+    assert result == {"id": "123"}
     mock_http_client.make_request.assert_called_once_with(
         "POST",
         f"/workspaces/{workspace_id}/Maps",
         expected_payload,
-    )
-
-
-def test_map_create_simple(mock_http_client: MagicMock) -> None:
-    mock_http_client.make_request.return_value = {"ok": True}
-    workspace_id = "cfafbeb1-8037-4d0c-896e-a46fb27ff229"
-    map_name="Bare Map"
-
-    _ = map_service.map_create_simple(workspace_id=workspace_id, name=map_name)
-
-    mock_http_client.make_request.assert_called_once_with(
-        "POST",
-        f"/workspaces/{workspace_id}/Maps",
-        {"displayName": map_name},
     )
 
 
@@ -79,7 +65,7 @@ def test_map_get_returns_response(mock_http_client: MagicMock) -> None:
 
     result = map_service.map_get(workspace_id, item_id)
 
-    assert result == [{"item": "value"}]
+    assert result == {"item": "value"}
     mock_http_client.make_request.assert_called_once_with(
         "GET",
         f"/workspaces/{workspace_id}/Maps/{item_id}",
@@ -92,7 +78,7 @@ def test_map_list_fetches_all_maps(mock_http_client: MagicMock) -> None:
 
     result = map_service.map_list(workspace_id)
 
-    assert result == [{"value": []}]
+    assert result == {"value": []}
     mock_http_client.make_request.assert_called_once_with("GET", f"/workspaces/{workspace_id}/Maps")
 
 
@@ -103,7 +89,7 @@ def test_map_delete_uses_items_endpoint(mock_http_client: MagicMock) -> None:
 
     result = map_service.map_delete(workspace_id, item_id)
 
-    assert result == [{"deleted": True}]
+    assert result == {"deleted": True}
     mock_http_client.make_request.assert_called_once_with(
         "DELETE",
         f"/workspaces/{workspace_id}/items/{item_id}",
@@ -122,7 +108,7 @@ def test_map_update_includes_provided_fields(mock_http_client: MagicMock) -> Non
         description="New description",
     )
 
-    assert result == [{"updated": True}]
+    assert result == {"updated": True}
     mock_http_client.make_request.assert_called_once_with(
         "PATCH",
         f"/workspaces/{workspace_id}/items/{item_id}",
@@ -135,7 +121,7 @@ def test_map_update_handles_empty_payload(mock_http_client: MagicMock) -> None:
 
     result = map_service.map_update("workspace-7", "item-7")
 
-    assert result == [{"updated": False}]
+    assert result == {"updated": False}
     mock_http_client.make_request.assert_called_once_with(
         "PATCH",
         "/workspaces/workspace-7/items/item-7",
@@ -160,7 +146,7 @@ def test_map_update_definition_encodes_payload(mock_http_client: MagicMock) -> N
         }
     }
 
-    assert result == [{"updated": True}]
+    assert result == {"updated": True}
     mock_http_client.make_request.assert_called_once_with(
         "POST",
         f"/workspaces/{workspace_id}/Maps/{item_id}/updateDefinition",
@@ -173,22 +159,8 @@ def test_map_get_definition_requests_items_endpoint(mock_http_client: MagicMock)
 
     result = map_service.map_get_definition("workspace-9", "item-9")
 
-    assert result == [{"definition": {}}]
+    assert result == {"definition": {}}
     mock_http_client.make_request.assert_called_once_with(
         "GET",
         "/workspaces/workspace-9/items/item-9/getDefinition",
-    )
-
-
-def test_map_create_simple_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
-    map_create_mock = MagicMock(return_value=[{"id": "simple"}])
-    monkeypatch.setattr(map_service, "map_create", map_create_mock)
-
-    result = map_service.map_create_simple("workspace-10", "Simple Map", description="desc")
-
-    assert result == [{"id": "simple"}]
-    map_create_mock.assert_called_once_with(
-        workspace_id="workspace-10",
-        map_name="Simple Map",
-        description="desc",
     )
