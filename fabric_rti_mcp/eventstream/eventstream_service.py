@@ -1,23 +1,106 @@
+import asyncio
 import base64
 import json
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Coroutine, Dict, List, Optional
 
-from fabric_rti_mcp.fabric_api_http_client import FabricHttpClientCache
+from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
+from fabric_rti_mcp.eventstream.eventstream_connection import EventstreamConnection
 
 # Microsoft Fabric API configuration
 
 DEFAULT_TIMEOUT = 30
+FABRIC_CONFIG = GlobalFabricRTIConfig.from_env()
+
+
+class EventstreamConnectionCache:
+    """Simple connection cache for Eventstream API clients using Azure Identity."""
+
+    def __init__(self) -> None:
+        self._connection: Optional[EventstreamConnection] = None
+
+    def get_connection(self) -> EventstreamConnection:
+        """Get or create an Eventstream connection using the configured API base URL."""
+        if self._connection is None:
+            api_base = FABRIC_CONFIG.fabric_api_base
+            self._connection = EventstreamConnection(api_base)
+            logger.info(f"Created Eventstream connection for API base: {api_base}")
+
+        return self._connection
+
+
+EVENTSTREAM_CONNECTION_CACHE = EventstreamConnectionCache()
+
+
+def get_eventstream_connection() -> EventstreamConnection:
+    """Get or create an Eventstream connection using the configured API base URL."""
+    return EVENTSTREAM_CONNECTION_CACHE.get_connection()
+
+
+def _run_async_operation(coro: Coroutine[Any, Any, Any]) -> Any:
+    """
+    Helper function to run async operations in sync context.
+    Handles event loop management gracefully.
+    """
+    try:
+        # Try to get the existing event loop
+        asyncio.get_running_loop()
+        # If we're already in an event loop, we need to run in a thread
+        import concurrent.futures
+
+        def run_in_thread() -> Any:
+            # Create a new event loop for this thread
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                return new_loop.run_until_complete(coro)
+            finally:
+                new_loop.close()
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_in_thread)
+            return future.result()
+
+    except RuntimeError:
+        # No event loop running, we can use asyncio.run
+        return asyncio.run(coro)
+
+
+async def _execute_eventstream_operation(
+    method: str,
+    endpoint: str,
+    payload: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Base execution method for Eventstream operations using Azure Identity.
+    No longer requires explicit authorization token - handled transparently.
+
+    :param method: HTTP method (GET, POST, PUT, DELETE)
+    :param endpoint: API endpoint relative to the configured API base
+    :param payload: Optional request payload
+    :return: API response as dictionary
+    """
+    # Get connection with automatic Azure authentication
+    connection = get_eventstream_connection()
+
+    try:
+        # Make authenticated request
+        result = await connection.make_request(method, endpoint, payload, DEFAULT_TIMEOUT)
+        return result
+
+    except Exception as e:
+        logger.error(f"Error executing Eventstream operation: {e}")
+        return {"error": True, "message": str(e)}
 
 
 def eventstream_create(
     workspace_id: str,
-    eventstream_name: str | None = None,
-    eventstream_id: str | None = None,
-    definition: dict[str, Any] | None = None,
-    description: str | None = None,
-) -> list[dict[str, Any] | Any]:
+    eventstream_name: Optional[str] = None,
+    eventstream_id: Optional[str] = None,
+    definition: Optional[Dict[str, Any]] = None,
+    description: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """
     Create an Eventstream item in Microsoft Fabric.
     Authentication is handled transparently using Azure Identity.
@@ -59,7 +142,7 @@ def eventstream_create(
     definition_json = json.dumps(definition)
     definition_b64 = base64.b64encode(definition_json.encode("utf-8")).decode("utf-8")
 
-    payload: dict[str, Any] = {
+    payload: Dict[str, Any] = {
         "displayName": eventstream_name,
         "type": "Eventstream",
         "definition": {
@@ -72,11 +155,11 @@ def eventstream_create(
 
     endpoint = f"/workspaces/{workspace_id}/items"
 
-    result = FabricHttpClientCache.get_client().make_request("POST", endpoint, payload)
+    result = _run_async_operation(_execute_eventstream_operation("POST", endpoint, payload))
     return [result]
 
 
-def eventstream_get(workspace_id: str, item_id: str) -> list[dict[str, Any]]:
+def eventstream_get(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     Get an Eventstream item by workspace and item ID.
     Authentication is handled transparently using Azure Identity.
@@ -87,11 +170,11 @@ def eventstream_get(workspace_id: str, item_id: str) -> list[dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
+    result = _run_async_operation(_execute_eventstream_operation("GET", endpoint))
     return [result]
 
 
-def eventstream_list(workspace_id: str) -> list[dict[str, Any]]:
+def eventstream_list(workspace_id: str) -> List[Dict[str, Any]]:
     """
     List all Eventstream items in a workspace.
     Authentication is handled transparently using Azure Identity.
@@ -101,13 +184,20 @@ def eventstream_list(workspace_id: str) -> list[dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items"
 
-    result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
+    result = _run_async_operation(_execute_eventstream_operation("GET", endpoint))
 
     # Filter only Eventstream items if the result contains a list
-    if "value" in result and isinstance(result["value"], list):
-        eventstreams: list[dict[str, Any]] = [
+    if isinstance(result, dict) and "value" in result and isinstance(result["value"], list):
+        eventstreams: List[Dict[str, Any]] = [
             item
             for item in result["value"]  # type: ignore
+            if isinstance(item, dict) and item.get("type") == "Eventstream"  # type: ignore
+        ]
+        return eventstreams
+    elif isinstance(result, list):
+        eventstreams = [
+            item
+            for item in result  # type: ignore
             if isinstance(item, dict) and item.get("type") == "Eventstream"  # type: ignore
         ]
         return eventstreams
@@ -115,7 +205,7 @@ def eventstream_list(workspace_id: str) -> list[dict[str, Any]]:
     return [result]
 
 
-def eventstream_delete(workspace_id: str, item_id: str) -> list[dict[str, Any]]:
+def eventstream_delete(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     Delete an Eventstream item by workspace and item ID.
     Authentication is handled transparently using Azure Identity.
@@ -126,11 +216,11 @@ def eventstream_delete(workspace_id: str, item_id: str) -> list[dict[str, Any]]:
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = FabricHttpClientCache.get_client().make_request("DELETE", endpoint)
+    result = _run_async_operation(_execute_eventstream_operation("DELETE", endpoint))
     return [result]
 
 
-def eventstream_update(workspace_id: str, item_id: str, definition: dict[str, Any]) -> list[dict[str, Any]]:
+def eventstream_update(workspace_id: str, item_id: str, definition: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Update an Eventstream item by workspace and item ID.
     Authentication is handled transparently using Azure Identity.
@@ -144,7 +234,7 @@ def eventstream_update(workspace_id: str, item_id: str, definition: dict[str, An
     definition_json = json.dumps(definition)
     definition_b64 = base64.b64encode(definition_json.encode("utf-8")).decode("utf-8")
 
-    payload: dict[str, Any] = {
+    payload: Dict[str, Any] = {
         "definition": {
             "parts": [{"path": "eventstream.json", "payload": definition_b64, "payloadType": "InlineBase64"}]
         }
@@ -152,11 +242,11 @@ def eventstream_update(workspace_id: str, item_id: str, definition: dict[str, An
 
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}"
 
-    result = FabricHttpClientCache.get_client().make_request("PUT", endpoint, payload)
+    result = _run_async_operation(_execute_eventstream_operation("PUT", endpoint, payload))
     return [result]
 
 
-def eventstream_get_definition(workspace_id: str, item_id: str) -> list[dict[str, Any]]:
+def eventstream_get_definition(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """
     Get the definition of an Eventstream item.
     Authentication is handled transparently using Azure Identity.
@@ -167,11 +257,11 @@ def eventstream_get_definition(workspace_id: str, item_id: str) -> list[dict[str
     """
     endpoint = f"/workspaces/{workspace_id}/items/{item_id}/getDefinition"
 
-    result = FabricHttpClientCache.get_client().make_request("POST", endpoint)
+    result = _run_async_operation(_execute_eventstream_operation("POST", endpoint))
     return [result]
 
 
-def _create_basic_eventstream_definition(name: str, stream_id: str | None = None) -> dict[str, Any]:
+def _create_basic_eventstream_definition(name: str, stream_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Create a basic eventstream definition that can be extended later.
 
@@ -193,7 +283,7 @@ def _create_basic_eventstream_definition(name: str, stream_id: str | None = None
     }
 
 
-def eventstream_create_simple(workspace_id: str, name: str, description: str | None = None) -> list[dict[str, Any]]:
+def eventstream_create_simple(workspace_id: str, name: str, description: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Simple eventstream creation - just provide workspace and name.
     Perfect for quick testing and getting started.

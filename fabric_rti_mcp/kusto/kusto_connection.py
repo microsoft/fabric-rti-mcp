@@ -1,6 +1,6 @@
 import time
 from contextvars import ContextVar
-from typing import Any
+from typing import Any, Optional
 
 from azure.core.credentials import AccessToken, TokenCredential
 from azure.identity import DefaultAzureCredential
@@ -8,15 +8,15 @@ from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
 
 # Thread-safe context variable to store the current request's auth token
-_request_token: ContextVar[str | None] = ContextVar("_request_token", default=None)
+_request_token: ContextVar[Optional[str]] = ContextVar("_request_token", default=None)
 
 
-def set_auth_token(token: str | None) -> None:
+def set_auth_token(token: Optional[str]) -> None:
     """Set the auth token for the current request context"""
     _request_token.set(token)
 
 
-def get_auth_token() -> str | None:
+def get_auth_token() -> Optional[str]:
     """Get the auth token from the current request context"""
     return _request_token.get()
 
@@ -39,7 +39,7 @@ class KustoConnection:
     ingestion_client: KustoStreamingIngestClient
     default_database: str
 
-    def __init__(self, cluster_uri: str, default_database: str | None = None):
+    def __init__(self, cluster_uri: str, default_database: Optional[str] = None):
         cluster_uri = sanitize_uri(cluster_uri)
         kcsb = KustoConnectionStringBuilder.with_azure_token_credential(
             connection_string=cluster_uri,

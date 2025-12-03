@@ -1,7 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from fabric_rti_mcp.services.kusto import kusto_service
+from fabric_rti_mcp.kusto import kusto_service
 
 
 def register_tools(mcp: FastMCP) -> None:
@@ -44,4 +44,9 @@ def register_tools(mcp: FastMCP) -> None:
     mcp.add_tool(
         kusto_service.kusto_get_shots,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+    )
+
+    mcp.add_tool(
+        kusto_service.anomaly_diffpatterns_query,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )

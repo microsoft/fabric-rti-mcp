@@ -3,17 +3,18 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from azure.kusto.data import KustoConnectionStringBuilder
 
-from fabric_rti_mcp.config import logger
+from fabric_rti_mcp.common import logger
 
 
 @dataclass(slots=True, frozen=True)
 class KustoServiceConfig:
     service_uri: str
-    default_database: str | None = None
-    description: str | None = None
+    default_database: Optional[str] = None
+    description: Optional[str] = None
 
 
 class KustoEnvVarNames:
@@ -26,7 +27,7 @@ class KustoEnvVarNames:
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
 
     @staticmethod
-    def all() -> list[str]:
+    def all() -> List[str]:
         """Return a list of all environment variable names used by KustoConfig."""
         return [
             KustoEnvVarNames.default_service_uri,
@@ -42,11 +43,11 @@ class KustoEnvVarNames:
 @dataclass(slots=True, frozen=True)
 class KustoConfig:
     # Default service. Will be used if no specific service is provided.
-    default_service: KustoServiceConfig | None = None
+    default_service: Optional[KustoServiceConfig] = None
     # Optional OpenAI embedding endpoint to be used for embeddings where applicable.
-    open_ai_embedding_endpoint: str | None = None
+    open_ai_embedding_endpoint: Optional[str] = None
     # List of known Kusto services. If empty, no services are configured.
-    known_services: list[KustoServiceConfig] | None = None
+    known_services: Optional[List[KustoServiceConfig]] = None
     # Whether to eagerly connect to the default service on startup.
     # This can slow startup and is not recommended.
     eager_connect: bool = False
@@ -54,7 +55,7 @@ class KustoConfig:
     # only services in known_services will be allowed.
     allow_unknown_services: bool = True
     # Global timeout for all Kusto operations in seconds
-    timeout_seconds: int | None = None
+    timeout_seconds: Optional[int] = None
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -71,7 +72,7 @@ class KustoConfig:
 
         open_ai_embedding_endpoint = os.getenv(KustoEnvVarNames.open_ai_embedding_endpoint, None)
         known_services_string = os.getenv(KustoEnvVarNames.known_services, None)
-        known_services: list[KustoServiceConfig] | None = None
+        known_services: List[KustoServiceConfig] | None = None
         eager_connect = os.getenv(KustoEnvVarNames.eager_connect, "false").lower() in ("true", "1")
         allow_unknown_services = os.getenv(KustoEnvVarNames.allow_unknown_services, "true").lower() in ("true", "1")
 
@@ -102,18 +103,18 @@ class KustoConfig:
         )
 
     @staticmethod
-    def existing_env_vars() -> list[str]:
+    def existing_env_vars() -> List[str]:
         """Return a lit of environment variables that are used by KustoConfig, and are present in the environment."""
-        collected: list[str] = []
+        collected: List[str] = []
         for env_var in KustoEnvVarNames.all():
             if os.getenv(env_var) is not None:
                 collected.append(env_var)
         return collected
 
     @staticmethod
-    def get_known_services() -> dict[str, KustoServiceConfig]:
+    def get_known_services() -> Dict[str, KustoServiceConfig]:
         config = KustoConfig.from_env()
-        result: dict[str, KustoServiceConfig] = {}
+        result: Dict[str, KustoServiceConfig] = {}
         if config.default_service:
             result[config.default_service.service_uri] = config.default_service
         if config.known_services is not None:

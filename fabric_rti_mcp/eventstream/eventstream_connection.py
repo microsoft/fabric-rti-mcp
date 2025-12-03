@@ -1,26 +1,18 @@
-import asyncio
-from typing import Any, Coroutine, cast
+from typing import Any, Dict, Optional, cast
 
 import httpx
 from azure.identity import ChainedTokenCredential, DefaultAzureCredential
 
-from fabric_rti_mcp.config import GlobalFabricRTIConfig, logger
+from fabric_rti_mcp.common import GlobalFabricRTIConfig, logger
 
 
-class FabricAPIHttpClient:
+class EventstreamConnection:
     """
-    Generic Azure Identity-based HTTP client for Microsoft Fabric APIs.
+    Azure Identity-based connection for Fabric Eventstream API.
     Handles authentication transparently using Azure credential providers.
-    Can be used for any Fabric service public APIs
     """
 
-    def __init__(self, api_base_url: str | None = None):
-        """
-        Initialize the Fabric API HTTP client.
-
-        Args:
-            api_base_url: Optional base URL for Fabric API. If None, uses environment config.
-        """
+    def __init__(self, api_base_url: Optional[str] = None):
         # Use environment variable if provided, otherwise use parameter or default
         if api_base_url is None:
             config = GlobalFabricRTIConfig.from_env()
@@ -34,10 +26,10 @@ class FabricAPIHttpClient:
 
     def _get_credential(self) -> ChainedTokenCredential:
         """
-        Get Azure credential for authentication.
-        This ensures consistent authentication behavior across all Fabric services.
+        Get Azure credential using the same pattern as Kusto module.
+        This ensures consistent authentication behavior across both modules.
 
-        Uses the user's default tenant, allowing the client to work
+        Uses the user's default tenant, allowing the MCP server to work
         for users in any tenant (not hard-coded to Microsoft's tenant).
         """
         return DefaultAzureCredential(
@@ -46,6 +38,10 @@ class FabricAPIHttpClient:
         )
 
     def _get_access_token(self) -> str:
+        """
+        Get a valid access token for Fabric API.
+        Handles token caching and refresh automatically.
+        """
         try:
             # Get token from Azure credential
             token = self.credential.get_token(self.token_scope)
@@ -60,7 +56,10 @@ class FabricAPIHttpClient:
             logger.error(f"Failed to get Fabric API access token: {e}")
             raise Exception(f"Authentication failed: {e}")
 
-    def _get_headers(self) -> dict[str, str]:
+    def get_headers(self) -> Dict[str, str]:
+        """
+        Get HTTP headers with valid authentication.
+        """
         access_token = self._get_access_token()
         return {
             "Authorization": f"Bearer {access_token}",
@@ -68,35 +67,11 @@ class FabricAPIHttpClient:
             "Accept": "application/json",
         }
 
-    def _run_async_operation(self, coro: Coroutine[Any, Any, Any]) -> Any:
-        try:
-            # Try to get the existing event loop
-            asyncio.get_running_loop()
-            # If we're already in an event loop, we need to run in a thread
-            import concurrent.futures
-
-            def run_in_thread() -> Any:
-                # Create a new event loop for this thread
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    return new_loop.run_until_complete(coro)
-                finally:
-                    new_loop.close()
-
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(run_in_thread)
-                return future.result()
-
-        except RuntimeError:
-            # No event loop running, we can use asyncio.run
-            return asyncio.run(coro)
-
-    async def make_request_async(
-        self, method: str, endpoint: str, payload: dict[str, Any] | None = None, timeout: int = 30
-    ) -> dict[str, Any]:
+    async def make_request(
+        self, method: str, endpoint: str, payload: Optional[Dict[str, Any]] = None, timeout: int = 30
+    ) -> Dict[str, Any]:
         """
-        Make an authenticated HTTP request to the Fabric API (async version).
+        Make an authenticated HTTP request to the Fabric API.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
@@ -108,7 +83,7 @@ class FabricAPIHttpClient:
             Dict containing the API response
         """
         url = f"{self.api_base_url}{endpoint}"
-        headers = self._get_headers()
+        headers = self.get_headers()
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -135,49 +110,10 @@ class FabricAPIHttpClient:
                     return {"success": True, "message": "Operation completed successfully"}
 
                 try:
-                    return cast(dict[str, Any], response.json())
+                    return cast(Dict[str, Any], response.json())
                 except Exception:
                     return {"success": True, "message": response.text}
 
         except Exception as e:
             logger.error(f"Error making Fabric API request: {e}")
             return {"error": True, "message": str(e)}
-
-    def make_request(
-        self, method: str, endpoint: str, payload: dict[str, Any] | None = None, timeout: int = 30
-    ) -> dict[str, Any]:
-        """
-        Make an authenticated HTTP request to the Fabric API (sync version).
-
-        This is a synchronous wrapper around make_request_async that handles
-        event loop management automatically.
-
-        Args:
-            method: HTTP method (GET, POST, PUT, DELETE)
-            endpoint: API endpoint (relative to api_base_url)
-            payload: Optional request payload for POST/PUT
-            timeout: Request timeout in seconds
-
-        Returns:
-            Dict containing the API response
-        """
-        return cast(
-            dict[str, Any], self._run_async_operation(self.make_request_async(method, endpoint, payload, timeout))
-        )
-
-
-class FabricHttpClientCache:
-    """Generic connection cache for Fabric API clients using Azure Identity."""
-
-    _connection: FabricAPIHttpClient | None = None
-
-    @classmethod
-    def get_client(cls) -> FabricAPIHttpClient:
-        """Get or create a Fabric API connection using the configured API base URL."""
-        if cls._connection is None:
-            config = GlobalFabricRTIConfig.from_env()
-            api_base = config.fabric_api_base
-            cls._connection = FabricAPIHttpClient(api_base)
-            logger.info(f"Created Fabric API connection for API base: {api_base}")
-
-        return cls._connection

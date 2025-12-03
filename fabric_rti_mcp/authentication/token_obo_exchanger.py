@@ -5,8 +5,8 @@ from typing import Any, Dict, Optional
 import msal  # type: ignore
 from azure.identity import ManagedIdentityCredential
 
-from fabric_rti_mcp.config import logger
-from fabric_rti_mcp.config.obo import FabricRtiMcpOBOFlowEnvVarNames, obo_config
+from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.config.obo_config import FabricRtiMcpOBOFlowEnvVarNames, obo_config
 
 
 class TokenOboExchanger:

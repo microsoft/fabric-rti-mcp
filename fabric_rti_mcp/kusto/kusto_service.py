@@ -4,15 +4,15 @@ import functools
 import inspect
 import uuid
 from dataclasses import asdict
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
-from fabric_rti_mcp.config import logger
-from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
-from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
-from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.common import logger
+from fabric_rti_mcp.kusto.kusto_config import KustoConfig
+from fabric_rti_mcp.kusto.kusto_connection import KustoConnection, sanitize_uri
+from fabric_rti_mcp.kusto.kusto_formatter import KustoFormatter
 
 
 def canonical_entity_type(entity_type: str) -> str:
@@ -48,7 +48,7 @@ _DEFAULT_DB_NAME = (
 
 class KustoConnectionManager:
     def __init__(self) -> None:
-        self._cache: dict[str, KustoConnection] = {}
+        self._cache: Dict[str, KustoConnection] = {}
 
     def connect_to_all_known_services(self) -> None:
         """
@@ -118,7 +118,7 @@ def destructive_operation(func: F) -> F:
 
 
 def _crp(
-    action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: dict[str, Any] | None = None
+    action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: Optional[Dict[str, Any]] = None
 ) -> ClientRequestProperties:
     crp: ClientRequestProperties = ClientRequestProperties()
     crp.application = f"fabric-rti-mcp{{{__version__}}}"  # type: ignore
@@ -147,9 +147,9 @@ def _execute(
     query: str,
     cluster_uri: str,
     readonly_override: bool = False,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
     caller_func = caller_frame.f_globals.get(action_name)  # type: ignore
@@ -179,7 +179,7 @@ def _execute(
 
 
 # NOTE: This is temporary. The intent is to not use environment variables for persistency.
-def kusto_known_services() -> list[dict[str, str]]:
+def kusto_known_services() -> List[Dict[str, str]]:
     """
     Retrieves a list of all Kusto services known to the MCP.
     Could be null if no services are configured.
@@ -193,9 +193,9 @@ def kusto_known_services() -> list[dict[str, str]]:
 def kusto_query(
     query: str,
     cluster_uri: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Executes a KQL query on the specified database. If no database is provided,
     it will use the default database.
@@ -214,8 +214,8 @@ def kusto_graph_query(
     query: str,
     cluster_uri: str,
     database: str | None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Intelligently executes a graph query using snapshots if they exist,
     otherwise falls back to transient graphs.
@@ -288,9 +288,9 @@ def kusto_graph_query(
 def kusto_command(
     command: str,
     cluster_uri: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Executes a kusto management command on the specified database. If no database is provided,
     it will use the default database.
@@ -307,9 +307,9 @@ def kusto_command(
 def kusto_list_entities(
     cluster_uri: str,
     entity_type: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
 
@@ -359,8 +359,8 @@ def kusto_list_entities(
 
 
 def kusto_describe_database(
-    cluster_uri: str, database: str | None, client_request_properties: dict[str, Any] | None = None
-) -> dict[str, Any]:
+    cluster_uri: str, database: str | None, client_request_properties: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
     Retrieves schema information for all entities (tables, materialized views, functions, graphs)
     in the specified database.
@@ -387,9 +387,9 @@ def kusto_describe_database_entity(
     entity_name: str,
     entity_type: str,
     cluster_uri: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Retrieves the schema information for a specific entity (table, materialized view, function, graph)
     in the specified database. If no database is provided, uses the default database.
@@ -441,9 +441,9 @@ def kusto_sample_entity(
     entity_type: str,
     cluster_uri: str,
     sample_size: int = 10,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Retrieves a data sample from the specified entity.
     If no database is provided, uses the default database.
@@ -493,9 +493,9 @@ def kusto_ingest_inline_into_table(
     table_name: str,
     data_comma_separator: str,
     cluster_uri: str,
-    database: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Ingests inline CSV data into a specified table. The data should be provided as a comma-separated string.
     If no database is provided, uses the default database.
@@ -520,10 +520,10 @@ def kusto_get_shots(
     shots_table_name: str,
     cluster_uri: str,
     sample_size: int = 3,
-    database: str | None = None,
-    embedding_endpoint: str | None = None,
-    client_request_properties: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    database: Optional[str] = None,
+    embedding_endpoint: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
 
@@ -554,3 +554,55 @@ def kusto_get_shots(
     """
 
     return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+def anomaly_diffpatterns_query(
+    cluster_uri: str,
+    table_name: str,
+    first_set_condition: str,
+    second_set_condition: str,
+    threshold: str = "~", # "~" means use default (0.05). Otherwise a string representing a float between 0.015 and 1.0
+    project_columns: Optional[List[str]] = None,  # New optional parameter
+    database: Optional[str] = None,
+    client_request_properties: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Executes a KQL query that compares first data set vs. second data set patterns
+    using the diffpatterns operator.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param table_name: The Kusto table to query.    
+    :param first_set_condition: A KQL filter expression defining the first dataset 
+        (e.g., "Timestamp between (datetime(2025-01-01) .. datetime(2025-01-07))").
+    :param second_set_condition: A KQL filter expression defining the second dataset
+        (e.g., "Timestamp between (datetime(2025-02-01) .. datetime(2025-02-07))").
+    :param threshold: A real between 0.015–1.0, or "~" to use the default (0.05). 
+        Controls the sensitivity of the diffpatterns operator.
+    :param project_columns: Optional list of column names to include in the query. 
+        If provided, only these columns plus the extended 'AB' column are used in diffpatterns.        
+    :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
+    :return: The result of the query execution as a list of dictionaries (json).
+    """
+
+    if threshold == "~":
+        threshold = "'~'"
+
+    query = f"""
+    {table_name}
+    | where ({first_set_condition}) or ({second_set_condition})
+    | extend AB = iff({second_set_condition}, 'Anomaly', 'Baseline')
+    """
+
+    if project_columns:
+        # Ensure 'AB' is always included
+        columns = ", ".join(project_columns + ["AB"])
+        query += f"\n| project {columns}"
+
+    query += f"\n| evaluate diffpatterns(AB, 'Anomaly', 'Baseline', '~', {threshold})"
+
+    return _execute(
+        query,
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+    )
