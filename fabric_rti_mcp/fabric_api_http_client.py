@@ -63,12 +63,6 @@ class FabricAPIHttpClient:
             raise Exception(f"Authentication failed: {e}")
 
     def _get_headers(self) -> dict[str, str]:
-        """
-        Get HTTP headers for API requests.
-
-        Returns:
-            Dict of HTTP headers including extra headers from constructor
-        """
         access_token = self._get_access_token()
         headers = {
             "Authorization": f"Bearer {access_token}",
