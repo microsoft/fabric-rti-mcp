@@ -29,12 +29,11 @@ def map_create(
     :param map_name: Name for the new map item
     :param definition: Map item definition (auto-generated basic one if not provided)
     :param description: Optional description for the map
-    :param folder_id: Optional folder ID (UUID) to place the map in. If not specified, the Map is created with the workspace root folder.
+    :param folder_id: Optional folder ID (UUID) to place the map in.
+    If not specified, the Map is created with the workspace root folder.
     :return: Created map details
     """
-    payload: dict[str, Any] = {
-        "displayName": map_name
-    }
+    payload: dict[str, Any] = {"displayName": map_name}
 
     if description:
         payload["description"] = description
@@ -104,11 +103,8 @@ def map_delete(workspace_id: str, item_id: str) -> dict[str, Any]:
 
 
 def map_update(
-        workspace_id: str,
-        item_id: str,
-        display_name: str | None = None,
-        description: str | None = None
-    ) -> dict[str, Any]:
+    workspace_id: str, item_id: str, display_name: str | None = None, description: str | None = None
+) -> dict[str, Any]:
     """
     Update a Map item's display name and description by workspace and item ID.
     Authentication is handled transparently using Azure Identity.
@@ -150,9 +146,7 @@ def map_update_definition(workspace_id: str, item_id: str, definition: dict[str,
     definition_b64 = base64.b64encode(definition_json.encode("utf-8")).decode("utf-8")
 
     payload: dict[str, Any] = {
-        "definition": {
-            "parts": [{"path": "map.json", "payload": definition_b64, "payloadType": "InlineBase64"}]
-        }
+        "definition": {"parts": [{"path": "map.json", "payload": definition_b64, "payloadType": "InlineBase64"}]}
     }
 
     endpoint = f"/workspaces/{workspace_id}/Maps/{item_id}/updateDefinition"

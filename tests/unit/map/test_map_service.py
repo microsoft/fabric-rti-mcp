@@ -142,11 +142,7 @@ def test_map_update_definition_encodes_payload(mock_http_client: MagicMock) -> N
 
     encoded_payload = base64.b64encode(json.dumps(definition).encode("utf-8")).decode("utf-8")
     expected_payload: dict[str, Any] = {
-        "definition": {
-            "parts": [
-                {"path": "map.json", "payload": encoded_payload, "payloadType": "InlineBase64"}
-            ]
-        }
+        "definition": {"parts": [{"path": "map.json", "payload": encoded_payload, "payloadType": "InlineBase64"}]}
     }
 
     assert result == {"updated": True}
