@@ -13,7 +13,8 @@
                 "-m", 
                 "fabric_rti_mcp.server", 
                 "--http", 
-                "--stateless-http"
+                "--stateless-http",
+                "--use-ai-foundry-compat"
             ]
         },
         "enableForwardingHttpRequest": true,
