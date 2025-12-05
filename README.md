@@ -96,6 +96,15 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - **`activator_list_artifacts`** - List all Activator artifacts in a Fabric workspace
 - **`activator_create_trigger`** - Create new Activator triggers with KQL source monitoring and email/Teams alerts
 
+#### Map - 7 Tools:
+- **`map_list`** - List all Map items in your Fabric workspace
+- **`map_get`** - Get detailed information about a specific Map item
+- **`map_get_definition`** - Retrieve the full JSON definition of a Map item
+- **`map_create`** - Create a new Map item from a provided configuration
+- **`map_update_definition`** - Replace the full JSON definition of an existing Map item
+- **`map_update`** - Partially update properties of an existing Map item
+- **`map_delete`** - Delete a Map item and its associated configuration
+
 ## Getting Started
 
 ### Prerequisites
