@@ -14,7 +14,7 @@ from fabric_rti_mcp.authentication.auth_middleware import add_auth_middleware
 from fabric_rti_mcp.config import global_config as config
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
-from fabric_rti_mcp.foundry_schema_transformation import FoundryCompatibleMCP
+from fabric_rti_mcp.compat_ms_foundry import FoundryCompatibleMCP
 from fabric_rti_mcp.services.activator import activator_tools
 from fabric_rti_mcp.services.eventstream import eventstream_tools
 from fabric_rti_mcp.services.kusto import kusto_config, kusto_tools
