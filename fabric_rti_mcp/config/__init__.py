@@ -19,6 +19,7 @@ class GlobalFabricRTIEnvVarNames:
     http_path = "FABRIC_RTI_HTTP_PATH"
     stateless_http = "FABRIC_RTI_STATELESS_HTTP"
     use_obo_flow = "USE_OBO_FLOW"
+    use_ai_foundry_compat = "FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA"
 
 
 DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
@@ -29,6 +30,7 @@ DEFAULT_FABRIC_RTI_HTTP_PATH = "/mcp"
 DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
 DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
 DEFAULT_USE_OBO_FLOW = False
+DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -41,6 +43,7 @@ class GlobalFabricRTIConfig:
     http_path: str
     stateless_http: bool
     use_obo_flow: bool
+    use_ai_foundry_compat: bool
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -63,6 +66,11 @@ class GlobalFabricRTIConfig:
                 os.getenv(GlobalFabricRTIEnvVarNames.stateless_http, DEFAULT_FABRIC_RTI_STATELESS_HTTP)
             ),
             use_obo_flow=bool(os.getenv(GlobalFabricRTIEnvVarNames.use_obo_flow, DEFAULT_USE_OBO_FLOW)),
+            use_ai_foundry_compat=bool(
+                os.getenv(
+                    GlobalFabricRTIEnvVarNames.use_ai_foundry_compat, DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA
+                )
+            ),
         )
 
     @staticmethod
@@ -78,6 +86,7 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.http_path,
             GlobalFabricRTIEnvVarNames.stateless_http,
             GlobalFabricRTIEnvVarNames.use_obo_flow,
+            GlobalFabricRTIEnvVarNames.use_ai_foundry_compat,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -96,6 +105,9 @@ class GlobalFabricRTIConfig:
         parser.add_argument("--port", type=int, help="HTTP port to listen on")
         parser.add_argument("--stateless-http", action="store_true", help="Enable or disable stateless HTTP")
         parser.add_argument("--use-obo-flow", action="store_true", help="Enable or disable OBO flow")
+        parser.add_argument(
+            "--use-ai-foundry-compat", action="store_true", help="Enable or disable AI Foundry compatibility mode"
+        )
         args, _ = parser.parse_known_args()
 
         transport = base_config.transport
@@ -108,6 +120,9 @@ class GlobalFabricRTIConfig:
         http_host = args.host if args.host is not None else base_config.http_host
         http_port = args.port if args.port is not None else base_config.http_port
         use_obo_flow = args.use_obo_flow if args.use_obo_flow is not None else base_config.use_obo_flow
+        use_ai_foundry_compat = (
+            args.use_ai_foundry_compat if args.use_ai_foundry_compat is not None else base_config.use_ai_foundry_compat
+        )
 
         return GlobalFabricRTIConfig(
             fabric_api_base=base_config.fabric_api_base,
@@ -118,6 +133,7 @@ class GlobalFabricRTIConfig:
             http_path=base_config.http_path,
             stateless_http=stateless_http,
             use_obo_flow=use_obo_flow,
+            use_ai_foundry_compat=use_ai_foundry_compat,
         )
 
 
