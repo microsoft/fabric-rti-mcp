@@ -11,6 +11,7 @@ from starlette.responses import JSONResponse
 
 from fabric_rti_mcp import __version__
 from fabric_rti_mcp.authentication.auth_middleware import add_auth_middleware
+from fabric_rti_mcp.compat.ms_foundry import FoundryCompatibleMCP
 from fabric_rti_mcp.config import global_config as config
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
@@ -93,9 +94,14 @@ def main() -> None:
         if config.use_obo_flow and (not obo_config.entra_app_client_id or not obo_config.umi_client_id):
             raise ValueError("OBO flow is enabled but required client IDs are missing")
 
+        if config.use_ai_foundry_compat:
+            logger.info("AI Foundry compatibility mode enabled - schemas will be simplified")
+
         name = "fabric-rti-mcp-server"
+        fastmcp_class = FoundryCompatibleMCP if config.use_ai_foundry_compat else FastMCP
+
         if config.transport == "http":
-            fastmcp_server = FastMCP(
+            fastmcp_server = fastmcp_class(
                 name,
                 host=config.http_host,
                 port=config.http_port,
@@ -103,7 +109,7 @@ def main() -> None:
                 stateless_http=config.stateless_http,
             )
         else:
-            fastmcp_server = FastMCP(name)
+            fastmcp_server = fastmcp_class(name)
 
         # 1. Register tools
         register_tools(fastmcp_server)
