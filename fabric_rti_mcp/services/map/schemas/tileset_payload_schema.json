@@ -1,0 +1,175 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TilesetJob",
+  "description": "Schema for Tileset Job payload used to generate tilesets from GeoJSON sources",
+  "type": "object",
+  "required": ["version", "sources", "destination"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Version of the TilesetJob schema",
+      "enum": ["1.0"]
+    },
+    "sources": {
+      "type": "array",
+      "description": "List of source GeoJSON files for tileset generation",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/definitions/TilesetSource"
+      }
+    },
+    "destination": {
+      "$ref": "#/definitions/TilesetDestination",
+      "description": "Destination details for the generated tileset"
+    },
+    "tilesetRecipe": {
+      "$ref": "#/definitions/TilesetRecipe",
+      "description": "Recipe configuration for tileset generation (optional, will use defaults if not provided)"
+    }
+  },
+  "definitions": {
+    "TilesetSource": {
+      "type": "object",
+      "description": "Source configuration for GeoJSON files in OneLake",
+      "required": ["type", "workspaceId", "artifactId", "relativePath"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Type of source storage",
+          "enum": ["lakehouse"]
+        },
+        "workspaceId": {
+          "type": "string",
+          "description": "Workspace ID where the source file resides",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "artifactId": {
+          "type": "string",
+          "description": "Artifact ID of the lakehouse containing the source file",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "relativePath": {
+          "type": "string",
+          "description": "Relative path to the GeoJSON file within the lakehouse",
+          "maxLength": 500,
+          "pattern": "^.*\\.geojson$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TilesetDestination": {
+      "type": "object",
+      "description": "Destination configuration for generated PMTiles file in OneLake",
+      "required": ["type", "workspaceId", "artifactId", "relativePath"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Type of destination storage",
+          "enum": ["lakehouse"]
+        },
+        "workspaceId": {
+          "type": "string",
+          "description": "Workspace ID where the destination file will be stored",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "artifactId": {
+          "type": "string",
+          "description": "Artifact ID of the lakehouse for storing the destination file",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "relativePath": {
+          "type": "string",
+          "description": "Relative path for the output PMTiles file within the lakehouse",
+          "maxLength": 500,
+          "pattern": "^.*\\.pmtiles$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TilesetRecipe": {
+      "type": "object",
+      "description": "Configuration recipe for tileset generation including zoom levels and layer options",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the tileset (defaults to destination filename if not provided)",
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the tileset",
+          "maxLength": 1000
+        },
+        "copyright": {
+          "type": "string",
+          "description": "Copyright information for the tileset",
+          "maxLength": 1000
+        },
+        "minZoom": {
+          "type": "integer",
+          "description": "Minimum zoom level for the tileset",
+          "minimum": 1,
+          "maximum": 18,
+          "default": 5
+        },
+        "maxZoom": {
+          "type": "integer",
+          "description": "Maximum zoom level for the tileset",
+          "minimum": 1,
+          "maximum": 18,
+          "default": 15
+        },
+        "layerOptions": {
+          "type": "array",
+          "description": "Layer-specific options for each source (must match number of sources if provided)",
+          "items": {
+            "$ref": "#/definitions/LayerOption"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "LayerOption": {
+      "type": "object",
+      "description": "Configuration options for individual layers in the tileset",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the layer (defaults to source filename if not provided)",
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the layer",
+          "maxLength": 1000
+        },
+        "minZoom": {
+          "type": "integer",
+          "description": "Minimum zoom level for this layer (defaults to tileset minZoom if not provided)",
+          "minimum": 1,
+          "maximum": 18
+        },
+        "maxZoom": {
+          "type": "integer",
+          "description": "Maximum zoom level for this layer (defaults to tileset maxZoom if not provided)",
+          "minimum": 1,
+          "maximum": 18
+        },
+        "properties": {
+          "type": "string",
+          "description": "What properties to include in the layer",
+          "enum": ["all", "none"],
+          "default": "all"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
