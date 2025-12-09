@@ -14,13 +14,12 @@ class FabricAPIHttpClient:
     Can be used for any Fabric service public APIs
     """
 
-    def __init__(self, api_base_url: str | None = None, extra_headers: dict[str, str] | None = None):
+    def __init__(self, api_base_url: str | None = None):
         """
         Initialize the Fabric API HTTP client.
 
         Args:
             api_base_url: Optional base URL for Fabric API. If None, uses environment config.
-            extra_headers: Optional additional headers to include in all requests.
         """
         # Use environment variable if provided, otherwise use parameter or default
         if api_base_url is None:
@@ -28,7 +27,6 @@ class FabricAPIHttpClient:
             api_base_url = config.fabric_api_base
 
         self.api_base_url = api_base_url.rstrip("/")
-        self.extra_headers = extra_headers or {}
         self.credential = self._get_credential()
         self.token_scope = "https://api.fabric.microsoft.com/.default"
         self._cached_token = None
@@ -62,7 +60,7 @@ class FabricAPIHttpClient:
             logger.error(f"Failed to get Fabric API access token: {e}")
             raise Exception(f"Authentication failed: {e}")
 
-    def _get_headers(self) -> dict[str, str]:
+    def _get_headers(self, extra_headers: dict[str, str] | None = None) -> dict[str, str]:
         access_token = self._get_access_token()
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -70,8 +68,9 @@ class FabricAPIHttpClient:
             "Accept": "application/json",
         }
 
-        # Merge extra headers from constructor
-        headers.update(self.extra_headers)
+        # Merge extra headers if provided
+        if extra_headers:
+            headers.update(extra_headers)
 
         return headers
 
@@ -105,6 +104,7 @@ class FabricAPIHttpClient:
         endpoint: str,
         payload: dict[str, Any] | None = None,
         timeout: int = 30,
+        extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """
         Make an authenticated HTTP request to the Fabric API (async version).
@@ -114,12 +114,13 @@ class FabricAPIHttpClient:
             endpoint: API endpoint (relative to api_base_url)
             payload: Optional request payload for POST/PUT
             timeout: Request timeout in seconds
+            extra_headers: Optional additional headers to include in the request
 
         Returns:
             Dict containing the API response
         """
         url = f"{self.api_base_url}{endpoint}"
-        headers = self._get_headers()
+        headers = self._get_headers(extra_headers)
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -160,6 +161,7 @@ class FabricAPIHttpClient:
         endpoint: str,
         payload: dict[str, Any] | None = None,
         timeout: int = 30,
+        extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """
         Make an authenticated HTTP request to the Fabric API (sync version).
@@ -172,13 +174,14 @@ class FabricAPIHttpClient:
             endpoint: API endpoint (relative to api_base_url)
             payload: Optional request payload for POST/PUT
             timeout: Request timeout in seconds
+            extra_headers: Optional additional headers to include in the request
 
         Returns:
             Dict containing the API response
         """
         return cast(
             dict[str, Any],
-            self._run_async_operation(self.make_request_async(method, endpoint, payload, timeout)),
+            self._run_async_operation(self.make_request_async(method, endpoint, payload, timeout, extra_headers)),
         )
 
 
