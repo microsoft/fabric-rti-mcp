@@ -23,6 +23,41 @@ def register_tools(mcp: FastMCP) -> None:
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
 
+    mcp.add_tool(
+        map_service.get_map_definition_schema,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+
+    mcp.add_tool(
+        map_service.get_bubble_layer_options_schema,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+
+    mcp.add_tool(
+        map_service.get_heatmap_layer_options_schema,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+
+    mcp.add_tool(
+        map_service.get_line_layer_options_schema,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+
+    mcp.add_tool(
+        map_service.get_polygon_layer_options_schema,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+
+    mcp.add_tool(
+        map_service.get_basemap_options_schema,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+
+    mcp.add_tool(
+        map_service.get_layer_source_options_schema,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+
     # Destructive tools (create, update, delete operations)
     mcp.add_tool(
         map_service.map_create,
