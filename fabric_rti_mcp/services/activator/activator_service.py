@@ -49,6 +49,16 @@ TriggerSource = KqlSource
 class ActivatorService:
     """Service class for Fabric Activator operations."""
 
+    # Custom headers for Activator service tracking
+    _ACTIVATOR_HEADERS = {"x-ms-operation-name": "rti-mcp-py"}
+
+    def _make_request(
+        self, method: str, endpoint: str, payload: dict[str, Any] | None = None, timeout: int = 30
+    ) -> dict[str, Any]:
+        return FabricHttpClientCache.get_client().make_request(
+            method, endpoint, payload, timeout, extra_headers=self._ACTIVATOR_HEADERS
+        )
+
     def activator_list_artifacts(self, workspace_id: str) -> list[dict[str, Any]]:
         """
         Use this tool to list all Activator artifacts in a workspace.
@@ -57,7 +67,7 @@ class ActivatorService:
         :return: List of activator artifacts
         """
         endpoint = f"/workspaces/{workspace_id}/items"
-        result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
+        result = self._make_request("GET", endpoint)
 
         # Filter only Reflex (Activator) items if the result contains a list
         if "value" in result and isinstance(result["value"], list):
@@ -182,9 +192,7 @@ class ActivatorService:
     def _get_existing_payload(self, workspace_id: str, artifact_id: str) -> dict[str, Any]:
         # Get the existing artifact definition
         get_definition_endpoint = f"/workspaces/{workspace_id}/reflexes/{artifact_id}/getDefinition"
-        existing_definition_response = FabricHttpClientCache.get_client().make_request(
-            "POST", get_definition_endpoint, {}
-        )
+        existing_definition_response = self._make_request("POST", get_definition_endpoint, {})
 
         if existing_definition_response.get("error"):
             raise Exception(f"Failed to get existing definition: {existing_definition_response.get('error')}")
@@ -250,7 +258,7 @@ class ActivatorService:
 
         # Update the existing artifact
         update_endpoint = f"/workspaces/{workspace_id}/reflexes/{artifact_id}/updateDefinition"
-        result = FabricHttpClientCache.get_client().make_request("POST", update_endpoint, update_payload)
+        result = self._make_request("POST", update_endpoint, update_payload)
 
         if result.get("error"):
             raise Exception(f"Failed to update artifact: {result.get('error')}")
@@ -263,7 +271,7 @@ class ActivatorService:
     def _create_new_artifact(self, workspace_id: str, full_payload: dict[str, Any]) -> dict[str, Any]:
         endpoint = f"/workspaces/{workspace_id}/reflexes"
 
-        result = FabricHttpClientCache.get_client().make_request("POST", endpoint, full_payload)
+        result = self._make_request("POST", endpoint, full_payload)
 
         if not result.get("error"):
             # augment result with a url back to the artifact

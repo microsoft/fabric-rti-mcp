@@ -60,13 +60,19 @@ class FabricAPIHttpClient:
             logger.error(f"Failed to get Fabric API access token: {e}")
             raise Exception(f"Authentication failed: {e}")
 
-    def _get_headers(self) -> dict[str, str]:
+    def _get_headers(self, extra_headers: dict[str, str] | None = None) -> dict[str, str]:
         access_token = self._get_access_token()
-        return {
+        headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+
+        # Merge extra headers if provided
+        if extra_headers:
+            headers.update(extra_headers)
+
+        return headers
 
     def _run_async_operation(self, coro: Coroutine[Any, Any, Any]) -> Any:
         try:
@@ -93,7 +99,12 @@ class FabricAPIHttpClient:
             return asyncio.run(coro)
 
     async def make_request_async(
-        self, method: str, endpoint: str, payload: dict[str, Any] | None = None, timeout: int = 30
+        self,
+        method: str,
+        endpoint: str,
+        payload: dict[str, Any] | None = None,
+        timeout: int = 30,
+        extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """
         Make an authenticated HTTP request to the Fabric API (async version).
@@ -103,12 +114,13 @@ class FabricAPIHttpClient:
             endpoint: API endpoint (relative to api_base_url)
             payload: Optional request payload for POST/PUT
             timeout: Request timeout in seconds
+            extra_headers: Optional additional headers to include in the request
 
         Returns:
             Dict containing the API response
         """
         url = f"{self.api_base_url}{endpoint}"
-        headers = self._get_headers()
+        headers = self._get_headers(extra_headers)
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -144,7 +156,12 @@ class FabricAPIHttpClient:
             return {"error": True, "message": str(e)}
 
     def make_request(
-        self, method: str, endpoint: str, payload: dict[str, Any] | None = None, timeout: int = 30
+        self,
+        method: str,
+        endpoint: str,
+        payload: dict[str, Any] | None = None,
+        timeout: int = 30,
+        extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """
         Make an authenticated HTTP request to the Fabric API (sync version).
@@ -157,12 +174,14 @@ class FabricAPIHttpClient:
             endpoint: API endpoint (relative to api_base_url)
             payload: Optional request payload for POST/PUT
             timeout: Request timeout in seconds
+            extra_headers: Optional additional headers to include in the request
 
         Returns:
             Dict containing the API response
         """
         return cast(
-            dict[str, Any], self._run_async_operation(self.make_request_async(method, endpoint, payload, timeout))
+            dict[str, Any],
+            self._run_async_operation(self.make_request_async(method, endpoint, payload, timeout, extra_headers)),
         )
 
 
