@@ -47,6 +47,11 @@ def register_tools(mcp: FastMCP) -> None:
     )
 
     mcp.add_tool(
-            kusto_service.rootcause_analysis_query,
-            annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+        kusto_service.rootcause_analysis_query,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+
+    mcp.add_tool(
+        kusto_service.kusto_univariate_anomaly_detection,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
