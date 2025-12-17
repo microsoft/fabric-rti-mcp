@@ -555,6 +555,100 @@ def kusto_get_shots(
 
     return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
 
+
+def kusto_univariate_anomaly_detection(
+    cluster_uri: str,
+    table_name: str,
+    time_column: str,
+    start_time: str,
+    end_time: str,
+    bin_size: str,
+    metric: str | None = None,
+    threshold: float = 2.0,
+    partition_keys: list[str] | None = None,
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Detects anomalous behavior in a time series over a given time range.
+
+    This tool automatically builds a time series from raw records, learns normal behavior
+    (trend + seasonality), and identifies points that significantly deviate from the
+    expected baseline.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param table_name: The Kusto table to analyze.
+    :param time_column: The datetime column used for time bucketing.
+    :param start_time: A KQL datetime expression defining the start of the analysis window
+        (e.g., "datetime(2024-01-01)").
+    :param end_time: A KQL datetime expression defining the end of the analysis window.
+    :param bin_size: A KQL timespan literal defining the aggregation granularity
+        (e.g., "1m", "10m", "1h").
+    :param metric: Optional numeric column to analyze. If not provided, anomalies are
+        detected on event volume (count). If provided, anomalies are detected on the
+        average value of this column.
+    :param threshold: Numeric threshold passed to series_decompose_anomalies.
+        Higher values flag fewer anomalies (less sensitive). Defaults to 2.0.
+    :param partition_keys: Optional list of column names to partition by.
+        When provided, anomaly detection is performed independently per partition.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
+    :return: The query result as a columnar dict. Each row represents an anomalous point
+        and includes partition key values (if provided), Timestamp, Value, Baseline,
+        AnomalyDirection (Spike or Drop), and AnomalyScore.
+    """
+
+    if threshold <= 0:
+        raise ValueError(f"threshold must be positive, got {threshold}")
+
+    aggregation = "count()" if metric is None else f"avg({metric})"
+
+    by_clause = ""
+    partition_project_prefix = ""
+    if partition_keys:
+        cleaned_keys = [k.strip() for k in partition_keys if k and k.strip()]
+        if cleaned_keys:
+            by_clause = f" by {', '.join(cleaned_keys)}"
+            partition_project_prefix = f"{', '.join(cleaned_keys)}, "
+
+    query = f"""
+    let _start = {start_time};
+    let _end = {end_time};
+    {table_name}
+    | where {time_column} between (_start .. _end)
+    | make-series value={aggregation} on {time_column} from _start to _end step {bin_size}{by_clause}
+    | extend (flag, score, baseline) = series_decompose_anomalies(
+        value,
+        {threshold},
+        -1,
+        'avg',
+        0,
+        'ctukey',
+        0.6
+    )
+    | mv-expand
+        ts={time_column} to typeof(datetime),
+        value=value to typeof(real),
+        baseline=baseline to typeof(real),
+        flag=flag to typeof(long),
+        score=score to typeof(real)
+    | where flag != 0
+    | project
+        {partition_project_prefix}Timestamp=ts,
+        Value=value,
+        Baseline=baseline,
+        AnomalyDirection=iff(flag > 0, "Spike", "Drop"),
+        AnomalyScore=score
+    | order by abs(AnomalyScore) desc
+    """
+
+    return _execute(
+        query,
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+    )
+
 def rootcause_analysis_query(
     cluster_uri: str,
     table_name: str,
