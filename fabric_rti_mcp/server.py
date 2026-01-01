@@ -35,13 +35,27 @@ def setup_shutdown_handler(sig: int, frame: Optional[types.FrameType]) -> None:
 
 def register_tools(mcp: FastMCP) -> None:
     """Register all tools with the MCP server."""
-    logger.info("Kusto configuration keys found in environment:")
-    logger.info(", ".join(kusto_config.KustoConfig.existing_env_vars()))
-
-    kusto_tools.register_tools(mcp)
-    eventstream_tools.register_tools(mcp)
-    activator_tools.register_tools(mcp)
-    map_tools.register_tools(mcp)
+    if config.enable_kusto:
+        logger.info("Kusto configuration keys found in environment:")
+        logger.info(", ".join(kusto_config.KustoConfig.existing_env_vars()))
+        kusto_tools.register_tools(mcp)
+    else:
+        logger.info("Kusto tools disabled via configuration")
+    
+    if config.enable_eventstream:
+        eventstream_tools.register_tools(mcp)
+    else:
+        logger.info("Eventstream tools disabled via configuration")
+    
+    if config.enable_activator:
+        activator_tools.register_tools(mcp)
+    else:
+        logger.info("Activator tools disabled via configuration")
+    
+    if config.enable_map:
+        map_tools.register_tools(mcp)
+    else:
+        logger.info("Map tools disabled via configuration")
 
 
 # Health check function defined at module level

@@ -20,6 +20,10 @@ class GlobalFabricRTIEnvVarNames:
     stateless_http = "FABRIC_RTI_STATELESS_HTTP"
     use_obo_flow = "USE_OBO_FLOW"
     use_ai_foundry_compat = "FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA"
+    enable_kusto = "FABRIC_RTI_ENABLE_KUSTO"
+    enable_eventstream = "FABRIC_RTI_ENABLE_EVENTSTREAM"
+    enable_activator = "FABRIC_RTI_ENABLE_ACTIVATOR"
+    enable_map = "FABRIC_RTI_ENABLE_MAP"
 
 
 DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
@@ -31,6 +35,10 @@ DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
 DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
 DEFAULT_USE_OBO_FLOW = False
 DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA = False
+DEFAULT_FABRIC_RTI_ENABLE_KUSTO = True
+DEFAULT_FABRIC_RTI_ENABLE_EVENTSTREAM = True
+DEFAULT_FABRIC_RTI_ENABLE_ACTIVATOR = True
+DEFAULT_FABRIC_RTI_ENABLE_MAP = True
 
 
 @dataclass(slots=True, frozen=True)
@@ -44,6 +52,10 @@ class GlobalFabricRTIConfig:
     stateless_http: bool
     use_obo_flow: bool
     use_ai_foundry_compat: bool
+    enable_kusto: bool
+    enable_eventstream: bool
+    enable_activator: bool
+    enable_map: bool
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -62,15 +74,15 @@ class GlobalFabricRTIConfig:
                 )
             ),
             http_path=os.getenv(GlobalFabricRTIEnvVarNames.http_path, DEFAULT_FABRIC_RTI_HTTP_PATH),
-            stateless_http=bool(
-                os.getenv(GlobalFabricRTIEnvVarNames.stateless_http, DEFAULT_FABRIC_RTI_STATELESS_HTTP)
-            ),
-            use_obo_flow=bool(os.getenv(GlobalFabricRTIEnvVarNames.use_obo_flow, DEFAULT_USE_OBO_FLOW)),
-            use_ai_foundry_compat=bool(
-                os.getenv(
-                    GlobalFabricRTIEnvVarNames.use_ai_foundry_compat, DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA
-                )
-            ),
+            stateless_http=os.getenv(GlobalFabricRTIEnvVarNames.stateless_http, str(DEFAULT_FABRIC_RTI_STATELESS_HTTP)).lower() in ("true", "1", "yes"),
+            use_obo_flow=os.getenv(GlobalFabricRTIEnvVarNames.use_obo_flow, str(DEFAULT_USE_OBO_FLOW)).lower() in ("true", "1", "yes"),
+            use_ai_foundry_compat=os.getenv(
+                GlobalFabricRTIEnvVarNames.use_ai_foundry_compat, str(DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA)
+            ).lower() in ("true", "1", "yes"),
+            enable_kusto=os.getenv(GlobalFabricRTIEnvVarNames.enable_kusto, str(DEFAULT_FABRIC_RTI_ENABLE_KUSTO)).lower() in ("true", "1", "yes"),
+            enable_eventstream=os.getenv(GlobalFabricRTIEnvVarNames.enable_eventstream, str(DEFAULT_FABRIC_RTI_ENABLE_EVENTSTREAM)).lower() in ("true", "1", "yes"),
+            enable_activator=os.getenv(GlobalFabricRTIEnvVarNames.enable_activator, str(DEFAULT_FABRIC_RTI_ENABLE_ACTIVATOR)).lower() in ("true", "1", "yes"),
+            enable_map=os.getenv(GlobalFabricRTIEnvVarNames.enable_map, str(DEFAULT_FABRIC_RTI_ENABLE_MAP)).lower() in ("true", "1", "yes"),
         )
 
     @staticmethod
@@ -87,6 +99,10 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.stateless_http,
             GlobalFabricRTIEnvVarNames.use_obo_flow,
             GlobalFabricRTIEnvVarNames.use_ai_foundry_compat,
+            GlobalFabricRTIEnvVarNames.enable_kusto,
+            GlobalFabricRTIEnvVarNames.enable_eventstream,
+            GlobalFabricRTIEnvVarNames.enable_activator,
+            GlobalFabricRTIEnvVarNames.enable_map,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -134,6 +150,10 @@ class GlobalFabricRTIConfig:
             stateless_http=stateless_http,
             use_obo_flow=use_obo_flow,
             use_ai_foundry_compat=use_ai_foundry_compat,
+            enable_kusto=base_config.enable_kusto,
+            enable_eventstream=base_config.enable_eventstream,
+            enable_activator=base_config.enable_activator,
+            enable_map=base_config.enable_map,
         )
 
 
