@@ -17,7 +17,6 @@ precommit: fmt typecheck test
 ci:
 	ruff format --check fabric_rti_mcp
 	ruff check fabric_rti_mcp
-	ty check fabric_rti_mcp
 	pytest
 
 run:
