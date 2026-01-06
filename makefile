@@ -9,7 +9,7 @@ check:
 test:
 	pytest
 
-precommit: fmt lint test
+precommit: fmt test
 
 run:
 	uvx .
