@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
-from typing import Any, Awaitable, Callable, Dict
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
@@ -24,7 +25,7 @@ def extract_token_from_header(auth_header: str) -> str:
     return auth_header
 
 
-def decode_jwt_token(token: str) -> Dict[str, Any]:
+def decode_jwt_token(token: str) -> dict[str, Any]:
     """
     Decode a JWT token without verification.
 
@@ -61,7 +62,7 @@ def decode_jwt_token(token: str) -> Dict[str, Any]:
         # Decode base64
         try:
             decoded = base64.b64decode(payload_fixed)
-            payload: Dict[str, Any] = json.loads(decoded)
+            payload: dict[str, Any] = json.loads(decoded)
             return payload
         except Exception as e:
             logger.warning(f"Failed to decode JWT payload: {str(e)}")
@@ -99,9 +100,7 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
 
         # Add middleware to check authentication for MCP endpoints
         @app.middleware("http")  # type: ignore
-        async def check_auth(
-            request: Request, call_next: Callable[[Request], Awaitable[JSONResponse]]
-        ) -> JSONResponse:  # noqa: F811  # type: ignore[reportUnusedFunction]
+        async def check_auth(request: Request, call_next: Callable[[Request], Awaitable[JSONResponse]]) -> JSONResponse:  # noqa: F811  # type: ignore[reportUnusedFunction]
             try:
                 # Skip auth check for health endpoint
                 if request.url.path == "/health":
@@ -126,7 +125,6 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
                 token = extract_token_from_header(auth_header)
 
                 try:
-
                     if config.use_obo_flow:
                         logger.info("Started performing OBO token exchange")
                         # Create token exchanger and perform OBO token exchange

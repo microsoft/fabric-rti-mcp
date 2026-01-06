@@ -53,7 +53,6 @@ class KustoConnection:
         self.default_database = default_database
 
     def _get_credential(self, login_endpoint: str) -> TokenCredential:
-
         # Check if we have a bearer token from HTTP auth
         token = get_auth_token()
         if token:

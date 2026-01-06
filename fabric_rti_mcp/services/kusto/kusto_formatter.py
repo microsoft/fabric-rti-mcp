@@ -92,7 +92,7 @@ class KustoFormatter:
         columnar_data: dict[str, list[Any]] = {}
 
         # Initialize columns
-        for i, col in enumerate(first_result.columns):
+        for col in first_result.columns:
             columnar_data[col.column_name] = []
 
         # Populate columns
