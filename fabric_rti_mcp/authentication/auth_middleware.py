@@ -91,7 +91,7 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
 
         # Add CORS middleware
         app.add_middleware(
-            CORSMiddleware,
+            CORSMiddleware,  # ty: ignore[invalid-argument-type]
             allow_origins=["*"],  # Allows all origins
             allow_credentials=True,
             allow_methods=["*"],  # Allows all methods

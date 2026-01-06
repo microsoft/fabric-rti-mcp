@@ -29,6 +29,7 @@ dependencies = [
 dev = [
     "pytest>=8.3.5",
     "ruff>=0.14.10",
+    "ty",
 ]
 
 [project.scripts]
@@ -82,4 +83,5 @@ write_to = "fabric_rti_mcp/_version.py"
 dev = [
     "pytest>=8.3.5",
     "ruff>=0.14.10",
+    "ty",
 ]

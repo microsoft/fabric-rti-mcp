@@ -17,7 +17,7 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.10"
         
@@ -30,95 +30,23 @@ jobs:
       id: quality
       continue-on-error: true
       run: |
-        echo "::group::Running isort"
-        isort_output=$(isort . --skip-glob=**/_version.py --extend-skip-glob=__init__.py --check-only --diff 2>&1) || isort_failed=true
-        echo "$isort_output"
+        echo "::group::Running `make ci`"
+        ci_output=$(make ci 2>&1) || ci_failed=true
+        echo "$ci_output"
         echo "::endgroup::"
 
-        echo "::group::Running Black"
-        black_output=$(black . --check --diff 2>&1) || black_failed=true
-        echo "$black_output"
-        echo "::endgroup::"
-
-        echo "::group::Running Flake8"
-        flake8_output=$(flake8 . 2>&1) || flake8_failed=true
-        echo "$flake8_output"
-        echo "::endgroup::"
-
-        echo "::group::Running MyPy"
-        mypy_output=$(mypy fabric_rti_mcp --explicit-package-bases  2>&1) || mypy_failed=true
-        echo "$mypy_output"
-        echo "::endgroup::"
-
-        # Prepare markdown report
         echo "# Code Quality Report" > report.md
         echo "" >> report.md
-        
-        if [ "$isort_failed" = true ]; then
-          echo "### ❌ isort checks failed" >> report.md
-          echo "\`\`\`" >> report.md
-          echo "$isort_output" >> report.md
-          echo "\`\`\`" >> report.md
-        else
-          echo "### ✅ isort checks passed" >> report.md
-        fi
 
-        if [ "$black_failed" = true ]; then
-          echo "### ❌ Black checks failed" >> report.md
+        if [ "$ci_failed" = true ]; then
+          echo "### ❌ quality gate (`make ci`) failed" >> report.md
           echo "\`\`\`" >> report.md
-          echo "$black_output" >> report.md
+          echo "$ci_output" >> report.md
           echo "\`\`\`" >> report.md
+          echo "ci_failed=true" >> $GITHUB_OUTPUT
         else
-          echo "### ✅ Black checks passed" >> report.md
-        fi
-
-        if [ "$flake8_failed" = true ]; then
-          echo "### ❌ Flake8 checks failed" >> report.md
-          echo "\`\`\`" >> report.md
-          echo "$flake8_output" >> report.md
-          echo "\`\`\`" >> report.md
-        else
-          echo "### ✅ Flake8 checks passed" >> report.md
-        fi
-
-        if [ "$mypy_failed" = true ]; then
-          echo "### ❌ MyPy checks failed" >> report.md
-          echo "\`\`\`" >> report.md
-          echo "$mypy_output" >> report.md
-          echo "\`\`\`" >> report.md
-        else
-          echo "### ✅ MyPy checks passed" >> report.md
-        fi
-
-        if [ "$isort_failed" = true ] || [ "$black_failed" = true ] || [ "$flake8_failed" = true ] || [ "$mypy_failed" = true ]; then
-          echo "checks_failed=true" >> $GITHUB_OUTPUT
-        else
-          echo "checks_failed=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Run tests
-      id: tests
-      continue-on-error: true
-      run: |
-        echo "::group::Running pytest"
-        pytest_output=$(python -m pytest 2>&1) || pytest_failed=true
-        echo "$pytest_output"
-        echo "::endgroup::"
-
-        # Add test results to report
-        if [ "$pytest_failed" = true ]; then
-          echo "### ❌ Pytest checks failed" >> report.md
-          echo "\`\`\`" >> report.md
-          echo "$pytest_output" >> report.md
-          echo "\`\`\`" >> report.md
-        else
-          echo "### ✅ Pytest checks passed" >> report.md
-        fi
-
-        if [ "$pytest_failed" = true ]; then
-          echo "tests_failed=true" >> $GITHUB_OUTPUT
-        else
-          echo "tests_failed=false" >> $GITHUB_OUTPUT
+          echo "### ✅ make ci passed" >> report.md
+          echo "ci_failed=false" >> $GITHUB_OUTPUT
         fi
 
     - name: Post results
@@ -144,5 +72,5 @@ jobs:
           }
 
     - name: Check results
-      if: steps.quality.outputs.checks_failed == 'true' || steps.tests.outputs.tests_failed == 'true'
+      if: steps.quality.outputs.ci_failed == 'true'
       run: exit 1
