@@ -3,8 +3,9 @@ from __future__ import annotations
 import functools
 import inspect
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
@@ -113,7 +114,7 @@ def destructive_operation(func: F) -> F:
     def wrapper(*args, **kwargs):  # type: ignore
         return func(*args, **kwargs)
 
-    setattr(wrapper, "_is_destructive", True)  # type: ignore
+    wrapper._is_destructive = True  # type: ignore
     return wrapper  # type: ignore
 
 
