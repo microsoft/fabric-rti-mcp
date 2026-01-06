@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-A comprehensive Model Context Protocol (MCP) server implementation for [Microsoft Fabric Real-Time Intelligence (RTI)](https://aka.ms/fabricrti). 
+A comprehensive Model Context Protocol (MCP) server implementation for [Microsoft Fabric Real-Time Intelligence (RTI)](https://aka.ms/fabricrti).
 This server enables AI agents to interact with Fabric RTI services by providing tools through the MCP interface, allowing for seamless data querying, analysis, and streaming capabilities.
 
 > [!NOTE]  
@@ -22,17 +22,23 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 
 **Eventhouse (Kusto)**: Execute KQL queries against Microsoft Fabric RTI [Eventhouse](https://aka.ms/eventhouse) and [Azure Data Explorer (ADX)](https://aka.ms/adx).
 
-**Eventstreams**: Manage Microsoft Fabric [Eventstreams](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/eventstream/eventstream-introduction) for real-time data processing:
+**Eventstreams**: Manage Microsoft Fabric [Eventstreams](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/overview) for real-time data processing:
 - List Eventstreams in workspaces
 - Get Eventstream details and definitions
 - Create new Eventstreams
 - Update existing Eventstreams
 - Delete Eventstreams
 
-**Activator**: Create and manage Microsoft Fabric [Activator](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/data-activator/data-activator-introduction) triggers for real-time alerting:
+**Activator**: Create and manage Microsoft Fabric [Activator](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/data-activator/activator-introduction) triggers for real-time alerting:
 - Create new triggers with KQL source monitoring
 - Set up email and Teams notifications when a condition occurs
 - List Activator artifacts in workspaces
+
+**Map**: Create and manage Microsoft Fabric [Map](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/map/create-map) to visualize geospatial data:
+- Create a new map from a provided configuration
+- Visualize data on maps
+- List Map items in workspaces
+- Delete Map items
 
 ## 🚧 Coming soon
 - **Other RTI items**
@@ -56,6 +62,11 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - "Using the StormEvents table, notify me via email when there is a flood in Illinois"
 - "Create a teams alert to notify me when my success rate drops below 95%"
 - "List all Activator artifacts in my workspace"
+
+**Map Visualization::**
+- "List all Map items in my workspace"
+- "Create a new Map and add LakeHouse with name 'MyLakeHouse' as a data source to Map item 'MyMap'"
+- "Delete a Map item with name 'MyMap' from my workspace"
 
 ### Available tools
 
