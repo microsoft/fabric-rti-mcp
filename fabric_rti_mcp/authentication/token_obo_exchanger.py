@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import msal  # type: ignore
 from azure.identity import ManagedIdentityCredential
@@ -10,8 +10,7 @@ from fabric_rti_mcp.config.obo import FabricRtiMcpOBOFlowEnvVarNames, obo_config
 
 
 class TokenOboExchanger:
-
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """
         Initialize the TokenOboExchanger with optional configuration.
 

@@ -27,11 +27,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
-    "pytest>=7.0.0"
+    "pytest>=8.3.5",
+    "ruff>=0.14.10",
+    "ty",
 ]
 
 [project.scripts]
@@ -49,30 +47,41 @@ packages = ["fabric_rti_mcp"]
 [tool.setuptools.package-data]
 fabric_rti_mcp = ["bin/*"]
 
-[tool.black]
+[tool.ruff]
+# Allow lines to be as long as 120.
 line-length = 120
-target-version = ["py310"]
 
-[tool.isort]
-profile = "black"
-line_length = 120
-multi_line_output = 3
-include_trailing_comma = true
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_incomplete_defs = true
-disallow_untyped_calls = false
-check_untyped_defs = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = false
-warn_no_return = true
-warn_unreachable = true
-strict = true
-exclude = ['scripts/build_executables.py', 'setup_dist.py', 'fabric_rti_mcp/_version.py']
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+ignore = [
+    "B904", # Within an `except` clause, raise exceptions with `raise
+    "B905", # `zip()` without an explicit `strict=` parameter
+    "SIM102", # Use a single `if` statement instead of nested `if` statements
+    "E501", # line too long
+    "B024", # `Component` is an abstract base class, but it has no abstract methods or properties
+    "UP031", # Use format specifiers instead of percent format
+    "SIM105", # Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+]
 
 [tool.setuptools_scm]
 write_to = "fabric_rti_mcp/_version.py"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "ruff>=0.14.10",
+    "ty",
+]

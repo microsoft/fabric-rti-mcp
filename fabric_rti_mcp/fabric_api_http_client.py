@@ -1,5 +1,6 @@
 import asyncio
-from typing import Any, Coroutine, cast
+from collections.abc import Coroutine
+from typing import Any, cast
 
 import httpx
 from azure.identity import ChainedTokenCredential, DefaultAzureCredential

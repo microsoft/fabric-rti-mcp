@@ -3,7 +3,6 @@ import signal
 import sys
 import types
 from datetime import datetime, timezone
-from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
@@ -24,7 +23,7 @@ from fabric_rti_mcp.services.map import map_tools
 server_start_time = datetime.now(timezone.utc)
 
 
-def setup_shutdown_handler(sig: int, frame: Optional[types.FrameType]) -> None:
+def setup_shutdown_handler(sig: int, frame: types.FrameType | None) -> None:
     """Handle process termination signals."""
     signal_name = signal.Signals(sig).name
     logger.info(f"Received signal {sig} ({signal_name}), shutting down...")

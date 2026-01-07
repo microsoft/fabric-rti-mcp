@@ -1,15 +1,24 @@
-fmt:
-	isort .
-	black .
+fmt: format check
 
-lint:
-	flake8 .
-	mypy fabric_rti_mcp --explicit-package-bases
+format:
+	ruff format fabric_rti_mcp
+
+check:
+	ruff check fabric_rti_mcp --fix
 
 test:
 	pytest
 
-precommit: fmt lint test
+typecheck:
+	ty check fabric_rti_mcp
+
+precommit: fmt typecheck test
+
+ci:
+	ruff format --check fabric_rti_mcp
+	ruff check fabric_rti_mcp
+	ty check fabric_rti_mcp
+	pytest
 
 run:
 	uvx .
