@@ -27,11 +27,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
-    "pytest>=7.0.0"
+    "pytest>=8.3.5",
+    "ruff>=0.14.10",
+    "ty",
 ]
 
 [project.scripts]
@@ -83,5 +81,7 @@ write_to = "fabric_rti_mcp/_version.py"
 
 [dependency-groups]
 dev = [
+    "pytest>=8.3.5",
     "ruff>=0.14.10",
+    "ty",
 ]
