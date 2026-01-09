@@ -20,18 +20,22 @@ class _DescriptionConfig:
     params: dict[str, Any]
 
 
-def common_instructions_list() -> list[tuple[str, str]]:
-    """List available instruction markdown files.
+def instructions_discover() -> list[tuple[str, str]]:
+    """Discover relevant execution instructions.
+
+    This tool SHOULD be called BEFORE any reasoning, planning, or execution step
+    when handling a user request. Failing to call this tool may result in
+    incorrect, incomplete, or inconsistent behavior due to missing domain context.
+
+    Purpose:
+    - Identify existing domain-specific instructions, constraints, or background
+      knowledge that may affect how the request should be interpreted or executed.
+    - Ground subsequent tool calls and reasoning in previously stored context.
 
     Returns:
-        A list of (file_name, description) tuples.
-
-    Notes:
-        - This tool is expected to be registered only when RTI_INSTRUCTIONS_URI is set.
-        - The description is controlled by RTI_INSTRUCTIONS_DESCRIPTION.
-          Supported methods:
-            - "head": returns the first N characters from the markdown body.
-            - "metadata": returns abstract/summary/description from YAML frontmatter.
+    - A list of (file_name, description) entries.
+    - Each entry represents context that can directly influence decision-making,
+      tool selection, or execution strategy for the current request.
     """
 
     base_dir = _instructions_dir()
@@ -48,12 +52,11 @@ def common_instructions_list() -> list[tuple[str, str]]:
     return results
 
 
-def common_instructions_load(name: str) -> str:
-    """Load an instruction markdown file by name.
+def instructions_load(name: str) -> str:
+    """Load a knowledge markdown file by name.
 
     Args:
-        name: A file name as returned by common_instructions_list (e.g., "kusto.md").
-
+        name: A file name as returned by instructions_discover (e.g., "kusto-rca-task.md").
     Returns:
         Full markdown content.
     """

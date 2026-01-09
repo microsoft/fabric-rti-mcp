@@ -30,11 +30,11 @@ def test_list_and_load_from_file_directory(tmp_path: Path, monkeypatch: pytest.M
         ),
     )
 
-    items = instructions_service.common_instructions_list()
+    items = instructions_service.instructions_discover()
     assert ("a.md", "Alpha instructions") in items
     assert ("b.md", "Beta summary") in items
 
-    loaded = instructions_service.common_instructions_load("a.md")
+    loaded = instructions_service.instructions_load("a.md")
     assert "# A" in loaded
     assert "Alpha instructions" in loaded
 
@@ -56,5 +56,5 @@ def test_description_head_strips_frontmatter(tmp_path: Path, monkeypatch: pytest
         ),
     )
 
-    items = dict(instructions_service.common_instructions_list())
+    items = dict(instructions_service.instructions_discover())
     assert items["doc.md"].startswith("# Title")
