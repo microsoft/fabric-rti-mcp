@@ -16,6 +16,7 @@ from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
 from fabric_rti_mcp.services.activator import activator_tools
 from fabric_rti_mcp.services.eventstream import eventstream_tools
+from fabric_rti_mcp.services.instructions import instructions_tools
 from fabric_rti_mcp.services.kusto import kusto_config, kusto_tools
 from fabric_rti_mcp.services.map import map_tools
 
@@ -41,6 +42,13 @@ def register_tools(mcp: FastMCP) -> None:
     eventstream_tools.register_tools(mcp)
     activator_tools.register_tools(mcp)
     map_tools.register_tools(mcp)
+
+    instructions_uri = (config.instructions_uri or "").strip()
+    if instructions_uri:
+        logger.info("Instruction tools enabled (RTI_INSTRUCTIONS_URI set)")
+        instructions_tools.register_tools(mcp)
+    else:
+        logger.info("Instruction tools disabled (RTI_INSTRUCTIONS_URI not set)")
 
 
 # Health check function defined at module level

@@ -20,6 +20,8 @@ class GlobalFabricRTIEnvVarNames:
     stateless_http = "FABRIC_RTI_STATELESS_HTTP"
     use_obo_flow = "USE_OBO_FLOW"
     use_ai_foundry_compat = "FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA"
+    instructions_uri = "RTI_INSTRUCTIONS_URI"
+    instructions_description = "RTI_INSTRUCTIONS_DESCRIPTION"
 
 
 DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
@@ -31,6 +33,8 @@ DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
 DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
 DEFAULT_USE_OBO_FLOW = False
 DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA = False
+DEFAULT_RTI_INSTRUCTIONS_URI = ""
+DEFAULT_RTI_INSTRUCTIONS_DESCRIPTION = ""
 
 
 @dataclass(slots=True, frozen=True)
@@ -44,6 +48,8 @@ class GlobalFabricRTIConfig:
     stateless_http: bool
     use_obo_flow: bool
     use_ai_foundry_compat: bool
+    instructions_uri: str
+    instructions_description: str
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -71,6 +77,10 @@ class GlobalFabricRTIConfig:
                     GlobalFabricRTIEnvVarNames.use_ai_foundry_compat, DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA
                 )
             ),
+            instructions_uri=os.getenv(GlobalFabricRTIEnvVarNames.instructions_uri, DEFAULT_RTI_INSTRUCTIONS_URI),
+            instructions_description=os.getenv(
+                GlobalFabricRTIEnvVarNames.instructions_description, DEFAULT_RTI_INSTRUCTIONS_DESCRIPTION
+            ),
         )
 
     @staticmethod
@@ -87,6 +97,8 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.stateless_http,
             GlobalFabricRTIEnvVarNames.use_obo_flow,
             GlobalFabricRTIEnvVarNames.use_ai_foundry_compat,
+            GlobalFabricRTIEnvVarNames.instructions_uri,
+            GlobalFabricRTIEnvVarNames.instructions_description,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -134,6 +146,8 @@ class GlobalFabricRTIConfig:
             stateless_http=stateless_http,
             use_obo_flow=use_obo_flow,
             use_ai_foundry_compat=use_ai_foundry_compat,
+            instructions_uri=base_config.instructions_uri,
+            instructions_description=base_config.instructions_description,
         )
 
 
