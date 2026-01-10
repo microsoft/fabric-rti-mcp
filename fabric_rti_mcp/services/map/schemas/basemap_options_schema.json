@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Basemap Options",
+  "description": "Configuration options for the base map. This object should be JSON.stringify'd and stored in basemap.options as a string.",
+  "type": "object",
+  "properties": {
+    "style": {
+      "type": "string",
+      "description": "The base map style to use",
+      "enum": [
+        "grayscale_light",
+        "grayscale_dark",
+        "night",
+        "road",
+        "road_shaded_relief",
+        "satellite",
+        "satellite_road_labels",
+        "high_contrast_dark",
+        "high_contrast_light"
+      ],
+      "default": "grayscale_light",
+      "examples": ["grayscale_light", "satellite", "night"]
+    },
+    "center": {
+      "type": "array",
+      "description": "Initial center position of the map [longitude, latitude]",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "examples": [[-122.4194, 37.7749], [0, 0], [-74.006, 40.7128]]
+    },
+    "zoom": {
+      "type": "number",
+      "description": "Initial zoom level (0-22)",
+      "minimum": 0,
+      "maximum": 22,
+      "examples": [10, 12, 15]
+    },
+    "pitch": {
+      "type": "number",
+      "description": "Initial pitch/tilt angle in degrees (0-60)",
+      "minimum": 0,
+      "maximum": 60,
+      "default": 0,
+      "examples": [0, 30, 45]
+    },
+    "bearing": {
+      "type": "number",
+      "description": "Initial bearing/rotation angle in degrees (0-360)",
+      "minimum": 0,
+      "maximum": 360,
+      "default": 0,
+      "examples": [0, 90, 180, 270]
+    },
+    "showLabels": {
+      "type": "boolean",
+      "description": "Whether to show map labels (place names, roads, etc.)",
+      "default": true
+    },
+    "language": {
+      "type": "string",
+      "description": "Language for map labels. Use 'default' for auto-detection or ISO language codes",
+      "default": "default",
+      "examples": ["default", "en-US", "es-ES", "fr-FR", "de-DE", "ja-JP", "zh-CN"]
+    },
+    "renderWorldCopies": {
+      "type": "boolean",
+      "description": "Whether to render multiple copies of the world at low zoom levels",
+      "default": true
+    },
+    "styleOverrides": {
+      "type": "object",
+      "description": "Overrides for specific map elements visibility",
+      "properties": {
+        "countryRegion": {
+          "type": "object",
+          "properties": {
+            "borderVisible": {
+              "type": "boolean",
+              "description": "Whether country/region borders are visible",
+              "default": true
+            }
+          }
+        },
+        "adminDistrict": {
+          "type": "object",
+          "properties": {
+            "borderVisible": {
+              "type": "boolean",
+              "description": "Whether admin district (state/province) borders are visible",
+              "default": true
+            }
+          }
+        },
+        "adminDistrict2": {
+          "type": "object",
+          "properties": {
+            "borderVisible": {
+              "type": "boolean",
+              "description": "Whether admin district 2 (county) borders are visible",
+              "default": true
+            }
+          }
+        },
+        "roadDetails": {
+          "type": "object",
+          "properties": {
+            "visible": {
+              "type": "boolean",
+              "description": "Whether road details are visible",
+              "default": true
+            }
+          }
+        },
+        "buildingFootprint": {
+          "type": "object",
+          "properties": {
+            "visible": {
+              "type": "boolean",
+              "description": "Whether building footprints are visible",
+              "default": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "comment": "Light grayscale map with default settings",
+      "style": "grayscale_light",
+      "center": [-98.5795, 39.8283],
+      "zoom": 4,
+      "pitch": 0,
+      "bearing": 0,
+      "showLabels": true,
+      "language": "default",
+      "renderWorldCopies": true,
+      "styleOverrides": {
+        "countryRegion": {
+          "borderVisible": true
+        },
+        "adminDistrict": {
+          "borderVisible": true
+        },
+        "adminDistrict2": {
+          "borderVisible": true
+        },
+        "roadDetails": {
+          "visible": true
+        },
+        "buildingFootprint": {
+          "visible": true
+        }
+      }
+    },
+    {
+      "comment": "Satellite imagery with road labels",
+      "style": "satellite_road_labels",
+      "center": [-122.4194, 37.7749],
+      "zoom": 12,
+      "pitch": 0,
+      "bearing": 0,
+      "showLabels": true,
+      "language": "en-US",
+      "renderWorldCopies": true
+    },
+    {
+      "comment": "Dark theme for night mode",
+      "style": "night",
+      "center": [0, 20],
+      "zoom": 2,
+      "pitch": 0,
+      "bearing": 0,
+      "showLabels": true,
+      "language": "default",
+      "renderWorldCopies": true,
+      "styleOverrides": {
+        "countryRegion": {
+          "borderVisible": true
+        }
+      }
+    },
+    {
+      "comment": "3D tilted view of city",
+      "style": "road",
+      "center": [-74.006, 40.7128],
+      "zoom": 15,
+      "pitch": 45,
+      "bearing": 90,
+      "showLabels": true,
+      "language": "en-US",
+      "renderWorldCopies": false,
+      "styleOverrides": {
+        "buildingFootprint": {
+          "visible": true
+        }
+      }
+    },
+    {
+      "comment": "Minimal map with reduced elements",
+      "style": "grayscale_light",
+      "center": [13.405, 52.52],
+      "zoom": 10,
+      "pitch": 0,
+      "bearing": 0,
+      "showLabels": false,
+      "language": "de-DE",
+      "renderWorldCopies": true,
+      "styleOverrides": {
+        "countryRegion": {
+          "borderVisible": true
+        },
+        "adminDistrict": {
+          "borderVisible": false
+        },
+        "adminDistrict2": {
+          "borderVisible": false
+        },
+        "roadDetails": {
+          "visible": false
+        },
+        "buildingFootprint": {
+          "visible": false
+        }
+      }
+    }
+  ]
+}

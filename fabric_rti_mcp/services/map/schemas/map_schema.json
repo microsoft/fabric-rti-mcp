@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://developer.microsoft.com/json-schemas/fabric/item/map/definition/1.0.0/schema.json",
+  "title": "Microsoft Fabric Map Definition",
+  "description": "Schema for Microsoft Fabric Geospatial Analytics Map artifact definition",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema version URL",
+      "default": "https://developer.microsoft.com/json-schemas/fabric/item/map/definition/1.0.0/schema.json"
+    },
+    "basemap": {
+      "$ref": "#/definitions/BasemapConfig",
+      "description": "Base map configuration"
+    },
+    "dataSources": {
+      "$ref": "#/definitions/DataSourcesConfig",
+      "description": "Data sources configuration"
+    },
+    "layerSources": {
+      "type": "array",
+      "description": "List of layer sources",
+      "items": {
+        "$ref": "#/definitions/LayerSource"
+      },
+      "default": []
+    },
+    "layerSettings": {
+      "type": "array",
+      "description": "List of layer settings",
+      "items": {
+        "$ref": "#/definitions/LayerSetting"
+      },
+      "default": []
+    }
+  },
+  "required": ["$schema"],
+  "additionalProperties": false,
+  "definitions": {
+    "BasemapConfig": {
+      "type": "object",
+      "description": "Configuration for the base map",
+      "properties": {
+        "options": {
+          "type": "string",
+          "description": "Base map options as a JSON string"
+        },
+        "controls": {
+          "$ref": "#/definitions/BasemapControls",
+          "description": "Map controls configuration"
+        },
+        "backgroundColor": {
+          "type": "string",
+          "description": "Background color of the map"
+        },
+        "theme": {
+          "type": "string",
+          "description": "Theme of the map"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BasemapControls": {
+      "type": "object",
+      "description": "Controls configuration for the base map",
+      "properties": {
+        "zoom": {
+          "type": "boolean",
+          "description": "Whether to show zoom control"
+        },
+        "pitch": {
+          "type": "boolean",
+          "description": "Whether to show pitch control"
+        },
+        "compass": {
+          "type": "boolean",
+          "description": "Whether to show compass control"
+        },
+        "scale": {
+          "type": "boolean",
+          "description": "Whether to show scale control"
+        },
+        "traffic": {
+          "type": "boolean",
+          "description": "Whether to show traffic control"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DataSourcesConfig": {
+      "type": "object",
+      "description": "Configuration for data sources",
+      "properties": {
+        "lakehouses": {
+          "type": "array",
+          "description": "List of lakehouse artifact references",
+          "items": {
+            "$ref": "#/definitions/ArtifactReference"
+          },
+          "default": []
+        },
+        "kqlDataBases": {
+          "type": "array",
+          "description": "List of KQL database artifact references",
+          "items": {
+            "$ref": "#/definitions/ArtifactReference"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "ArtifactReference": {
+      "type": "object",
+      "description": "Reference to a Microsoft Fabric artifact",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "The workspace ID (GUID)",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "artifactId": {
+          "type": "string",
+          "description": "The artifact ID (GUID)",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        }
+      },
+      "required": ["workspaceId", "artifactId"],
+      "additionalProperties": false
+    },
+    "LayerSource": {
+      "type": "object",
+      "description": "Configuration for a layer source",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The ID of the layer source (GUID)",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the layer source"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of the layer source"
+        },
+        "options": {
+          "type": "string",
+          "description": "Layer source options as a JSON string"
+        },
+        "parentArtifactId": {
+          "type": "string",
+          "description": "The parent artifact ID (GUID)",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "relativePath": {
+          "type": "string",
+          "description": "The relative path for lakehouse sources"
+        },
+        "querysetTabId": {
+          "type": "string",
+          "description": "The queryset tab ID for data sources"
+        },
+        "latitudeColumnName": {
+          "type": "string",
+          "description": "The latitude column name for geospatial data"
+        },
+        "longitudeColumnName": {
+          "type": "string",
+          "description": "The longitude column name for geospatial data"
+        },
+        "geometryColumnName": {
+          "type": "string",
+          "description": "The geometry column name for geospatial data"
+        },
+        "refreshIntervalMs": {
+          "type": "integer",
+          "description": "The refresh interval for the data source in milliseconds",
+          "minimum": 0
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "LayerSetting": {
+      "type": "object",
+      "description": "Configuration for a layer setting",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The ID of the layer (GUID)",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the layer"
+        },
+        "sourceId": {
+          "type": "string",
+          "description": "The source ID for the layer (GUID)",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "sourceLayerId": {
+          "type": "string",
+          "description": "The source layer ID"
+        },
+        "options": {
+          "type": "string",
+          "description": "Layer options as a JSON string"
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  }
+}
