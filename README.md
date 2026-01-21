@@ -84,6 +84,18 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
 - **`kusto_get_shots`** - Retrieve semantically similar query examples from a shots table using AI embeddings
 
+**Optional Context Abilities (2 tools - enabled via environment variables):**
+- **`list_context_abilities`** - List available context abilities stored in a Kusto database
+- **`inject_context_ability`** - Retrieve specific context ability content by name
+
+> **💡 Context Abilities**: To enable context abilities tools, set `FABRIC_CONTEXT_ABILITIES_KUSTO_URL` (cluster URL) and `FABRIC_CONTEXT_ABILITIES_TABLE_NAME` environment variables. 
+> 
+> **Optional column mapping** (defaults: `FileName`, `Content`):
+> - `FABRIC_CONTEXT_ABILITIES_NAME_COLUMN`: Column containing ability name/filename
+> - `FABRIC_CONTEXT_ABILITIES_CONTENT_COLUMN`: Column containing markdown content
+> 
+> The tool auto-extracts descriptions from the content (first non-header line).
+
 #### Eventstreams - 17 Tools:
 
 **Core Operations (6 tools):**

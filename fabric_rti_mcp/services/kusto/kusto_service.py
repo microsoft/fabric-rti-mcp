@@ -555,3 +555,234 @@ def kusto_get_shots(
     """
 
     return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+
+# Context Abilities
+# Environment variables for context abilities configuration
+CONTEXT_ABILITIES_KUSTO_URL = "FABRIC_CONTEXT_ABILITIES_KUSTO_URL"
+CONTEXT_ABILITIES_TABLE_NAME = "FABRIC_CONTEXT_ABILITIES_TABLE_NAME"
+CONTEXT_ABILITIES_NAME_COLUMN = "FABRIC_CONTEXT_ABILITIES_NAME_COLUMN"
+CONTEXT_ABILITIES_CONTENT_COLUMN = "FABRIC_CONTEXT_ABILITIES_CONTENT_COLUMN"
+
+# Default column names
+DEFAULT_NAME_COLUMN = "FileName"
+DEFAULT_CONTENT_COLUMN = "Content"
+
+
+def is_context_enabled() -> bool:
+    """Check if context abilities are enabled via environment variables."""
+    import os
+
+    kusto_url = os.environ.get(CONTEXT_ABILITIES_KUSTO_URL)
+    table_name = os.environ.get(CONTEXT_ABILITIES_TABLE_NAME)
+    return bool(kusto_url and table_name)
+
+
+def _get_context_config() -> tuple[str, str, str, str]:
+    """
+    Get Kusto URL, table name, and column names from environment variables.
+
+    Returns:
+        Tuple of (kusto_url, table_name, name_column, content_column)
+        Column names use defaults if not specified in environment.
+
+    Raises:
+        RuntimeError: If required environment variables (URL and table name) are not set
+    """
+    import os
+
+    kusto_url = os.environ.get(CONTEXT_ABILITIES_KUSTO_URL)
+    table_name = os.environ.get(CONTEXT_ABILITIES_TABLE_NAME)
+    name_column = os.environ.get(CONTEXT_ABILITIES_NAME_COLUMN, DEFAULT_NAME_COLUMN)
+    content_column = os.environ.get(CONTEXT_ABILITIES_CONTENT_COLUMN, DEFAULT_CONTENT_COLUMN)
+
+    if not kusto_url or not table_name:
+        raise RuntimeError(
+            f"Context abilities not configured. Set {CONTEXT_ABILITIES_KUSTO_URL} "
+            f"and {CONTEXT_ABILITIES_TABLE_NAME} environment variables."
+        )
+
+    return kusto_url, table_name, name_column, content_column
+
+
+def list_context_abilities() -> list[dict[str, Any]]:
+    """
+    Lists available context abilities (procedural knowledge, guides, and instructions) from a Kusto database.
+    
+    Context abilities are markdown documents that provide step-by-step instructions, queries, 
+    best practices, and domain-specific knowledge for solving particular problems or tasks.
+    Use this tool to discover what guidance is available, then use inject_context_ability 
+    to retrieve the full content of a specific guide when you need detailed instructions.
+
+    Requires environment variables:
+    - FABRIC_CONTEXT_ABILITIES_KUSTO_URL: Kusto cluster URL
+    - FABRIC_CONTEXT_ABILITIES_TABLE_NAME: Table name containing context abilities
+
+    Optional environment variables (with defaults):
+    - FABRIC_CONTEXT_ABILITIES_NAME_COLUMN: Column containing ability name (default: "FileName")
+    - FABRIC_CONTEXT_ABILITIES_CONTENT_COLUMN: Column containing markdown content (default: "Content")
+
+    Returns:
+        List of context abilities with name, description, content, and source info.
+        Each ability contains a short description - use inject_context_ability to get full content.
+        Returns empty list if environment variables are not set.
+    """
+    if not is_context_enabled():
+        return []
+
+    kusto_url, table_name, name_column, content_column = _get_context_config()
+
+    # Query the table for all context abilities
+    query = f"{table_name} | project {name_column}, {content_column}"
+
+    try:
+        result = kusto_query(cluster_uri=kusto_url, query=query)
+
+        # Parse the result into the expected format
+        abilities: list[dict[str, Any]] = []
+        if result and "data" in result:
+            data = result["data"]
+            file_names = data.get(name_column, [])
+            contents = data.get(content_column, [])
+
+            for i in range(len(file_names)):
+                file_name = file_names[i] if i < len(file_names) else ""
+                content = contents[i] if i < len(contents) else ""
+
+                # Extract ability name from filename (remove .md extension)
+                name = file_name.replace(".md", "") if file_name.endswith(".md") else file_name
+
+                # Extract description from content (first non-header line)
+                description = ""
+                if content:
+                    lines = content.strip().split("\n")
+                    for line in lines:
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            description = line
+                            break
+                    # If no non-header line found, use first header
+                    if not description and lines:
+                        description = lines[0].strip().replace("#", "").strip()
+
+                # Truncate description if too long
+                desc_truncated = description[:200] + "..." if len(description) > 200 else description
+
+                abilities.append(
+                    {
+                        "name": name,
+                        "description": desc_truncated,
+                        "content": content,
+                        "source": f"{kusto_url}:{table_name}",
+                    }
+                )
+
+        return abilities
+
+    except Exception as e:
+        # Return error information in a consistent format
+        return [
+            {
+                "name": "error",
+                "description": f"Error loading context abilities: {str(e)}",
+                "content": "",
+                "source": f"{kusto_url}:{table_name}",
+            }
+        ]
+
+
+def inject_context_ability(ability_name: str) -> dict[str, Any]:
+    """
+    Retrieves the full content of a context ability (procedural knowledge/instructions) from Kusto database.
+    
+    Use this tool to get detailed step-by-step instructions, queries, best practices, and guidance
+    for solving a specific problem. The 'content' field contains complete markdown documentation
+    that you should read and follow to accomplish the related task.
+    
+    IMPORTANT: This tool provides INSTRUCTIONS and CONTEXT, not executable operations. 
+    After retrieving the content, read it carefully and follow the steps/guidance provided.
+    The content may include:
+    - Step-by-step procedures
+    - KQL queries to run (use kusto_query tool to execute them)
+    - Best practices and troubleshooting tips
+    - Tool usage examples
+
+    Args:
+        ability_name: Name of the context ability to retrieve (without .md extension)
+                     Use list_context_abilities to discover available ability names.
+
+    Returns:
+        Dictionary with name, description, content (full markdown), and source info.
+        The 'content' field contains the complete instructions/guidance.
+        Returns error info if ability not found or context is not enabled.
+    """
+    if not is_context_enabled():
+        return {
+            "name": ability_name,
+            "description": "Context abilities not configured. Set FABRIC_CONTEXT_ABILITIES_KUSTO_URL and FABRIC_CONTEXT_ABILITIES_TABLE_NAME environment variables.",
+            "content": "",
+            "source": "not_configured",
+        }
+
+    kusto_url, table_name, name_column, content_column = _get_context_config()
+
+    # Add .md extension if not present for matching
+    file_name = ability_name if ability_name.endswith(".md") else f"{ability_name}.md"
+
+    # Query for the specific ability
+    query = f"{table_name} | where {name_column} == '{file_name}' | project {name_column}, {content_column}"
+
+    try:
+        result = kusto_query(cluster_uri=kusto_url, query=query)
+
+        # Parse the result
+        if result and "data" in result:
+            data = result["data"]
+            file_names = data.get(name_column, [])
+            contents = data.get(content_column, [])
+
+            if file_names and len(file_names) > 0:
+                file_name_result = file_names[0]
+                content = contents[0] if contents else ""
+
+                # Extract ability name from filename
+                name = file_name_result.replace(".md", "") if file_name_result.endswith(".md") else file_name_result
+
+                # Extract description from content (first non-header line)
+                description = ""
+                if content:
+                    lines = content.strip().split("\n")
+                    for line in lines:
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            description = line
+                            break
+                    # If no non-header line found, use first header
+                    if not description and lines:
+                        description = lines[0].strip().replace("#", "").strip()
+
+                # Truncate description if too long
+                desc_truncated = description[:200] + "..." if len(description) > 200 else description
+
+                return {
+                    "name": name,
+                    "description": desc_truncated,
+                    "content": content,
+                    "source": f"{kusto_url}:{table_name}",
+                }
+
+        # Ability not found
+        return {
+            "name": ability_name,
+            "description": "Ability not found",
+            "content": "",
+            "source": f"{kusto_url}:{table_name}",
+        }
+
+    except Exception as e:
+        return {
+            "name": ability_name,
+            "description": f"Error loading ability: {str(e)}",
+            "content": "",
+            "source": f"{kusto_url}:{table_name}",
+        }

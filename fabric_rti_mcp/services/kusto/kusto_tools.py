@@ -45,3 +45,14 @@ def register_tools(mcp: FastMCP) -> None:
         kusto_service.kusto_get_shots,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
     )
+
+    # Conditionally register context tools if environment variables are set
+    if kusto_service.is_context_enabled():
+        mcp.add_tool(
+            kusto_service.list_context_abilities,
+            annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+        )
+        mcp.add_tool(
+            kusto_service.inject_context_ability,
+            annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+        )
