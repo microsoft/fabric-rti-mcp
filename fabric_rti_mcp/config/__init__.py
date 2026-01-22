@@ -103,10 +103,16 @@ class GlobalFabricRTIConfig:
         parser.add_argument("--http", action="store_true", help="Use HTTP transport")
         parser.add_argument("--host", type=str, help="HTTP host to listen on")
         parser.add_argument("--port", type=int, help="HTTP port to listen on")
-        parser.add_argument("--stateless-http", action="store_true", help="Enable or disable stateless HTTP")
-        parser.add_argument("--use-obo-flow", action="store_true", help="Enable or disable OBO flow")
         parser.add_argument(
-            "--use-ai-foundry-compat", action="store_true", help="Enable or disable AI Foundry compatibility mode"
+            "--stateless-http", action=argparse.BooleanOptionalAction, help="Enable or disable stateless HTTP"
+        )
+        parser.add_argument(
+            "--use-obo-flow", action=argparse.BooleanOptionalAction, help="Enable or disable OBO flow"
+        )
+        parser.add_argument(
+            "--use-ai-foundry-compat",
+            action=argparse.BooleanOptionalAction,
+            help="Enable or disable AI Foundry compatibility mode",
         )
         args, _ = parser.parse_known_args()
 
