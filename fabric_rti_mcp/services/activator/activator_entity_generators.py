@@ -175,7 +175,7 @@ def create_simple_event_rule_entities(
         "uniqueIdentifier": rule_id,
         "payload": {
             "name": f"{trigger_name} rule",
-            "description": "Created by: RTI-MCP",
+            "description": "Created by: rti-mcp-py",
             "parentContainer": {"targetUniqueIdentifier": container_id},
             "definition": {
                 "type": "Rule",
