@@ -11,7 +11,7 @@ from typing import Any
 # Add the project root to the path so we can import the service
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from fabric_rti_mcp.services.activator.activator_service import DEFAULT_ACTIVATOR_SERVICE, KqlSource
+from fabric_rti_mcp.services.activator.activator_service import DEFAULT_ACTIVATOR_SERVICE
 
 
 def create_email_trigger_new_artifact(
@@ -57,18 +57,13 @@ def create_email_trigger_new_artifact(
     print()
 
     try:
-        # Create KQL source model
-        kql_source = KqlSource(
-            cluster_url=kql_cluster_url,
-            database=kql_database,
-            query=kql_query,
-            polling_frequency_minutes=polling_frequency_in_minutes,
-        )
-
         email_result = DEFAULT_ACTIVATOR_SERVICE.activator_create_trigger(
             workspace_id=workspace_id,
             trigger_name=email_trigger_name,
-            source=kql_source,
+            kql_cluster_url=kql_cluster_url,
+            kql_database=kql_database,
+            kql_query=kql_query,
+            kql_polling_frequency_minutes=polling_frequency_in_minutes,
             alert_recipient=alert_recipient,
             alert_type="email",
             artifact_id=None,  # Create new artifact
@@ -145,18 +140,13 @@ def create_teams_trigger_existing_artifact(
     print()
 
     try:
-        # Create KQL source model
-        kql_source = KqlSource(
-            cluster_url=kql_cluster_url,
-            database=kql_database,
-            query=kql_query,
-            polling_frequency_minutes=polling_frequency_in_minutes,
-        )
-
         teams_result = DEFAULT_ACTIVATOR_SERVICE.activator_create_trigger(
             workspace_id=workspace_id,
             trigger_name=teams_trigger_name,
-            source=kql_source,
+            kql_cluster_url=kql_cluster_url,
+            kql_database=kql_database,
+            kql_query=kql_query,
+            kql_polling_frequency_minutes=polling_frequency_in_minutes,
             alert_recipient=alert_recipient,
             alert_type="teams",
             artifact_id=artifact_id,  # Add to existing artifact
