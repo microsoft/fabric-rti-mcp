@@ -42,10 +42,6 @@ class KqlSource(SourceBase):
         extra = "forbid"
 
 
-# Union type for all supported source types (extensible for future source types)
-TriggerSource = KqlSource
-
-
 class ActivatorService:
     """Service class for Fabric Activator operations."""
 
@@ -84,7 +80,7 @@ class ActivatorService:
         self,
         workspace_id: str,
         trigger_name: str,
-        source: TriggerSource,
+        source: KqlSource,
         alert_recipient: str,
         alert_message: str,
         alert_headline: str,
