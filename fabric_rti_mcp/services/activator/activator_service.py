@@ -2,48 +2,12 @@ import base64
 import json
 from typing import Any, cast
 
-from pydantic import BaseModel, Field
-
 from fabric_rti_mcp.config import GlobalFabricRTIConfig
 from fabric_rti_mcp.fabric_api_http_client import FabricHttpClientCache
 from fabric_rti_mcp.services.activator import activator_entity_generators
 
 # Microsoft Fabric API configuration
 FABRIC_CONFIG = GlobalFabricRTIConfig.from_env()
-
-
-# Pydantic models for source types
-class SourceBase(BaseModel):
-    """Base class for all activator source types."""
-
-    source_type: str = Field(..., description="The type of source (e.g., 'kql', 'eventstream')")
-
-
-class KqlSource(SourceBase):
-    """KQL source configuration for activator triggers."""
-
-    source_type: str = Field(default="kql", description="Source type identifier")
-    cluster_url: str = Field(..., description="The KQL cluster URL")
-    database: str = Field(..., description="The KQL database name")
-    query: str = Field(
-        ...,
-        description="The KQL query to monitor. "
-        "The query MUST be appropriate for the schema of the underlying data, "
-        "otherwise the alert will not function correctly",
-    )
-    polling_frequency_minutes: int = Field(
-        default=5,
-        description="Polling frequency in minutes. Must be one of: 5, 15, 60, 180, 360, 720, 1440 (defaults to 5)",
-        ge=1,
-        le=1440,
-    )
-
-    class Config:
-        extra = "forbid"
-
-
-# Union type for all supported source types (extensible for future source types)
-TriggerSource = KqlSource
 
 
 class ActivatorService:
@@ -84,11 +48,14 @@ class ActivatorService:
         self,
         workspace_id: str,
         trigger_name: str,
-        source: TriggerSource,
+        kql_cluster_url: str,
+        kql_database: str,
+        kql_query: str,
         alert_recipient: str,
         alert_message: str,
         alert_headline: str,
         alert_type: str = "teams",
+        kql_polling_frequency_minutes: int = 5,
         artifact_id: str | None = None,
     ) -> dict[str, Any]:
         """
@@ -96,13 +63,18 @@ class ActivatorService:
 
         :param workspace_id: The workspace ID (UUID)
         :param trigger_name: Name of the trigger
-        :param source: Source configuration (e.g., KqlSource)
+        :param kql_cluster_url: The KQL cluster URL
+        :param kql_database: The KQL database name
+        :param kql_query: The KQL query to monitor. The query MUST be appropriate for the schema of the underlying
+            data, otherwise the alert will not function correctly
         :param alert_recipient: Email address of the alert recipient
-        :param alert_type: Type of alert - "teams" or "email" (defaults to "teams")
         :param alert_message: Alert message for the trigger
         :param alert_headline: Alert headline for the trigger
+        :param alert_type: Type of alert - "teams" or "email" (defaults to "teams")
+        :param kql_polling_frequency_minutes: Polling frequency in minutes. Must be one of: 5, 15, 60, 180, 360, 720,
+            1440 (defaults to 5)
         :param artifact_id: If specified, the trigger will be created in the specified Activator artifact.
-        If left blank, a new Activator artifact will be created.
+            If left blank, a new Activator artifact will be created.
         :return: Created trigger details:
             * url: URL back to the trigger in Fabric UI for further management
             * id: Artifact ID if a new one was created
@@ -114,19 +86,15 @@ class ActivatorService:
         """
         (container_entity, container_guid) = activator_entity_generators.create_container_entity(trigger_name)
 
-        # Handle different source types
-        if isinstance(source, KqlSource):  # type: ignore
-            (source_entity, source_guid) = activator_entity_generators.create_kql_source_entity(
-                trigger_name,
-                polling_frequency_minutes=source.polling_frequency_minutes,
-                kql_query=source.query,
-                database=source.database,
-                cluster_hostname=source.cluster_url,
-                container_id=container_guid,
-                workspace_id=workspace_id,
-            )
-        else:
-            raise ValueError(f"Unsupported source type: {type(source)}")
+        (source_entity, source_guid) = activator_entity_generators.create_kql_source_entity(
+            trigger_name,
+            polling_frequency_minutes=kql_polling_frequency_minutes,
+            kql_query=kql_query,
+            database=kql_database,
+            cluster_hostname=kql_cluster_url,
+            container_id=container_guid,
+            workspace_id=workspace_id,
+        )
 
         return self._create_trigger_with_source(
             workspace_id=workspace_id,
