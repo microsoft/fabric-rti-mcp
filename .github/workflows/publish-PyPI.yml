@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       id-token: write        # <<–– this is the fix
       contents: read
