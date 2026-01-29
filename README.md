@@ -166,6 +166,36 @@ The process should end with the below settings in your `settings.json` or your `
 
 > **Note**: All environment variables are optional. The `KUSTO_SERVICE_URI` and `KUSTO_SERVICE_DEFAULT_DB` provide default cluster and database settings. The `AZ_OPENAI_EMBEDDING_ENDPOINT` is only needed for semantic search functionality in the `kusto_get_shots` tool.
 
+#### From GitHub Copilot CLI
+
+Use the interactive command within a GitHub Copilot CLI session:
+
+```bash
+/mcp add
+```
+
+Or manually add to your `~/.copilot/mcp-config.json`:
+
+```json
+{
+    "mcpServers": {
+        "fabric-rti-mcp": {
+            "command": "uvx",
+            "args": [
+                "microsoft-fabric-rti-mcp"
+            ],
+            "env": {
+                "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
+                "KUSTO_SERVICE_DEFAULT_DB": "Samples",
+                "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
+            }
+        }
+    }
+}
+```
+
+For more information, see the [GitHub Copilot CLI documentation](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli).
+
 ### 🔧 Manual Install (Install from source)  
 
 1. Make sure you have Python 3.10+ installed properly and added to your PATH.
