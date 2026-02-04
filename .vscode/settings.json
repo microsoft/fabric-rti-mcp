@@ -9,24 +9,5 @@
         "fastmcp",
         "streamable"
     ],
-    "python-envs.pythonProjects": [],
-    "mcp": {
-        "servers": {
-            "fabric-rti-mcp": {
-                "command": "C:/Users/avhaddad/.local/bin/uv.exe",
-                "args": [
-                    "--directory",
-                    "C:/repo/fabric-rti-mcp/",
-                    "run",
-                    "-m",
-                    "fabric_rti_mcp.server"
-                ],
-                "env": {
-                    "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
-                    "KUSTO_SERVICE_DEFAULT_DB": "Samples",
-                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
-                }
-            }
-        }
-    }
+    "python-envs.pythonProjects": []
 }

@@ -42,7 +42,7 @@ Issues = "https://github.com/microsoft/fabric-rti-mcp/issues"
 Documentation = "https://github.com/microsoft/fabric-rti-mcp#readme"
 
 [tool.setuptools]
-packages = { find = { include = ["fabric_rti_mcp*"] } }
+packages = ["fabric_rti_mcp"]
 
 [tool.setuptools.package-data]
 fabric_rti_mcp = ["bin/*"]
