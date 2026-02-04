@@ -132,6 +132,8 @@ class FabricAPIHttpClient:
                     response = await client.post(url, json=payload, headers=headers)
                 elif method.upper() == "PUT":
                     response = await client.put(url, json=payload, headers=headers)
+                elif method.upper() == "PATCH":
+                    response = await client.patch(url, json=payload, headers=headers)
                 elif method.upper() == "DELETE":
                     response = await client.delete(url, headers=headers)
                 else:
