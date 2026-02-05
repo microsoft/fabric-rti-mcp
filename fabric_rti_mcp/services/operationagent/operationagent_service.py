@@ -5,7 +5,6 @@ from typing import Any, cast
 
 from fabric_rti_mcp.fabric_api_http_client import FabricHttpClientCache
 
-
 _CONFIGURATION_DEFINITION_PART_PATH = "Configurations.json"
 
 
