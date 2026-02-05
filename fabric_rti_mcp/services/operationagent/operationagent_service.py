@@ -65,14 +65,27 @@ def _get_agent_configuration_document(workspace_id: str, item_id: str) -> dict[s
     return _extract_configuration_document(definition_result)
 
 
+def _get_configuration_dict(document: dict[str, Any]) -> dict[str, Any] | None:
+    configuration = document.get("configuration")
+    if isinstance(configuration, dict):
+        return cast(dict[str, Any], configuration)
+    return None
+
+
+def _ensure_configuration_dict(document: dict[str, Any]) -> dict[str, Any]:
+    configuration = document.get("configuration")
+    if not isinstance(configuration, dict):
+        configuration = {}
+        document["configuration"] = configuration
+    return cast(dict[str, Any], configuration)
+
+
 def _get_agent_configuration_document_for_update(workspace_id: str, item_id: str) -> dict[str, Any]:
     document = _get_agent_configuration_document(workspace_id, item_id)
     if "error" in document:
         return document
 
-    configuration = document.get("configuration")
-    if not isinstance(configuration, dict):
-        document["configuration"] = {}
+    _ensure_configuration_dict(document)
 
     return document
 
@@ -158,11 +171,9 @@ def get_agent_goals(workspace_id: str, item_id: str) -> dict[str, Any]:
     if "error" in document:
         return document
 
-    configuration = document.get("configuration")
-    if not isinstance(configuration, dict):
+    configuration = _get_configuration_dict(document)
+    if configuration is None:
         return {"goals": None}
-
-    configuration = cast(dict[str, Any], configuration)
 
     return {"goals": configuration.get("goals")}
 
@@ -174,11 +185,9 @@ def get_agent_instructions(workspace_id: str, item_id: str) -> dict[str, Any]:
     if "error" in document:
         return document
 
-    configuration = document.get("configuration")
-    if not isinstance(configuration, dict):
+    configuration = _get_configuration_dict(document)
+    if configuration is None:
         return {"instructions": None}
-
-    configuration = cast(dict[str, Any], configuration)
 
     return {"instructions": configuration.get("instructions")}
 
@@ -190,11 +199,9 @@ def get_agent_knowledge_sources(workspace_id: str, item_id: str) -> dict[str, An
     if "error" in document:
         return document
 
-    configuration = document.get("configuration")
-    if not isinstance(configuration, dict):
+    configuration = _get_configuration_dict(document)
+    if configuration is None:
         return {"knowledge_sources": []}
-
-    configuration = cast(dict[str, Any], configuration)
 
     data_sources = configuration.get("dataSources")
     if isinstance(data_sources, dict):
@@ -219,11 +226,9 @@ def get_agents_actions(workspace_id: str, item_id: str) -> dict[str, Any]:
     if "error" in document:
         return document
 
-    configuration = document.get("configuration")
-    if not isinstance(configuration, dict):
+    configuration = _get_configuration_dict(document)
+    if configuration is None:
         return {"actions": {}}
-
-    configuration = cast(dict[str, Any], configuration)
 
     actions = configuration.get("actions")
     if isinstance(actions, dict):

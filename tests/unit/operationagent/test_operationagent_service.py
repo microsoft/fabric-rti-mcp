@@ -290,6 +290,46 @@ def _decode_update_definition_payload(call_args: tuple[Any, ...]) -> dict[str, A
     return json.loads(decoded_json)
 
 
+def test_get_agent_goals_returns_none_when_configuration_missing(mock_http_client: MagicMock) -> None:
+    mock_http_client.make_request.return_value = _make_get_definition_response({})
+
+    workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
+    item_id = "87654321-0000-1111-2222-123456789abc"
+
+    result = operationagent_service.get_agent_goals(workspace_id, item_id)
+    assert result == {"goals": None}
+
+
+def test_get_agent_instructions_returns_none_when_configuration_not_object(mock_http_client: MagicMock) -> None:
+    mock_http_client.make_request.return_value = _make_get_definition_response({"configuration": "nope"})
+
+    workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
+    item_id = "87654321-0000-1111-2222-123456789abc"
+
+    result = operationagent_service.get_agent_instructions(workspace_id, item_id)
+    assert result == {"instructions": None}
+
+
+def test_get_agent_knowledge_sources_returns_empty_when_configuration_invalid(mock_http_client: MagicMock) -> None:
+    mock_http_client.make_request.return_value = _make_get_definition_response({"configuration": []})
+
+    workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
+    item_id = "87654321-0000-1111-2222-123456789abc"
+
+    result = operationagent_service.get_agent_knowledge_sources(workspace_id, item_id)
+    assert result == {"knowledge_sources": []}
+
+
+def test_get_agents_actions_returns_empty_when_actions_not_object(mock_http_client: MagicMock) -> None:
+    mock_http_client.make_request.return_value = _make_get_definition_response({"configuration": {"actions": []}})
+
+    workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
+    item_id = "87654321-0000-1111-2222-123456789abc"
+
+    result = operationagent_service.get_agents_actions(workspace_id, item_id)
+    assert result == {"actions": {}}
+
+
 def test_set_agent_goals_updates_config_and_calls_update_definition(mock_http_client: MagicMock) -> None:
     workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
     item_id = "87654321-0000-1111-2222-123456789abc"
