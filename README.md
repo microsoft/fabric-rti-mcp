@@ -76,7 +76,7 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - **`kusto_command`** - Execute Kusto management commands (destructive operations)
 - **`kusto_list_databases`** - List all databases in the Kusto cluster
 - **`kusto_list_tables`** - List all tables in a specified database
-- **`kusto_get_entities_schema`** - Get schema information for all entities (tables, materialized views, functions) in a database
+- **`kusto_get_entities_schema`** - Get schema information for all entities (tables, external tables, materialized views, functions) in a database
 - **`kusto_get_table_schema`** - Get detailed schema information for a specific table
 - **`kusto_get_function_schema`** - Get schema information for a specific function, including parameters and output schema
 - **`kusto_sample_table_data`** - Retrieve random sample records from a specified table

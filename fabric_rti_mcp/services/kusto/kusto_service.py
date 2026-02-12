@@ -26,6 +26,8 @@ def canonical_entity_type(entity_type: str) -> str:
         return "materialized-view"
     elif entity_type in ["table", "tables"]:
         return "table"
+    elif entity_type in ["external table", "external-table", "externaltable", "external"]:
+        return "external-table"
     elif entity_type in ["function", "functions"]:
         return "function"
     elif entity_type in ["graph", "graphs", "graph model", "graph-model"]:
@@ -35,7 +37,7 @@ def canonical_entity_type(entity_type: str) -> str:
     else:
         raise ValueError(
             f"Unknown entity type '{entity_type}'. "
-            "Supported types: table, materialized-view, function, graph, database."
+            "Supported types: table, materialized-view, external-table, function, graph, database."
         )
 
 
@@ -312,9 +314,11 @@ def kusto_list_entities(
     client_request_properties: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Retrieves a list of all entities (databases, tables, materialized views, functions, graphs) in the Kusto cluster.
+    Retrieves a list of all entities (databases, tables, external tables, materialized views,
+    functions, graphs) in the Kusto cluster.
 
-    :param entity_type: Type of entities to list: "databases", "tables", "materialized-views", "functions", "graphs".
+    :param entity_type: Type of entities to list: "databases", "tables", "external-tables",
+    "materialized-views", "functions", "graphs".
     :param database: The name of the database to list entities from.
     Required for all types except "databases" (which are top-level).
     :param cluster_uri: The URI of the Kusto cluster.
@@ -334,6 +338,13 @@ def kusto_list_entities(
     elif entity_type == "table":
         return _execute(
             ".show tables | project-away DatabaseName",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
+    elif entity_type == "external-table":
+        return _execute(
+            ".show external tables",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
@@ -363,8 +374,8 @@ def kusto_describe_database(
     cluster_uri: str, database: str | None, client_request_properties: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """
-    Retrieves schema information for all entities (tables, materialized views, functions, graphs)
-    in the specified database.
+    Retrieves schema information for all entities (tables, external tables, materialized views,
+    functions, graphs) in the specified database.
 
     In most cases, it would be useful to call kusto_sample_entity() to see *actual* data samples,
     since schema information alone may not provide a complete picture of the data (e.g. dynamic columns, etc...)
@@ -392,11 +403,12 @@ def kusto_describe_database_entity(
     client_request_properties: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Retrieves the schema information for a specific entity (table, materialized view, function, graph)
-    in the specified database. If no database is provided, uses the default database.
+    Retrieves the schema information for a specific entity (table, external table,
+    materialized view, function, graph) in the specified database.
+    If no database is provided, uses the default database.
 
     :param entity_name: Name of the entity to get schema for.
-    :param entity_type: Type of the entity (table, materialized view, function, graph).
+    :param entity_type: Type of the entity (table, external-table, materialized-view, function, graph).
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
     :param client_request_properties: Optional dictionary of additional client request properties.
@@ -407,6 +419,13 @@ def kusto_describe_database_entity(
     if entity_type.lower() == "table":
         return _execute(
             f".show table {entity_name} cslschema",
+            cluster_uri,
+            database=database,
+            client_request_properties=client_request_properties,
+        )
+    elif entity_type.lower() == "external-table":
+        return _execute(
+            f".show external table {entity_name} cslschema",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
@@ -450,7 +469,7 @@ def kusto_sample_entity(
     If no database is provided, uses the default database.
 
     :param entity_name: Name of the entity to sample data from.
-    :param entity_type: Type of the entity (table, materialized-view, function, graph).
+    :param entity_type: Type of the entity (table, external-table, materialized-view, function, graph).
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of records to sample. Defaults to 10.
     :param database: Optional database name. If not provided, uses the default database.
@@ -458,7 +477,7 @@ def kusto_sample_entity(
     :return: List of dictionaries containing sampled records.
     """
     entity_type = canonical_entity_type(entity_type)
-    if entity_type.lower() in ["table", "materialized-view", "function"]:
+    if entity_type.lower() in ["table", "materialized-view", "external-table", "function"]:
         return _execute(
             f"{entity_name} | sample {sample_size}",
             cluster_uri,
