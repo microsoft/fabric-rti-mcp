@@ -255,6 +255,7 @@ class KustoToolsLiveTester:
         test_data = [
             ["databases", [self.test_cluster_uri, None], 8, None],
             ["tables", [self.test_cluster_uri, self.test_database], 50, None],
+            ["external-tables", [self.test_cluster_uri, self.test_database], 0, None],
             ["materialized-views", [self.test_cluster_uri, self.test_database], 0, None],
             ["functions", [self.test_cluster_uri, self.test_database], 0, None],
             ["graphs", [self.test_cluster_uri, self.test_database], 0, None],
