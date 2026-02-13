@@ -15,50 +15,46 @@ def register_tools(mcp: FastMCP) -> None:
         operationagent_service.operationagent_get,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
+
     mcp.add_tool(
-        operationagent_service.operationagent_get_definition,
+        operationagent_service.operationagent_get_goals,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        operationagent_service.operationagent_get_instructions,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        operationagent_service.operationagent_get_knowledge_sources,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        operationagent_service.operationagent_get_actions,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
 
     mcp.add_tool(
-        operationagent_service.get_agent_goals,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        operationagent_service.get_agent_instructions,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        operationagent_service.get_agent_knowledge_sources,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        operationagent_service.get_agents_actions,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-
-    mcp.add_tool(
-        operationagent_service.set_agent_goals,
+        operationagent_service.operationagent_set_goals,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
     mcp.add_tool(
-        operationagent_service.set_agent_instructions,
+        operationagent_service.operationagent_set_instructions,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
     mcp.add_tool(
-        operationagent_service.add_agent_knowledge_source,
+        operationagent_service.operationagent_add_knowledge_source,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
     mcp.add_tool(
-        operationagent_service.remove_agent_knowledge_source,
+        operationagent_service.operationagent_remove_knowledge_source,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
     mcp.add_tool(
-        operationagent_service.add_agent_action,
+        operationagent_service.operationagent_add_action,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
     mcp.add_tool(
-        operationagent_service.remove_agent_action,
+        operationagent_service.operationagent_remove_action,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
 
@@ -68,10 +64,5 @@ def register_tools(mcp: FastMCP) -> None:
     )
     mcp.add_tool(
         operationagent_service.operationagent_update,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
-    )
-
-    mcp.add_tool(
-        operationagent_service.operationagent_update_definition,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )

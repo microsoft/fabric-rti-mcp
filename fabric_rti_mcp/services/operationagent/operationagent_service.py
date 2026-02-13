@@ -60,7 +60,7 @@ def _extract_configuration_document(definition_result: dict[str, Any]) -> dict[s
 
 
 def _get_agent_configuration_document(workspace_id: str, item_id: str) -> dict[str, Any]:
-    definition_result = operationagent_get_definition(workspace_id, item_id)
+    definition_result = _operationagent_get_definition(workspace_id, item_id)
     return _extract_configuration_document(definition_result)
 
 
@@ -151,7 +151,7 @@ def operationagent_get(workspace_id: str, item_id: str) -> dict[str, Any]:
     return FabricHttpClientCache.get_client().make_request("GET", endpoint)
 
 
-def operationagent_get_definition(workspace_id: str, item_id: str) -> dict[str, Any]:
+def _operationagent_get_definition(workspace_id: str, item_id: str) -> dict[str, Any]:
     """
     Get the definition of an OperationAgent item.
 
@@ -163,7 +163,7 @@ def operationagent_get_definition(workspace_id: str, item_id: str) -> dict[str, 
     return FabricHttpClientCache.get_client().make_request("POST", endpoint)
 
 
-def get_agent_goals(workspace_id: str, item_id: str) -> dict[str, Any]:
+def operationagent_get_goals(workspace_id: str, item_id: str) -> dict[str, Any]:
     """Get the configured natural-language goals for an OperationAgent."""
 
     document = _get_agent_configuration_document(workspace_id, item_id)
@@ -177,7 +177,7 @@ def get_agent_goals(workspace_id: str, item_id: str) -> dict[str, Any]:
     return {"goals": configuration.get("goals")}
 
 
-def get_agent_instructions(workspace_id: str, item_id: str) -> dict[str, Any]:
+def operationagent_get_instructions(workspace_id: str, item_id: str) -> dict[str, Any]:
     """Get the configured instructions for an OperationAgent."""
 
     document = _get_agent_configuration_document(workspace_id, item_id)
@@ -191,7 +191,7 @@ def get_agent_instructions(workspace_id: str, item_id: str) -> dict[str, Any]:
     return {"instructions": configuration.get("instructions")}
 
 
-def get_agent_knowledge_sources(workspace_id: str, item_id: str) -> dict[str, Any]:
+def operationagent_get_knowledge_sources(workspace_id: str, item_id: str) -> dict[str, Any]:
     """Get the configured knowledge sources (dataSources) for an OperationAgent."""
 
     document = _get_agent_configuration_document(workspace_id, item_id)
@@ -218,7 +218,7 @@ def get_agent_knowledge_sources(workspace_id: str, item_id: str) -> dict[str, An
     return {"knowledge_sources": []}
 
 
-def get_agents_actions(workspace_id: str, item_id: str) -> dict[str, Any]:
+def operationagent_get_actions(workspace_id: str, item_id: str) -> dict[str, Any]:
     """Get the configured actions for an OperationAgent."""
 
     document = _get_agent_configuration_document(workspace_id, item_id)
@@ -236,7 +236,7 @@ def get_agents_actions(workspace_id: str, item_id: str) -> dict[str, Any]:
     return {"actions": {}}
 
 
-def set_agent_goals(workspace_id: str, item_id: str, goals: str) -> dict[str, Any]:
+def operationagent_set_goals(workspace_id: str, item_id: str, goals: str) -> dict[str, Any]:
     """Set the natural-language goals for an OperationAgent."""
 
     document = _get_agent_configuration_document_for_update(workspace_id, item_id)
@@ -246,10 +246,10 @@ def set_agent_goals(workspace_id: str, item_id: str, goals: str) -> dict[str, An
     configuration = cast(dict[str, Any], document["configuration"])
     configuration["goals"] = goals
 
-    return operationagent_update_definition(workspace_id, item_id, document)
+    return _operationagent_update_definition(workspace_id, item_id, document)
 
 
-def set_agent_instructions(workspace_id: str, item_id: str, instructions: str) -> dict[str, Any]:
+def operationagent_set_instructions(workspace_id: str, item_id: str, instructions: str) -> dict[str, Any]:
     """Set the instructions for an OperationAgent."""
 
     document = _get_agent_configuration_document_for_update(workspace_id, item_id)
@@ -259,10 +259,10 @@ def set_agent_instructions(workspace_id: str, item_id: str, instructions: str) -
     configuration = cast(dict[str, Any], document["configuration"])
     configuration["instructions"] = instructions
 
-    return operationagent_update_definition(workspace_id, item_id, document)
+    return _operationagent_update_definition(workspace_id, item_id, document)
 
 
-def add_agent_knowledge_source(
+def operationagent_add_knowledge_source(
     workspace_id: str,
     item_id: str,
     knowledge_source: dict[str, Any],
@@ -293,11 +293,11 @@ def add_agent_knowledge_source(
     existing[source_id] = knowledge_source
     configuration["dataSources"] = existing
 
-    result = operationagent_update_definition(workspace_id, item_id, document)
+    result = _operationagent_update_definition(workspace_id, item_id, document)
     return {"knowledge_source_id": source_id, "result": result}
 
 
-def remove_agent_knowledge_source(workspace_id: str, item_id: str, knowledge_source_id: str) -> dict[str, Any]:
+def operationagent_remove_knowledge_source(workspace_id: str, item_id: str, knowledge_source_id: str) -> dict[str, Any]:
     """Remove a knowledge source (dataSource) from an OperationAgent by id."""
 
     document = _get_agent_configuration_document_for_update(workspace_id, item_id)
@@ -314,11 +314,11 @@ def remove_agent_knowledge_source(workspace_id: str, item_id: str, knowledge_sou
     existing.pop(source_id, None)
     configuration["dataSources"] = existing
 
-    result = operationagent_update_definition(workspace_id, item_id, document)
+    result = _operationagent_update_definition(workspace_id, item_id, document)
     return {"removed": True, "knowledge_source_id": source_id, "result": result}
 
 
-def add_agent_action(
+def operationagent_add_action(
     workspace_id: str,
     item_id: str,
     action: dict[str, Any],
@@ -349,11 +349,11 @@ def add_agent_action(
     actions[resolved_action_id] = action
     configuration["actions"] = actions
 
-    result = operationagent_update_definition(workspace_id, item_id, document)
+    result = _operationagent_update_definition(workspace_id, item_id, document)
     return {"action_id": resolved_action_id, "result": result}
 
 
-def remove_agent_action(workspace_id: str, item_id: str, action_id: str) -> dict[str, Any]:
+def operationagent_remove_action(workspace_id: str, item_id: str, action_id: str) -> dict[str, Any]:
     """Remove an action from an OperationAgent by id."""
 
     document = _get_agent_configuration_document_for_update(workspace_id, item_id)
@@ -371,7 +371,7 @@ def remove_agent_action(workspace_id: str, item_id: str, action_id: str) -> dict
     actions.pop(resolved_action_id, None)
     configuration["actions"] = actions
 
-    result = operationagent_update_definition(workspace_id, item_id, document)
+    result = _operationagent_update_definition(workspace_id, item_id, document)
     return {"removed": True, "action_id": resolved_action_id, "result": result}
 
 
@@ -440,7 +440,7 @@ def operationagent_update(
     return FabricHttpClientCache.get_client().make_request("PATCH", endpoint, payload)
 
 
-def operationagent_update_definition(workspace_id: str, item_id: str, definition: dict[str, Any]) -> dict[str, Any]:
+def _operationagent_update_definition(workspace_id: str, item_id: str, definition: dict[str, Any]) -> dict[str, Any]:
     """
     Update an OperationAgent item's definition.
 
