@@ -8,15 +8,6 @@ def register_tools(mcp: FastMCP) -> None:
     """Register all OperationAgent tools with the MCP server."""
 
     mcp.add_tool(
-        operationagent_service.operationagent_list,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-    mcp.add_tool(
-        operationagent_service.operationagent_get,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
-    )
-
-    mcp.add_tool(
         operationagent_service.operationagent_get_goals,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
@@ -55,14 +46,5 @@ def register_tools(mcp: FastMCP) -> None:
     )
     mcp.add_tool(
         operationagent_service.operationagent_remove_action,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
-    )
-
-    mcp.add_tool(
-        operationagent_service.operationagent_create,
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
-    )
-    mcp.add_tool(
-        operationagent_service.operationagent_update,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )

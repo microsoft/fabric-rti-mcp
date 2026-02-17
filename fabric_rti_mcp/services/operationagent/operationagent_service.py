@@ -119,38 +119,6 @@ def _normalize_id_keyed_object(value: Any) -> dict[str, dict[str, Any]]:
     return {}
 
 
-def operationagent_list(workspace_id: str) -> list[dict[str, Any]]:
-    """
-    List all OperationAgent items in a Fabric workspace.
-
-    This uses the OperationsAgents endpoint.
-
-    :param workspace_id: The Fabric workspace ID (UUID)
-    :return: List of OperationAgent items
-    """
-    endpoint = f"/workspaces/{workspace_id}/OperationsAgents"
-    result = FabricHttpClientCache.get_client().make_request("GET", endpoint)
-
-    if "value" in result and isinstance(result["value"], list):
-        value = cast(list[Any], result["value"])
-        items: list[dict[str, Any]] = [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
-        return items
-
-    return [result]
-
-
-def operationagent_get(workspace_id: str, item_id: str) -> dict[str, Any]:
-    """
-    Get an OperationAgent item by workspace and item ID.
-
-    :param workspace_id: The Fabric workspace ID (UUID)
-    :param item_id: The OperationAgent item ID (UUID)
-    :return: OperationAgent item details
-    """
-    endpoint = f"/workspaces/{workspace_id}/OperationsAgents/{item_id}"
-    return FabricHttpClientCache.get_client().make_request("GET", endpoint)
-
-
 def _operationagent_get_definition(workspace_id: str, item_id: str) -> dict[str, Any]:
     """
     Get the definition of an OperationAgent item.
@@ -373,71 +341,6 @@ def operationagent_remove_action(workspace_id: str, item_id: str, action_id: str
 
     result = _operationagent_update_definition(workspace_id, item_id, document)
     return {"removed": True, "action_id": resolved_action_id, "result": result}
-
-
-def operationagent_create(
-    workspace_id: str,
-    display_name: str,
-    definition: dict[str, Any] | None = None,
-    description: str | None = None,
-) -> dict[str, Any]:
-    """
-    Create an OperationAgent item in a Fabric workspace.
-
-    Note: Fabric may require a valid definition for some item types. If you don't provide a
-    definition and the API rejects the request, supply one via the `definition` parameter.
-
-    :param workspace_id: The Fabric workspace ID (UUID)
-    :param display_name: Display name for the new item
-    :param definition: Optional item definition (JSON) encoded and sent as a definition part
-    :param description: Optional description
-    :return: Created item details
-    """
-    payload: dict[str, Any] = {"displayName": display_name}
-
-    if description is not None:
-        payload["description"] = description
-
-    if definition is not None:
-        definition_json = json.dumps(definition)
-        definition_b64 = base64.b64encode(definition_json.encode("utf-8")).decode("utf-8")
-        payload["definition"] = {
-            "parts": [
-                {
-                    "path": _CONFIGURATION_DEFINITION_PART_PATH,
-                    "payload": definition_b64,
-                    "payloadType": "InlineBase64",
-                }
-            ]
-        }
-
-    endpoint = f"/workspaces/{workspace_id}/OperationsAgents"
-    return FabricHttpClientCache.get_client().make_request("POST", endpoint, payload)
-
-
-def operationagent_update(
-    workspace_id: str,
-    item_id: str,
-    display_name: str | None = None,
-    description: str | None = None,
-) -> dict[str, Any]:
-    """
-    Update an OperationAgent item's metadata.
-
-    :param workspace_id: The Fabric workspace ID (UUID)
-    :param item_id: The OperationAgent item ID (UUID)
-    :param display_name: Optional new display name
-    :param description: Optional new description
-    :return: Updated item details
-    """
-    payload: dict[str, Any] = {}
-    if display_name is not None:
-        payload["displayName"] = display_name
-    if description is not None:
-        payload["description"] = description
-
-    endpoint = f"/workspaces/{workspace_id}/OperationsAgents/{item_id}"
-    return FabricHttpClientCache.get_client().make_request("PATCH", endpoint, payload)
 
 
 def _operationagent_update_definition(workspace_id: str, item_id: str, definition: dict[str, Any]) -> dict[str, Any]:

@@ -19,35 +19,6 @@ def mock_http_client(monkeypatch: pytest.MonkeyPatch) -> Generator[MagicMock, No
     yield client
 
 
-def test_operationagent_list_calls_operations_agents_endpoint(mock_http_client: MagicMock) -> None:
-    mock_http_client.make_request.return_value = {
-        "value": [
-            {"id": "1", "type": "OperationAgent"},
-            {"id": "2", "type": "Eventstream"},
-        ]
-    }
-
-    workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
-    result = operationagent_service.operationagent_list(workspace_id)
-
-    assert result == [{"id": "1", "type": "OperationAgent"}, {"id": "2", "type": "Eventstream"}]
-    mock_http_client.make_request.assert_called_once_with("GET", f"/workspaces/{workspace_id}/OperationsAgents")
-
-
-def test_operationagent_get_calls_items_endpoint(mock_http_client: MagicMock) -> None:
-    mock_http_client.make_request.return_value = {"id": "123"}
-
-    workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
-    item_id = "87654321-0000-1111-2222-123456789abc"
-
-    result = operationagent_service.operationagent_get(workspace_id, item_id)
-
-    assert result == {"id": "123"}
-    mock_http_client.make_request.assert_called_once_with(
-        "GET", f"/workspaces/{workspace_id}/OperationsAgents/{item_id}"
-    )
-
-
 def test_operationagent_get_definition_uses_get_definition_endpoint(mock_http_client: MagicMock) -> None:
     mock_http_client.make_request.return_value = {"definition": {}}
 
@@ -59,59 +30,6 @@ def test_operationagent_get_definition_uses_get_definition_endpoint(mock_http_cl
     assert result == {"definition": {}}
     mock_http_client.make_request.assert_called_once_with(
         "POST", f"/workspaces/{workspace_id}/OperationsAgents/{item_id}/getDefinition"
-    )
-
-
-def test_operationagent_create_with_definition_encodes_payload(mock_http_client: MagicMock) -> None:
-    mock_http_client.make_request.return_value = {"id": "created"}
-
-    workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
-    display_name = "Example Operation Agent"
-    definition = {"nodes": ["n1"]}
-
-    result = operationagent_service.operationagent_create(
-        workspace_id=workspace_id,
-        display_name=display_name,
-        definition=definition,
-        description="desc",
-    )
-
-    encoded = base64.b64encode(json.dumps(definition).encode("utf-8")).decode("utf-8")
-    expected_payload: dict[str, Any] = {
-        "displayName": display_name,
-        "description": "desc",
-        "definition": {
-            "parts": [
-                {
-                    "path": "Configurations.json",
-                    "payload": encoded,
-                    "payloadType": "InlineBase64",
-                }
-            ]
-        },
-    }
-
-    assert result == {"id": "created"}
-    mock_http_client.make_request.assert_called_once_with(
-        "POST", f"/workspaces/{workspace_id}/OperationsAgents", expected_payload
-    )
-
-
-def test_operationagent_update_patches_metadata(mock_http_client: MagicMock) -> None:
-    mock_http_client.make_request.return_value = {"updated": True}
-
-    workspace_id = "0b67c1e8-04cb-4b05-9e7a-e4c2c8db7d8a"
-    item_id = "87654321-0000-1111-2222-123456789abc"
-
-    result = operationagent_service.operationagent_update(
-        workspace_id, item_id, display_name="New Name", description="New description"
-    )
-
-    assert result == {"updated": True}
-    mock_http_client.make_request.assert_called_once_with(
-        "PATCH",
-        f"/workspaces/{workspace_id}/OperationsAgents/{item_id}",
-        {"displayName": "New Name", "description": "New description"},
     )
 
 
