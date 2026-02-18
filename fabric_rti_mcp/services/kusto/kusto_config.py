@@ -24,6 +24,8 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
+    adaptive_query_results = "KUSTO_ADAPTIVE_QUERY_RESULTS"
+    adaptive_query_results_path = "KUSTO_ADAPTIVE_QUERY_RESULTS_PATH"
 
     @staticmethod
     def all() -> list[str]:
@@ -36,6 +38,8 @@ class KustoEnvVarNames:
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
+            KustoEnvVarNames.adaptive_query_results,
+            KustoEnvVarNames.adaptive_query_results_path,
         ]
 
 
@@ -55,6 +59,10 @@ class KustoConfig:
     allow_unknown_services: bool = True
     # Global timeout for all Kusto operations in seconds
     timeout_seconds: int | None = None
+    # When enabled, large query results are written to local files instead of returned inline.
+    adaptive_query_results: bool = False
+    # Directory for adaptive query result files. Defaults to system temp directory.
+    adaptive_query_results_path: str | None = None
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -99,6 +107,8 @@ class KustoConfig:
             eager_connect,
             allow_unknown_services,
             timeout_seconds,
+            adaptive_query_results=os.getenv(KustoEnvVarNames.adaptive_query_results, "false").lower() in ("true", "1"),
+            adaptive_query_results_path=os.getenv(KustoEnvVarNames.adaptive_query_results_path, None),
         )
 
     @staticmethod
