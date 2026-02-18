@@ -13,7 +13,7 @@ from fabric_rti_mcp import __version__  # type: ignore
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
-from fabric_rti_mcp.services.kusto.kusto_file_writer import maybe_write_to_file
+from fabric_rti_mcp.services.kusto.kusto_file_writer import should_write_to_file, write_to_file
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
 
 
@@ -176,11 +176,8 @@ def _execute(
         result_set = client.execute(database, query, crp)
         result = asdict(KustoFormatter.to_columnar(result_set))
 
-        if CONFIG.adaptive_query_results:
-            result = maybe_write_to_file(
-                result,
-                output_dir=CONFIG.adaptive_query_results_path,
-            )
+        if CONFIG.adaptive_query_results and should_write_to_file(result):
+            return write_to_file(result, output_dir=CONFIG.adaptive_query_results_path)
 
         return result
 

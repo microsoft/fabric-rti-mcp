@@ -78,16 +78,23 @@ def estimate_token_count(response: dict[str, Any]) -> int:
     return len(serialized) // 4
 
 
-def maybe_write_to_file(
+def should_write_to_file(
+    response: dict[str, Any],
+    threshold: int = ADAPTIVE_RESULTS_TOKEN_THRESHOLD,
+) -> bool:
+    token_count = estimate_token_count(response)
+    if token_count <= threshold:
+        return False
+
+    rows = KustoFormatter.parse(response)
+    return rows is not None and len(rows) > 0
+
+
+def write_to_file(
     response: dict[str, Any],
     output_dir: str | None = None,
     file_format: str = "jsonl",
-    threshold: int = ADAPTIVE_RESULTS_TOKEN_THRESHOLD,
 ) -> dict[str, Any]:
-    token_count = estimate_token_count(response)
-    if token_count <= threshold:
-        return response
-
     rows = KustoFormatter.parse(response)
     if rows is None or len(rows) == 0:
         return response

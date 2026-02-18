@@ -14,7 +14,8 @@ from fabric_rti_mcp.services.kusto.kusto_file_writer import (
     JsonlFileWriter,
     estimate_token_count,
     get_file_writer,
-    maybe_write_to_file,
+    should_write_to_file,
+    write_to_file,
 )
 from fabric_rti_mcp.services.kusto.kusto_service import kusto_query
 
@@ -99,17 +100,27 @@ class TestEstimateTokenCount:
         assert estimate_token_count(large) > estimate_token_count(small)
 
 
-class TestMaybeWriteToFile:
-    def test_small_response_returned_inline(self) -> None:
+class TestShouldWriteToFile:
+    def test_small_response_returns_false(self) -> None:
         response: dict[str, Any] = {"format": "columnar", "data": {"Name": ["Alice"], "Age": [30]}}
-        result = maybe_write_to_file(response, threshold=100000)
-        assert result is response
+        assert should_write_to_file(response, threshold=100000) is False
 
-    def test_large_response_written_to_file(self, tmp_path: Any) -> None:
+    def test_large_response_returns_true(self) -> None:
+        large_data = {"Name": [f"User{i}" for i in range(500)], "Age": list(range(500))}
+        response: dict[str, Any] = {"format": "columnar", "data": large_data}
+        assert should_write_to_file(response, threshold=10) is True
+
+    def test_empty_response_returns_false(self) -> None:
+        response: dict[str, Any] = {"format": "columnar", "data": {}}
+        assert should_write_to_file(response, threshold=0) is False
+
+
+class TestWriteToFile:
+    def test_writes_jsonl_by_default(self, tmp_path: Any) -> None:
         large_data = {"Name": [f"User{i}" for i in range(500)], "Age": list(range(500))}
         response: dict[str, Any] = {"format": "columnar", "data": large_data}
 
-        result = maybe_write_to_file(response, output_dir=str(tmp_path), threshold=10)
+        result = write_to_file(response, output_dir=str(tmp_path))
 
         assert result["format"] == "file"
         assert result["file_format"] == "jsonl"
@@ -120,11 +131,11 @@ class TestMaybeWriteToFile:
             lines = f.readlines()
         assert len(lines) == 500
 
-    def test_large_response_csv_format(self, tmp_path: Any) -> None:
+    def test_writes_csv_format(self, tmp_path: Any) -> None:
         large_data = {"Name": [f"User{i}" for i in range(50)], "Age": list(range(50))}
         response: dict[str, Any] = {"format": "columnar", "data": large_data}
 
-        result = maybe_write_to_file(response, output_dir=str(tmp_path), file_format="csv", threshold=10)
+        result = write_to_file(response, output_dir=str(tmp_path), file_format="csv")
 
         assert result["format"] == "file"
         assert result["file_format"] == "csv"
@@ -132,9 +143,9 @@ class TestMaybeWriteToFile:
         assert result["path"].endswith(".csv")
         assert os.path.exists(result["path"])
 
-    def test_empty_response_not_written(self) -> None:
+    def test_empty_response_returned_as_is(self) -> None:
         response: dict[str, Any] = {"format": "columnar", "data": {}}
-        result = maybe_write_to_file(response, threshold=0)
+        result = write_to_file(response)
         assert result is response
 
     def test_custom_output_dir_created(self, tmp_path: Any) -> None:
@@ -142,7 +153,7 @@ class TestMaybeWriteToFile:
         large_data = {"Name": [f"User{i}" for i in range(100)]}
         response: dict[str, Any] = {"format": "columnar", "data": large_data}
 
-        result = maybe_write_to_file(response, output_dir=output_dir, threshold=10)
+        result = write_to_file(response, output_dir=output_dir)
 
         assert os.path.isdir(output_dir)
         assert os.path.exists(result["path"])
@@ -151,7 +162,7 @@ class TestMaybeWriteToFile:
         large_data = {"Name": [f"User{i}" for i in range(100)]}
         response: dict[str, Any] = {"format": "columnar", "data": large_data}
 
-        result = maybe_write_to_file(response, threshold=10)
+        result = write_to_file(response)
 
         assert result["format"] == "file"
         assert tempfile.gettempdir() in result["path"]
