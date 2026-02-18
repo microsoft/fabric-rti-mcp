@@ -24,6 +24,9 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
+    schema_cache_enabled = "KUSTO_SCHEMA_CACHE_ENABLED"
+    schema_cache_path = "KUSTO_SCHEMA_CACHE_PATH"
+    schema_cache_ttl = "KUSTO_SCHEMA_CACHE_TTL"
 
     @staticmethod
     def all() -> list[str]:
@@ -36,7 +39,13 @@ class KustoEnvVarNames:
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
+            KustoEnvVarNames.schema_cache_enabled,
+            KustoEnvVarNames.schema_cache_path,
+            KustoEnvVarNames.schema_cache_ttl,
         ]
+
+
+DEFAULT_SCHEMA_CACHE_TTL_SECONDS = 86400  # 1 day
 
 
 @dataclass(slots=True, frozen=True)
@@ -55,6 +64,12 @@ class KustoConfig:
     allow_unknown_services: bool = True
     # Global timeout for all Kusto operations in seconds
     timeout_seconds: int | None = None
+    # Whether schema caching is enabled
+    schema_cache_enabled: bool = False
+    # Path for storing schema cache files (defaults to user app data)
+    schema_cache_path: str | None = None
+    # Schema cache TTL in seconds (default: 1 day)
+    schema_cache_ttl_seconds: int = DEFAULT_SCHEMA_CACHE_TTL_SECONDS
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -92,6 +107,17 @@ class KustoConfig:
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse {KustoEnvVarNames.known_services}: {e}. Skipping known services.")
 
+        # Parse schema cache configuration
+        schema_cache_enabled = os.getenv(KustoEnvVarNames.schema_cache_enabled, "false").lower() in ("true", "1")
+        schema_cache_path = os.getenv(KustoEnvVarNames.schema_cache_path, None)
+        schema_cache_ttl_seconds = DEFAULT_SCHEMA_CACHE_TTL_SECONDS
+        ttl_env = os.getenv(KustoEnvVarNames.schema_cache_ttl)
+        if ttl_env:
+            try:
+                schema_cache_ttl_seconds = int(ttl_env)
+            except ValueError:
+                pass
+
         return KustoConfig(
             default_service,
             open_ai_embedding_endpoint,
@@ -99,6 +125,9 @@ class KustoConfig:
             eager_connect,
             allow_unknown_services,
             timeout_seconds,
+            schema_cache_enabled,
+            schema_cache_path,
+            schema_cache_ttl_seconds,
         )
 
     @staticmethod
