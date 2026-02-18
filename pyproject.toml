@@ -34,6 +34,7 @@ dev = [
 
 [project.scripts]
 microsoft-fabric-rti-mcp = "fabric_rti_mcp.server:main"
+microsoft_fabric_rti_mcp = "fabric_rti_mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/microsoft/fabric-rti-mcp"
