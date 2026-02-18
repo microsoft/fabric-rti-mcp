@@ -3,8 +3,8 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 
-def simplify_schema_for_foundry(schema: Any, root_schema: Any | None = None) -> Any:
-    """Fix the schema for AI Foundry compatibility fixing below issues:
+def simplify_schema(schema: Any, root_schema: Any | None = None) -> Any:
+    """Simplify JSON schemas for broad MCP client compatibility:
     - Remove anyOf/allOf constructs
     - fixes empty type strings
     - resolves $ref references by inlining definitions
@@ -53,9 +53,9 @@ def simplify_schema_for_foundry(schema: Any, root_schema: Any | None = None) -> 
     for key in ("properties", "$defs", "items", "additionalProperties"):
         if key in schema and isinstance(schema[key], dict):
             if key in ("properties", "$defs"):
-                schema[key] = {k: simplify_schema_for_foundry(v, root_schema) for k, v in schema[key].items()}
+                schema[key] = {k: simplify_schema(v, root_schema) for k, v in schema[key].items()}
             else:
-                schema[key] = simplify_schema_for_foundry(schema[key], root_schema)
+                schema[key] = simplify_schema(schema[key], root_schema)
 
     # Remove $defs from final output as all refs should be inlined
     schema.pop("$defs", None)
@@ -63,20 +63,24 @@ def simplify_schema_for_foundry(schema: Any, root_schema: Any | None = None) -> 
     return schema
 
 
-class FoundryCompatibleMCP(FastMCP):
-    """FastMCP wrapper that simplifies schemas for AI Foundry compatibility."""
+class SchemaCompatibleMCP(FastMCP):
+    """FastMCP wrapper that simplifies schemas for broad MCP client compatibility."""
 
     def add_tool(self, *args: Any, **kwargs: Any) -> None:
         super().add_tool(*args, **kwargs)
         if hasattr(self, "_tools") and self._tools:  # type: ignore
             tool = self._tools[-1]  # type: ignore
             if hasattr(tool, "inputSchema") and tool.inputSchema:  # type: ignore[assignment]
-                tool.inputSchema = simplify_schema_for_foundry(tool.inputSchema)  # type: ignore[assignment]
+                tool.inputSchema = simplify_schema(tool.inputSchema)  # type: ignore[assignment]
 
     async def list_tools(self) -> list[Any]:
         """Override list_tools to simplify schemas on-the-fly."""
         tools = await super().list_tools()
         for tool in tools:
             if hasattr(tool, "inputSchema") and tool.inputSchema:
-                tool.inputSchema = simplify_schema_for_foundry(tool.inputSchema)
+                tool.inputSchema = simplify_schema(tool.inputSchema)
         return tools
+
+
+# Backward-compatible alias
+FoundryCompatibleMCP = SchemaCompatibleMCP

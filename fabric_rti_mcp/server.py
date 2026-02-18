@@ -10,7 +10,7 @@ from starlette.responses import JSONResponse
 
 from fabric_rti_mcp import __version__
 from fabric_rti_mcp.authentication.auth_middleware import add_auth_middleware
-from fabric_rti_mcp.compat.ms_foundry import FoundryCompatibleMCP
+from fabric_rti_mcp.compat.ms_foundry import SchemaCompatibleMCP
 from fabric_rti_mcp.config import global_config as config
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
@@ -97,7 +97,7 @@ def main() -> None:
             logger.info("AI Foundry compatibility mode enabled - schemas will be simplified")
 
         name = "fabric-rti-mcp-server"
-        fastmcp_class = FoundryCompatibleMCP if config.use_ai_foundry_compat else FastMCP
+        fastmcp_class = SchemaCompatibleMCP if config.use_ai_foundry_compat else FastMCP
 
         if config.transport == "http":
             fastmcp_server = fastmcp_class(
