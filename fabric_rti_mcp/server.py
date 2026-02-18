@@ -97,8 +97,7 @@ def main() -> None:
             logger.info("AI Foundry compatibility mode enabled - schemas will be simplified")
 
         name = "fabric-rti-mcp-server"
-        # Always simplify schemas for broad MCP client compatibility (e.g., VS Code GitHub Copilot)
-        fastmcp_class = SchemaCompatibleMCP
+        fastmcp_class = SchemaCompatibleMCP if config.use_ai_foundry_compat else FastMCP
 
         if config.transport == "http":
             fastmcp_server = fastmcp_class(
