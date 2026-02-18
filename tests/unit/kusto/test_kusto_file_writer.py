@@ -12,7 +12,6 @@ from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig, KustoEnvVarN
 from fabric_rti_mcp.services.kusto.kusto_file_writer import (
     CsvFileWriter,
     JsonlFileWriter,
-    KustoFileResponseFormat,
     estimate_token_count,
     get_file_writer,
     maybe_write_to_file,
