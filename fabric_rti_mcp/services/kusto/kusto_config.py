@@ -24,8 +24,8 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
-    adaptive_query_results = "FABRIC_RTI_KUSTO_ADAPTIVE_QUERY_RESULTS"
-    adaptive_query_results_path = "FABRIC_RTI_KUSTO_ADAPTIVE_QUERY_RESULTS_PATH"
+    adaptive_query_results = "KUSTO_ADAPTIVE_QUERY_RESULTS"
+    adaptive_query_results_path = "KUSTO_ADAPTIVE_QUERY_RESULTS_PATH"
 
     @staticmethod
     def all() -> list[str]:

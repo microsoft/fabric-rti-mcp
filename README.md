@@ -157,7 +157,7 @@ The process should end with the below settings in your `settings.json` or your `
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
                     "KUSTO_SERVICE_DEFAULT_DB": "Samples",
                     "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1",
-                    "FABRIC_RTI_KUSTO_ADAPTIVE_QUERY_RESULTS": "true"
+                    "KUSTO_ADAPTIVE_QUERY_RESULTS": "true"
                 }
             }
         }
@@ -189,7 +189,7 @@ Or manually add to your `~/.copilot/mcp-config.json`:
                 "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
                 "KUSTO_SERVICE_DEFAULT_DB": "Samples",
                 "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1",
-                "FABRIC_RTI_KUSTO_ADAPTIVE_QUERY_RESULTS": "true"
+                "KUSTO_ADAPTIVE_QUERY_RESULTS": "true"
             }
         }
     }
@@ -226,7 +226,7 @@ For more information, see the [GitHub Copilot CLI documentation](https://docs.gi
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
                     "KUSTO_SERVICE_DEFAULT_DB": "Samples",
                     "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1",
-                    "FABRIC_RTI_KUSTO_ADAPTIVE_QUERY_RESULTS": "true"
+                    "KUSTO_ADAPTIVE_QUERY_RESULTS": "true"
                 }
             }
         }
@@ -303,8 +303,8 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_KNOWN_SERVICES` | Kusto | JSON array of preconfigured Kusto services | None | `[{"service_uri":"https://cluster1.kusto.windows.net","default_database":"DB1","description":"Prod"}]` |
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
-| `FABRIC_RTI_KUSTO_ADAPTIVE_QUERY_RESULTS` | Kusto | Enable writing large query results to local files instead of returning inline | `false` | `true` or `false` |
-| `FABRIC_RTI_KUSTO_ADAPTIVE_QUERY_RESULTS_PATH` | Kusto | Output directory for adaptive query result files | System temp dir | `/tmp/kusto_results` |
+| `KUSTO_ADAPTIVE_QUERY_RESULTS` | Kusto | Enable writing large query results to local files instead of returning inline | `false` | `true` or `false` |
+| `KUSTO_ADAPTIVE_QUERY_RESULTS_PATH` | Kusto | Output directory for adaptive query result files | System temp dir | `/tmp/kusto_results` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
 
