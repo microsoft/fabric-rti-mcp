@@ -276,9 +276,9 @@ class KustoToolsLiveTester:
                     parsed_data = KustoFormatter.parse(query_result) or []
 
                     # Assert minimum count
-                    assert (
-                        len(parsed_data) >= min_expected_count
-                    ), f"Expected at least {min_expected_count} {entity_type}, "
+                    assert len(parsed_data) >= min_expected_count, (
+                        f"Expected at least {min_expected_count} {entity_type}, "
+                    )
                     "got {len(parsed_data)}. Args: {json.dumps(call_args)}"
                     print(f"    ✅ Found {len(parsed_data)} {entity_type}")
 
@@ -335,9 +335,9 @@ class KustoToolsLiveTester:
                     print(f"✅ Query succeeded, current time from Kusto: {scalar_value}")
                     if scalar_value:
                         parsed_date = datetime.fromisoformat(scalar_value.replace("Z", "+00:00"))
-                        assert datetime.now(tz=timezone.utc) - parsed_date < timedelta(
-                            minutes=1
-                        ), "Query result is stale"
+                        assert datetime.now(tz=timezone.utc) - parsed_date < timedelta(minutes=1), (
+                            "Query result is stale"
+                        )
                 else:
                     print("❌ No data returned from query")
             else:
@@ -511,9 +511,9 @@ class KustoToolsLiveTester:
                     parsed_data = KustoFormatter.parse(query_result) or []
 
                     # Assert minimum count
-                    assert (
-                        len(parsed_data) >= min_expected_count
-                    ), f"Expected at least {min_expected_count} sample records, got {len(parsed_data)}."
+                    assert len(parsed_data) >= min_expected_count, (
+                        f"Expected at least {min_expected_count} sample records, got {len(parsed_data)}."
+                    )
                     print(f"    ✅ Retrieved {len(parsed_data)} sample records")
                 else:
                     print(f"    ❌ Failed to sample {entity_type} '{entity_name}': {result}")

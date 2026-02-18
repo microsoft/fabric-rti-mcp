@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -11,7 +11,7 @@ from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection
 @pytest.fixture
 def mock_kusto_response() -> KustoResponseDataSetV1:
     """Create a minimal KustoResponseDataSet for testing."""
-    json_response: Dict[str, List[Dict[str, Any]]] = {
+    json_response: dict[str, list[dict[str, Any]]] = {
         "Tables": [
             {
                 "TableName": "Table_0",
