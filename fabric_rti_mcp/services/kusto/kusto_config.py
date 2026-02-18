@@ -24,9 +24,9 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
-    schema_cache_enabled = "KUSTO_SCHEMA_CACHE_ENABLED"
-    schema_cache_path = "KUSTO_SCHEMA_CACHE_PATH"
-    schema_cache_ttl = "KUSTO_SCHEMA_CACHE_TTL"
+    schema_cache_enabled = "FABRIC_RTI_KUSTO_SCHEMA_CACHE_ENABLED"
+    schema_cache_path = "FABRIC_RTI_KUSTO_SCHEMA_CACHE_PATH"
+    schema_cache_ttl = "FABRIC_RTI_KUSTO_SCHEMA_CACHE_TTL"
 
     @staticmethod
     def all() -> list[str]:

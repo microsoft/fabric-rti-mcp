@@ -100,11 +100,11 @@ class TestKustoSchemaCache:
 
 
 class TestGetSchemaCache:
-    @patch.dict("os.environ", {"KUSTO_SCHEMA_CACHE_ENABLED": "false"}, clear=False)
+    @patch.dict("os.environ", {"FABRIC_RTI_KUSTO_SCHEMA_CACHE_ENABLED": "false"}, clear=False)
     def test_returns_none_when_disabled(self) -> None:
         assert get_schema_cache() is None
 
-    @patch.dict("os.environ", {"KUSTO_SCHEMA_CACHE_ENABLED": "true"}, clear=False)
+    @patch.dict("os.environ", {"FABRIC_RTI_KUSTO_SCHEMA_CACHE_ENABLED": "true"}, clear=False)
     def test_returns_cache_when_enabled(self) -> None:
         cache = get_schema_cache()
         assert cache is not None
@@ -112,7 +112,10 @@ class TestGetSchemaCache:
 
     @patch.dict(
         "os.environ",
-        {"KUSTO_SCHEMA_CACHE_ENABLED": "true", "KUSTO_SCHEMA_CACHE_PATH": "/tmp/test_schema_cache"},
+        {
+            "FABRIC_RTI_KUSTO_SCHEMA_CACHE_ENABLED": "true",
+            "FABRIC_RTI_KUSTO_SCHEMA_CACHE_PATH": "/tmp/test_schema_cache",
+        },
         clear=False,
     )
     def test_uses_custom_path(self) -> None:
@@ -122,7 +125,7 @@ class TestGetSchemaCache:
 
     @patch.dict(
         "os.environ",
-        {"KUSTO_SCHEMA_CACHE_ENABLED": "true", "KUSTO_SCHEMA_CACHE_TTL": "7200"},
+        {"FABRIC_RTI_KUSTO_SCHEMA_CACHE_ENABLED": "true", "FABRIC_RTI_KUSTO_SCHEMA_CACHE_TTL": "7200"},
         clear=False,
     )
     def test_uses_custom_ttl(self) -> None:
@@ -130,7 +133,7 @@ class TestGetSchemaCache:
         assert cache is not None
         assert cache._ttl_seconds == 7200
 
-    @patch.dict("os.environ", {"KUSTO_SCHEMA_CACHE_ENABLED": "true"}, clear=False)
+    @patch.dict("os.environ", {"FABRIC_RTI_KUSTO_SCHEMA_CACHE_ENABLED": "true"}, clear=False)
     def test_singleton_behaviour(self) -> None:
         c1 = get_schema_cache()
         c2 = get_schema_cache()

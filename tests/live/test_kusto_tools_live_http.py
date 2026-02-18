@@ -7,7 +7,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 from azure.identity import DefaultAzureCredential
@@ -31,7 +31,6 @@ class HttpMcpClient:
         # Try to get a token using DefaultAzureCredential
         auth_header = None
         try:
-
             print("Getting Kusto access token using DefaultAzureCredential...")
             credential = DefaultAzureCredential()
             # Get token for Kusto resource
@@ -130,13 +129,13 @@ class HttpMcpClient:
         self._connected = False
         print("Disconnected from HTTP MCP server")
 
-    async def list_tools(self) -> List[str]:
+    async def list_tools(self) -> list[str]:
         """List available tools from the server."""
         if not self._connected:
             await self.connect()
 
         request_id = str(uuid.uuid4())
-        request_data: Dict[str, Any] = {"jsonrpc": "2.0", "id": request_id, "method": "tools/list", "params": {}}
+        request_data: dict[str, Any] = {"jsonrpc": "2.0", "id": request_id, "method": "tools/list", "params": {}}
 
         print(f"Listing tools from {self.mcp_url}...")
         try:
@@ -176,13 +175,13 @@ class HttpMcpClient:
             print(f"❌ Error listing tools: {str(e)}")
             return []
 
-    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Call a tool on the server."""
         if not self._connected:
             await self.connect()
 
         request_id = str(uuid.uuid4())
-        request_data: Dict[str, Any] = {
+        request_data: dict[str, Any] = {
             "jsonrpc": "2.0",
             "id": request_id,
             "method": "tools/call",
@@ -220,7 +219,7 @@ class HttpMcpClient:
             print(f"❌ Error calling tool: {str(e)}")
             return {"success": False, "error": f"Error calling tool: {str(e)}"}
 
-    def _parse_json_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_json_response(self, data: dict[str, Any]) -> dict[str, Any]:
         """Parse a JSON response from the server."""
         if "result" not in data:
             return {"success": False, "error": "No result in response"}
@@ -240,7 +239,7 @@ class HttpMcpClient:
 
         return {"success": False, "error": "No content in response"}
 
-    def _parse_text(self, text: str) -> Dict[str, Any]:
+    def _parse_text(self, text: str) -> dict[str, Any]:
         """Parse an event stream response from the server."""
         lines = text.strip().split("\n")
 
@@ -277,8 +276,8 @@ class KustoHttpClientTester:
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.client: Optional[HttpMcpClient] = None
-        self.server_process: Optional[subprocess.Popen[bytes]] = None
+        self.client: HttpMcpClient | None = None
+        self.server_process: subprocess.Popen[bytes] | None = None
         self.test_cluster_uri = "https://help.kusto.windows.net"
         self.test_database = "Samples"
 
@@ -359,9 +358,9 @@ class KustoHttpClientTester:
                     parsed_data = KustoFormatter.parse(query_result) or []
 
                     # Assert minimum count
-                    assert (
-                        len(parsed_data) >= min_expected_count
-                    ), f"Expected at least {min_expected_count} {entity_type}, "
+                    assert len(parsed_data) >= min_expected_count, (
+                        f"Expected at least {min_expected_count} {entity_type}, "
+                    )
                     "got {len(parsed_data)}. Args: {json.dumps(call_args)}"
                     print(f"    ✅ Found {len(parsed_data)} {entity_type}")
 
@@ -418,9 +417,9 @@ class KustoHttpClientTester:
                     print(f"✅ Query succeeded, current time from Kusto: {scalar_value}")
                     if scalar_value:
                         parsed_date = datetime.fromisoformat(scalar_value.replace("Z", "+00:00"))
-                        assert datetime.now(tz=timezone.utc) - parsed_date < timedelta(
-                            minutes=1
-                        ), "Query result is stale"
+                        assert datetime.now(tz=timezone.utc) - parsed_date < timedelta(minutes=1), (
+                            "Query result is stale"
+                        )
                 else:
                     print("❌ No data returned from query")
             else:
