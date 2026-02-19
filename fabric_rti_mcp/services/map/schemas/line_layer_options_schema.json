@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Line Layer Options",
+  "description": "Configuration options for line layer visualization (LineString/MultiLineString data). This object should be JSON.stringify'd and stored in layerSettings[].options as a string.",
+  "type": "object",
+  "properties": {
+    "color": {
+      "type": "string",
+      "description": "Base color of lines (hex color)",
+      "default": "#1e90ff",
+      "examples": ["#1e90ff", "#FF5733", "#00AA00"]
+    },
+    "type": {
+      "type": "string",
+      "enum": ["vector", "raster"],
+      "description": "Layer type",
+      "default": "vector"
+    },
+    "visible": {
+      "type": "boolean",
+      "description": "Whether the layer is visible",
+      "default": true
+    },
+    "enablePopups": {
+      "type": "boolean",
+      "description": "Whether to show popups on click",
+      "default": true
+    },
+    "minZoom": {
+      "type": "number",
+      "description": "Minimum zoom level to render the layer (inclusive)",
+      "minimum": 1,
+      "maximum": 23,
+      "default": 1
+    },
+    "maxZoom": {
+      "type": "number",
+      "description": "Maximum zoom level to render the layer (exclusive)",
+      "minimum": 1,
+      "maximum": 23,
+      "default": 23
+    },
+    "sourceLayer": {
+      "type": "string",
+      "description": "Source layer name for vector tile sources (PMTiles, MVT)",
+      "examples": ["roads", "routes", "boundaries"]
+    },
+    "lineOptions": {
+      "type": "object",
+      "description": "Line-specific visualization options",
+      "properties": {
+        "strokeOpacity": {
+          "type": "number",
+          "description": "Opacity of the line (0-1)",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "examples": [1, 0.8, 0.5]
+        },
+        "strokeWidth": {
+          "type": "number",
+          "description": "Width of the line in pixels",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "examples": [1, 3, 5, 10]
+        },
+        "strokeColor": {
+          "description": "Color of the line (can be expression for series grouping)",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Simple hex color",
+              "examples": ["#1e90ff", "#FF0000"]
+            },
+            {
+              "type": "array",
+              "description": "MapLibre expression for data-driven coloring",
+              "examples": [
+                ["match", ["get", "type"], "highway", "#FF0000", "road", "#00FF00", "#CCCCCC"]
+              ]
+            }
+          ],
+          "default": "#1e90ff"
+        },
+        "enableSeriesGroup": {
+          "type": "boolean",
+          "description": "Whether to color lines by a categorical property",
+          "default": false
+        },
+        "seriesGroup": {
+          "type": "string",
+          "description": "Property name to use for series grouping/coloring",
+          "examples": ["route_type", "status", "category"]
+        }
+      }
+    },
+    "tooltipKeys": {
+      "type": "array",
+      "description": "Array of property names to show in tooltips",
+      "items": {
+        "type": "string"
+      },
+      "examples": [["name", "length", "type"]]
+    },
+    "dataLabelKeys": {
+      "type": "array",
+      "description": "Array of property names to display as labels at line midpoints",
+      "items": {
+        "type": "string"
+      },
+      "examples": [["name", "route_number"]]
+    },
+    "dataLabelOptions": {
+      "type": "object",
+      "description": "Styling options for data labels",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "color": {
+          "type": "string",
+          "default": "#000000"
+        },
+        "size": {
+          "type": "number",
+          "default": 12
+        },
+        "textStrokeColor": {
+          "type": "string",
+          "default": "#ffffff"
+        },
+        "textStrokeWidth": {
+          "type": "number",
+          "default": 1
+        },
+        "allowOverlap": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "comment": "Simple line layer with solid color",
+      "color": "#1e90ff",
+      "type": "vector",
+      "visible": true,
+      "enablePopups": true,
+      "lineOptions": {
+        "strokeOpacity": 0.8,
+        "strokeWidth": 3,
+        "strokeColor": "#1e90ff"
+      },
+      "tooltipKeys": ["name", "type"]
+    },
+    {
+      "comment": "Thick line with high opacity",
+      "color": "#FF5733",
+      "type": "vector",
+      "visible": true,
+      "enablePopups": true,
+      "lineOptions": {
+        "strokeOpacity": 1,
+        "strokeWidth": 5,
+        "strokeColor": "#FF5733"
+      }
+    },
+    {
+      "comment": "Series grouped lines by route type",
+      "color": "#CCCCCC",
+      "type": "vector",
+      "visible": true,
+      "enablePopups": true,
+      "lineOptions": {
+        "strokeOpacity": 0.9,
+        "strokeWidth": 4,
+        "enableSeriesGroup": true,
+        "seriesGroup": "route_type",
+        "strokeColor": [
+          "match",
+          ["get", "route_type"],
+          "highway", "#FF0000",
+          "arterial", "#FFA500",
+          "local", "#FFFF00",
+          "#CCCCCC"
+        ]
+      },
+      "tooltipKeys": ["name", "route_type", "length"],
+      "dataLabelKeys": ["name"],
+      "dataLabelOptions": {
+        "enabled": true,
+        "color": "#000000",
+        "size": 11,
+        "textStrokeColor": "#ffffff",
+        "textStrokeWidth": 2,
+        "allowOverlap": false
+      }
+    },
+    {
+      "comment": "Thin lines for vector tile source",
+      "color": "#00AA00",
+      "type": "vector",
+      "visible": true,
+      "enablePopups": true,
+      "sourceLayer": "roads",
+      "lineOptions": {
+        "strokeOpacity": 0.7,
+        "strokeWidth": 2,
+        "strokeColor": "#00AA00"
+      }
+    }
+  ]
+}

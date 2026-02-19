@@ -147,6 +147,9 @@ class FabricAPIHttpClient:
                 if response.status_code == 204:  # No content
                     return {"success": True, "message": "Operation completed successfully"}
 
+                if response.status_code == 202:  # Accepted (long running operation)
+                    return {"success": True, "message": "Operation accepted", "status_code": response.status_code, "headers": response.headers}
+                 
                 try:
                     return cast(dict[str, Any], response.json())
                 except Exception:
