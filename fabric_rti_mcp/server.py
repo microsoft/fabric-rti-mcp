@@ -18,6 +18,7 @@ from fabric_rti_mcp.services.activator import activator_tools
 from fabric_rti_mcp.services.eventstream import eventstream_tools
 from fabric_rti_mcp.services.kusto import kusto_config, kusto_tools
 from fabric_rti_mcp.services.map import map_tools
+from fabric_rti_mcp.services.operationagent import operationagent_tools
 
 # Global variable to store server start time
 server_start_time = datetime.now(timezone.utc)
@@ -41,6 +42,7 @@ def register_tools(mcp: FastMCP) -> None:
     eventstream_tools.register_tools(mcp)
     activator_tools.register_tools(mcp)
     map_tools.register_tools(mcp)
+    operationagent_tools.register_tools(mcp)
 
 
 # Health check function defined at module level
