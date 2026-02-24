@@ -6,7 +6,41 @@ from azure.kusto.data import ClientRequestProperties
 from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
-from fabric_rti_mcp.services.kusto.kusto_service import kusto_command, kusto_query
+from fabric_rti_mcp.services.kusto.kusto_service import kusto_command, kusto_graph_query, kusto_query
+
+
+def _mock_kusto_response_with_stats() -> KustoResponseDataSet:
+    primary_column = Mock()
+    primary_column.column_name = "TestColumn"
+
+    primary_result = Mock()
+    primary_result.columns = [primary_column]
+    primary_result.rows = [["TestValue"]]
+
+    severity_name = Mock()
+    severity_name.column_name = "SeverityName"
+    status_description = Mock()
+    status_description.column_name = "StatusDescription"
+
+    stats_payload = {
+        "ExecutionTime": 1.234,
+        "resource_usage": {
+            "memory": {"peak_per_node": 47395635},
+            "network": {"cross_cluster_total_bytes": 5452595, "inter_cluster_total_bytes": 0},
+        },
+        "cross_cluster_resource_usage": {
+            "https://clustername.region.kusto.windows.net/": {"memory": {"peak_per_node": 23173530}}
+        },
+    }
+    stats_table = Mock()
+    stats_table.table_kind = Mock(value="QueryCompletionInformation")
+    stats_table.columns = [severity_name, status_description]
+    stats_table.raw_rows = [["Stats", json.dumps(stats_payload)]]
+
+    result_set = Mock(spec=KustoResponseDataSet)
+    result_set.primary_results = [primary_result]
+    result_set.tables = [stats_table]
+    return result_set
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
@@ -291,3 +325,73 @@ def test_successful_operations_do_not_log_correlation_id(
     # Assert - verify no info or debug logging occurs for successful operations
     assert not mock_logger.info.called
     assert not mock_logger.debug.called
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_kusto_query_show_stats_true_includes_statistics(
+    mock_get_kusto_connection: Mock,
+    sample_cluster_uri: str,
+) -> None:
+    mock_client = MagicMock()
+    mock_client.execute.return_value = _mock_kusto_response_with_stats()
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    result = kusto_query("TestTable | take 10", sample_cluster_uri, database="test_db", show_stats=True)
+
+    assert result["format"] == "columnar"
+    assert result["data"]["TestColumn"] == ["TestValue"]
+    assert result["statistics"]["execution_time_sec"] == 1.234
+    assert result["statistics"]["memory_peak_per_node_mb"] == 45.2
+    assert result["statistics"]["network"]["cross_cluster_mb"] == 5.2
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_kusto_query_show_stats_false_omits_statistics(
+    mock_get_kusto_connection: Mock,
+    sample_cluster_uri: str,
+) -> None:
+    mock_client = MagicMock()
+    mock_client.execute.return_value = _mock_kusto_response_with_stats()
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    result = kusto_query("TestTable | take 10", sample_cluster_uri, database="test_db")
+
+    assert result["format"] == "columnar"
+    assert result["data"]["TestColumn"] == ["TestValue"]
+    assert "statistics" not in result
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_kusto_graph_query_show_stats_true_includes_statistics(
+    mock_get_kusto_connection: Mock,
+    sample_cluster_uri: str,
+) -> None:
+    mock_client = MagicMock()
+    mock_client.execute.return_value = _mock_kusto_response_with_stats()
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    result = kusto_graph_query(
+        "MyGraph",
+        "| graph-match (n) project labels=labels(n) | take 1",
+        sample_cluster_uri,
+        database="test_db",
+        show_stats=True,
+    )
+
+    assert result["format"] == "columnar"
+    assert result["statistics"]["execution_time_sec"] == 1.234
+    assert (
+        result["statistics"]["cross_cluster_breakdown"]["clustername.region.kusto.windows.net"]["memory_peak_mb"] == 22.1
+    )
