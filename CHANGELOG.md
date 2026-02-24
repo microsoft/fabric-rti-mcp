@@ -1,6 +1,9 @@
 # Release History
 
 ## 0.0.10 (Unreleased)
+### Features
+- Added Kusto Web Explorer deeplink URL to `kusto_query` responses, enabling one-click access to open queries in the Azure Data Explorer Web UI. Supports public, US Government, and China cloud endpoints.
+
 ### Other Changes
 - Use docstring as tool description
 - Add annotations (readonly, destructive)
