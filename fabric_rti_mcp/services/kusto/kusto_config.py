@@ -24,6 +24,7 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
+    custom_watermark = "FABRIC_RTI_KUSTO_CUSTOM_WATERMARK"
 
     @staticmethod
     def all() -> list[str]:
@@ -36,6 +37,7 @@ class KustoEnvVarNames:
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
+            KustoEnvVarNames.custom_watermark,
         ]
 
 

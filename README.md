@@ -300,6 +300,7 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_KNOWN_SERVICES` | Kusto | JSON array of preconfigured Kusto services | None | `[{"service_uri":"https://cluster1.kusto.windows.net","default_database":"DB1","description":"Prod"}]` |
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
+| `FABRIC_RTI_KUSTO_CUSTOM_WATERMARK` | Kusto | JSON object for custom query watermark key-value pairs | None | `{"team": "my-team", "app_id": "env:MY_APP_ID"}` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
 
@@ -327,6 +328,29 @@ https://{your-openai-resource}.openai.azure.com/openai/deployments/{deployment-n
 The `kusto_get_shots` tool retrieves shots that are most similar to your prompt from the shots table. This function requires configuration of:
 - **Shots table**: Should have an "EmbeddingText" (string) column containing the natural language prompt, "AugmentedText" (string) column containing the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector of the EmbeddingText.
 - **Azure OpenAI embedding endpoint**: Used to create embedding vectors for your prompt. Note that this endpoint must use the same model that was used for creating the "EmbeddingVector" column in the shots table.
+
+### Query Watermarking
+
+Kusto queries are automatically watermarked with a JSON comment containing the package version and current user. You can add custom key-value pairs via the `FABRIC_RTI_KUSTO_CUSTOM_WATERMARK` environment variable or the `--custom-watermark` CLI argument (CLI takes priority).
+
+Values can be:
+- **Literal strings** — used as-is, e.g. `"my-team"`
+- **`env:VAR_NAME`** — resolved from an environment variable at runtime, e.g. `"env:MY_APP_ID"`
+
+**Example:**
+```bash
+FABRIC_RTI_KUSTO_CUSTOM_WATERMARK='{"team": "data-eng", "app_id": "env:MY_APP_ID"}'
+```
+
+Or via CLI:
+```bash
+--custom-watermark '{"team": "data-eng", "app_id": "env:MY_APP_ID"}'
+```
+
+This produces a watermark like:
+```
+// {"fabric_rti_mcp_version": "0.1.0", "user": "alice", "app_id": "cool-app-123", "team": "data-eng"}
+```
 
 ## 🔑 Authentication
 

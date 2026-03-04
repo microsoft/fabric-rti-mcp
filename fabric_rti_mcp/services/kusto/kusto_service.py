@@ -14,6 +14,7 @@ from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.services.kusto.kusto_watermark import add_watermark
 
 
 def canonical_entity_type(entity_type: str) -> str:
@@ -168,6 +169,7 @@ def _execute(
 
         # agents can send messy inputs
         query = query.strip()
+        query = add_watermark(query)
 
         database = database or connection.default_database
         database = database.strip()

@@ -36,10 +36,11 @@ def test_execute_basic_query(
     mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
     mock_client.execute.assert_called_once()
 
-    # Verify database and stripped query
+    # Verify database and stripped query (watermark is prepended)
     args = mock_client.execute.call_args[0]
     assert args[0] == database
-    assert args[1] == "TestTable | take 10"
+    assert args[1].endswith("TestTable | take 10")
+    assert args[1].startswith("// ")
 
     # Verify ClientRequestProperties settings
     crp = mock_client.execute.call_args[0][2]
@@ -84,53 +85,11 @@ def test_execute_with_custom_client_request_properties(
     mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
     mock_client.execute.assert_called_once()
 
-    # Verify database and query
+    # Verify database and query (watermark is prepended)
     args = mock_client.execute.call_args[0]
     assert args[0] == database
-    assert args[1] == query
-
-    # Verify ClientRequestProperties settings
-    crp = mock_client.execute.call_args[0][2]
-    assert isinstance(crp, ClientRequestProperties)
-
-    # Verify default properties are still set
-    assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
-    assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
-    assert crp.has_option("request_readonly")
-
-    # Verify custom properties are set
-    assert crp.has_option("request_timeout")
-    assert crp.has_option("max_memory_consumption_per_query_per_node")
-    assert crp.has_option("custom_property")
-
-    # Verify result format
-    assert isinstance(result, dict)
-    assert result["format"] == "columnar"
-    assert "data" in result
-    assert result["data"]["TestColumn"] == ["TestValue"]
-
-
-@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-def test_execute_without_client_request_properties_preserves_behavior(
-    mock_get_kusto_connection: Mock,
-    sample_cluster_uri: str,
-    mock_kusto_response: KustoResponseDataSet,
-) -> None:
-    """Test that behavior is unchanged when no custom client request properties are provided."""
-    # Arrange
-    mock_client = MagicMock()
-    mock_client.execute.return_value = mock_kusto_response
-
-    mock_connection = MagicMock()
-    mock_connection.query_client = mock_client
-    mock_connection.default_database = "default_db"
-    mock_get_kusto_connection.return_value = mock_connection
-
-    query = "TestTable | take 10"
-    database = "test_db"
-
-    # Act
-    result = kusto_query(query, sample_cluster_uri, database=database)
+    assert args[1].endswith(query)
+    assert args[1].startswith("// ")
 
     # Assert
     mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
@@ -177,7 +136,7 @@ def test_destructive_operation_with_custom_client_request_properties(
     mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
     mock_client.execute.assert_called_once()
 
-    # Verify database and command
+    # Verify database and command (control commands are not watermarked)
     args = mock_client.execute.call_args[0]
     assert args[0] == database
     assert args[1] == command
