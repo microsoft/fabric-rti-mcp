@@ -14,6 +14,7 @@ from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.services.kusto.kusto_schema_cache import get_schema_cache
 
 
 def canonical_entity_type(entity_type: str) -> str:
@@ -385,14 +386,25 @@ def kusto_describe_database(
     :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing entity schema information.
     """
-    return _execute(
+    db = database or _DEFAULT_DB_NAME or KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+    query = (
         ".show databases entities with (showObfuscatedStrings=true) "
-        f"| where DatabaseName == '{database or _DEFAULT_DB_NAME}' "
-        "| project EntityName, EntityType, Folder, DocString, CslInputSchema, Content, CslOutputSchema",
-        cluster_uri,
-        database=database,
-        client_request_properties=client_request_properties,
+        f"| where DatabaseName == '{db}' "
+        "| project EntityName, EntityType, Folder, DocString, CslInputSchema, Content, CslOutputSchema"
     )
+
+    cache = get_schema_cache()
+    if cache is not None:
+        cached = cache.get(cluster_uri, db, query)
+        if cached is not None:
+            return cached
+
+    result = _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+    if cache is not None:
+        cache.put(cluster_uri, db, query, result)
+
+    return result
 
 
 def kusto_describe_database_entity(
@@ -416,44 +428,38 @@ def kusto_describe_database_entity(
     """
 
     entity_type = canonical_entity_type(entity_type)
+    db = database or _DEFAULT_DB_NAME or KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+    query: str | None = None
+
     if entity_type.lower() == "table":
-        return _execute(
-            f".show table {entity_name} cslschema",
-            cluster_uri,
-            database=database,
-            client_request_properties=client_request_properties,
-        )
+        query = f".show table {entity_name} cslschema"
     elif entity_type.lower() == "external-table":
-        return _execute(
-            f".show external table {entity_name} cslschema",
-            cluster_uri,
-            database=database,
-            client_request_properties=client_request_properties,
-        )
+        query = f".show external table {entity_name} cslschema"
     elif entity_type.lower() == "function":
-        return _execute(
-            f".show function {entity_name}",
-            cluster_uri,
-            database=database,
-            client_request_properties=client_request_properties,
-        )
+        query = f".show function {entity_name}"
     elif entity_type.lower() == "materialized-view":
-        return _execute(
+        query = (
             f".show materialized-view {entity_name} "
-            "| project Name, SourceTable, Query, LastRun, LastRunResult, IsHealthy, IsEnabled, DocString",
-            cluster_uri,
-            database=database,
-            client_request_properties=client_request_properties,
+            "| project Name, SourceTable, Query, LastRun, LastRunResult, IsHealthy, IsEnabled, DocString"
         )
     elif entity_type.lower() == "graph":
-        return _execute(
-            f".show graph_model {entity_name} details | project Name, Model",
-            cluster_uri,
-            database=database,
-            client_request_properties=client_request_properties,
-        )
-    # Add more entity types as needed
-    return {}
+        query = f".show graph_model {entity_name} details | project Name, Model"
+
+    if query is None:
+        return {}
+
+    cache = get_schema_cache()
+    if cache is not None:
+        cached = cache.get(cluster_uri, db, query)
+        if cached is not None:
+            return cached
+
+    result = _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+    if cache is not None:
+        cache.put(cluster_uri, db, query, result)
+
+    return result
 
 
 def kusto_sample_entity(
