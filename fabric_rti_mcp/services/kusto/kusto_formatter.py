@@ -3,6 +3,7 @@ import io
 import json
 from dataclasses import dataclass
 from typing import Any, cast
+from urllib.parse import urlparse
 
 from azure.kusto.data.response import KustoResponseDataSet
 
@@ -121,6 +122,288 @@ class KustoFormatter:
             lines.append(json.dumps(row_list, separators=(",", ":")))
 
         return KustoResponseFormat(format="header_arrays", data="\n".join(lines))
+
+    @staticmethod
+    def extract_statistics(result_set: KustoResponseDataSet | None) -> dict[str, Any] | None:
+        if not result_set or not getattr(result_set, "tables", None):
+            return None
+
+        for table in result_set.tables:
+            table_kind = getattr(getattr(table, "table_kind", None), "value", getattr(table, "table_kind", None))
+            if table_kind != "QueryCompletionInformation":
+                continue
+
+            parsed_stats = KustoFormatter._extract_statistics_payload(table)
+            if parsed_stats is None:
+                continue
+
+            return KustoFormatter._normalize_statistics(parsed_stats)
+
+        return None
+
+    @staticmethod
+    def _extract_statistics_payload(table: Any) -> dict[str, Any] | None:
+        columns = [getattr(column, "column_name", None) for column in getattr(table, "columns", [])]
+        if not columns:
+            return None
+
+        raw_rows = getattr(table, "raw_rows", None)
+        if raw_rows is None:
+            raw_rows = [list(row) for row in getattr(table, "rows", [])]
+
+        for row in raw_rows:
+            row_values = list(row)
+            row_data = {col_name: row_values[i] if i < len(row_values) else None for i, col_name in enumerate(columns)}
+
+            severity_name = row_data.get("SeverityName")
+            if isinstance(severity_name, str) and severity_name.lower() == "stats":
+                severity_payload = KustoFormatter._parse_json_object(row_data.get("StatusDescription"))
+                if severity_payload is not None:
+                    return severity_payload
+
+            payload = KustoFormatter._parse_json_object(row_data.get("Payload"))
+            if payload is None:
+                continue
+
+            event_type = row_data.get("EventTypeName")
+            if not isinstance(event_type, str):
+                return payload
+
+            if event_type.lower() in {"stats", "queryresourceconsumption", "querycompletioninformation"}:
+                return payload
+
+        return None
+
+    @staticmethod
+    def _normalize_statistics(source: dict[str, Any]) -> dict[str, Any] | None:
+        result: dict[str, Any] = {}
+
+        execution_time = KustoFormatter._to_float(source.get("ExecutionTime"))
+        if execution_time is not None:
+            result["execution_time_sec"] = execution_time
+
+        resource_usage = source.get("resource_usage")
+        if isinstance(resource_usage, dict):
+            cpu = resource_usage.get("cpu")
+            if isinstance(cpu, dict):
+                cpu_result: dict[str, Any] = {}
+                total_cpu = cpu.get("total cpu")
+                if isinstance(total_cpu, str) and total_cpu:
+                    cpu_result["total"] = total_cpu
+
+                breakdown = cpu.get("breakdown")
+                if isinstance(breakdown, dict):
+                    query_execution = breakdown.get("query execution")
+                    if isinstance(query_execution, str) and query_execution:
+                        cpu_result["query_execution"] = query_execution
+
+                    query_planning = breakdown.get("query planning")
+                    if isinstance(query_planning, str) and query_planning:
+                        cpu_result["query_planning"] = query_planning
+
+                if cpu_result:
+                    result["cpu"] = cpu_result
+
+            memory = resource_usage.get("memory")
+            if isinstance(memory, dict):
+                peak_per_node_bytes = KustoFormatter._to_float(memory.get("peak_per_node"))
+                if peak_per_node_bytes is not None:
+                    result["memory_peak_per_node_mb"] = KustoFormatter._bytes_to_megabytes(peak_per_node_bytes)
+
+            cache = resource_usage.get("cache")
+            if isinstance(cache, dict):
+                shards = cache.get("shards")
+                if isinstance(shards, dict):
+                    hot = shards.get("hot")
+                    if isinstance(hot, dict):
+                        cache_result: dict[str, Any] = {}
+                        hit_bytes = KustoFormatter._to_float(hot.get("hitbytes"))
+                        if hit_bytes is not None:
+                            cache_result["hot_hit_mb"] = KustoFormatter._bytes_to_megabytes(hit_bytes)
+
+                        miss_bytes = KustoFormatter._to_float(hot.get("missbytes"))
+                        if miss_bytes is not None:
+                            cache_result["hot_miss_mb"] = KustoFormatter._bytes_to_megabytes(miss_bytes)
+
+                        if cache_result:
+                            result["cache"] = cache_result
+
+            network = resource_usage.get("network")
+            if isinstance(network, dict):
+                network_result: dict[str, Any] = {}
+                cross_cluster_total_bytes = KustoFormatter._to_float(network.get("cross_cluster_total_bytes"))
+                if cross_cluster_total_bytes is not None:
+                    network_result["cross_cluster_mb"] = KustoFormatter._bytes_to_megabytes(cross_cluster_total_bytes)
+
+                inter_cluster_total_bytes = KustoFormatter._to_float(network.get("inter_cluster_total_bytes"))
+                if inter_cluster_total_bytes is not None:
+                    network_result["inter_cluster_mb"] = KustoFormatter._bytes_to_megabytes(inter_cluster_total_bytes)
+
+                if network_result:
+                    result["network"] = network_result
+
+        input_dataset_statistics = source.get("input_dataset_statistics")
+        if isinstance(input_dataset_statistics, dict):
+            extents = input_dataset_statistics.get("extents")
+            if isinstance(extents, dict):
+                extents_result: dict[str, Any] = {}
+                scanned_extents = KustoFormatter._to_int(extents.get("scanned"))
+                if scanned_extents is not None:
+                    extents_result["scanned"] = scanned_extents
+
+                total_extents = KustoFormatter._to_int(extents.get("total"))
+                if total_extents is not None:
+                    extents_result["total"] = total_extents
+
+                if extents_result:
+                    result["extents"] = extents_result
+
+            rows = input_dataset_statistics.get("rows")
+            if isinstance(rows, dict):
+                rows_result: dict[str, Any] = {}
+                scanned_rows = KustoFormatter._to_int(rows.get("scanned"))
+                if scanned_rows is not None:
+                    rows_result["scanned"] = scanned_rows
+
+                total_rows = KustoFormatter._to_int(rows.get("total"))
+                if total_rows is not None:
+                    rows_result["total"] = total_rows
+
+                if rows_result:
+                    result["rows"] = rows_result
+
+        dataset_statistics = source.get("dataset_statistics")
+        if isinstance(dataset_statistics, list) and dataset_statistics:
+            first_dataset = dataset_statistics[0]
+            if isinstance(first_dataset, dict):
+                result_dataset: dict[str, Any] = {}
+                table_row_count = KustoFormatter._to_int(first_dataset.get("table_row_count"))
+                if table_row_count is not None:
+                    result_dataset["row_count"] = table_row_count
+
+                table_size_bytes = KustoFormatter._to_float(first_dataset.get("table_size"))
+                if table_size_bytes is not None:
+                    result_dataset["size_kb"] = KustoFormatter._bytes_to_kilobytes(table_size_bytes)
+
+                if result_dataset:
+                    result["result"] = result_dataset
+
+        cross_cluster_resource_usage = source.get("cross_cluster_resource_usage")
+        if isinstance(cross_cluster_resource_usage, dict):
+            cross_cluster_result: dict[str, Any] = {}
+            for cluster_identifier, cluster_usage in cross_cluster_resource_usage.items():
+                if not isinstance(cluster_usage, dict):
+                    continue
+
+                cluster_result: dict[str, Any] = {}
+                cpu = cluster_usage.get("cpu")
+                if isinstance(cpu, dict):
+                    total_cpu = cpu.get("total cpu")
+                    if isinstance(total_cpu, str) and total_cpu:
+                        cluster_result["cpu_total"] = total_cpu
+
+                memory = cluster_usage.get("memory")
+                if isinstance(memory, dict):
+                    peak_per_node_bytes = KustoFormatter._to_float(memory.get("peak_per_node"))
+                    if peak_per_node_bytes is not None:
+                        cluster_result["memory_peak_mb"] = KustoFormatter._bytes_to_megabytes(peak_per_node_bytes)
+
+                cache = cluster_usage.get("cache")
+                if isinstance(cache, dict):
+                    shards = cache.get("shards")
+                    if isinstance(shards, dict):
+                        hot = shards.get("hot")
+                        if isinstance(hot, dict):
+                            hit_bytes = KustoFormatter._to_float(hot.get("hitbytes"))
+                            if hit_bytes is not None:
+                                cluster_result["cache_hit_mb"] = KustoFormatter._bytes_to_megabytes(hit_bytes)
+
+                            miss_bytes = KustoFormatter._to_float(hot.get("missbytes"))
+                            if miss_bytes is not None:
+                                cluster_result["cache_miss_mb"] = KustoFormatter._bytes_to_megabytes(miss_bytes)
+
+                if not cluster_result:
+                    continue
+
+                cluster_name = KustoFormatter._normalize_cluster_name(str(cluster_identifier))
+                if cluster_name:
+                    cross_cluster_result[cluster_name] = cluster_result
+
+            if cross_cluster_result:
+                result["cross_cluster_breakdown"] = cross_cluster_result
+
+        return result or None
+
+    @staticmethod
+    def _parse_json_object(raw_value: Any) -> dict[str, Any] | None:
+        if isinstance(raw_value, dict):
+            return raw_value
+
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            return None
+
+        try:
+            parsed = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return None
+
+        return parsed if isinstance(parsed, dict) else None
+
+    @staticmethod
+    def _to_float(value: Any) -> float | None:
+        if isinstance(value, bool):
+            return None
+
+        if isinstance(value, (int, float)):
+            return float(value)
+
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+
+        return None
+
+    @staticmethod
+    def _to_int(value: Any) -> int | None:
+        if isinstance(value, bool):
+            return None
+
+        if isinstance(value, int):
+            return value
+
+        if isinstance(value, float):
+            return int(value)
+
+        if isinstance(value, str):
+            try:
+                return int(float(value))
+            except ValueError:
+                return None
+
+        return None
+
+    @staticmethod
+    def _bytes_to_megabytes(value: float) -> float:
+        return round(value / 1048576, 2)
+
+    @staticmethod
+    def _bytes_to_kilobytes(value: float) -> float:
+        return round(value / 1024, 2)
+
+    @staticmethod
+    def _normalize_cluster_name(cluster_identifier: str) -> str:
+        parsed_uri = urlparse(cluster_identifier)
+        if parsed_uri.netloc:
+            return parsed_uri.netloc
+
+        normalized = cluster_identifier.strip().rstrip("/")
+        if normalized.lower().startswith("https://"):
+            return normalized[8:]
+        if normalized.lower().startswith("http://"):
+            return normalized[7:]
+        return normalized
 
     @staticmethod
     def parse(response: KustoResponseFormat | dict[str, Any]) -> list[dict[str, Any]] | None:

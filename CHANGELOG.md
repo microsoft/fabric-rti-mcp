@@ -1,6 +1,9 @@
 # Release History
 
 ## 0.0.10 (Unreleased)
+### Features
+- **Kusto query statistics**: Add optional `show_stats` parameter to `kusto_query` and `kusto_graph_query`. When `True`, the response includes a top-level `statistics` key with execution time, CPU, memory, cache, network, extents/rows scanned, result size, and per-cluster cross-cluster breakdown — extracted from the `QueryCompletionInformation` tables returned by the SDK.
+
 ### Other Changes
 - Use docstring as tool description
 - Add annotations (readonly, destructive)
