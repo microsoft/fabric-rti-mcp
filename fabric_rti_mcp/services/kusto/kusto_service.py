@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import functools
 import inspect
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict
+from datetime import timedelta
 from typing import Any, TypeVar
 
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
@@ -120,6 +122,56 @@ def destructive_operation(func: F) -> F:
     return wrapper  # type: ignore
 
 
+def _parse_timespan_to_timedelta(value: Any) -> timedelta:
+    """Convert a timespan string or numeric value to a timedelta.
+
+    The Azure Kusto SDK expects ``servertimeout`` to be a ``timedelta`` object
+    (it performs arithmetic with it in ``client_base.py``).  Users, however,
+    commonly pass strings like ``"00:03:00"`` or ``"3m"`` via
+    ``client_request_properties``.  This helper bridges that gap.
+
+    Supported formats:
+    - ``timedelta`` — returned as-is.
+    - ``int`` / ``float`` — interpreted as seconds.
+    - ``"HH:MM:SS"`` or ``"H:MM:SS"`` — standard timespan.
+    - ``"Xh"`` / ``"Xm"`` / ``"Xs"`` — shorthand.
+    - Numeric string — interpreted as seconds.
+    """
+    if isinstance(value, timedelta):
+        return value
+    if isinstance(value, (int, float)):
+        return timedelta(seconds=value)
+    if isinstance(value, str):
+        text = value.strip()
+        # "HH:MM:SS" or "H:MM:SS"
+        match = re.match(r"^(\d+):(\d+):(\d+)$", text)
+        if match:
+            return timedelta(
+                hours=int(match.group(1)),
+                minutes=int(match.group(2)),
+                seconds=int(match.group(3)),
+            )
+        # Shorthand: "3m", "180s", "1h"
+        match = re.match(r"^(\d+)\s*([hms])$", text, re.IGNORECASE)
+        if match:
+            amount = int(match.group(1))
+            unit = match.group(2).lower()
+            if unit == "h":
+                return timedelta(hours=amount)
+            if unit == "m":
+                return timedelta(minutes=amount)
+            return timedelta(seconds=amount)
+        # Plain numeric string
+        try:
+            return timedelta(seconds=float(text))
+        except ValueError:
+            pass
+    raise ValueError(
+        f"Cannot parse servertimeout value: {value!r}. "
+        "Use a timedelta, 'HH:MM:SS', 'Xm', 'Xs', 'Xh', or numeric seconds."
+    )
+
+
 def _crp(
     action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: dict[str, Any] | None = None
 ) -> ClientRequestProperties:
@@ -131,16 +183,16 @@ def _crp(
 
     # Set global timeout if configured
     if CONFIG.timeout_seconds is not None:
-        # Convert seconds to timespan format (HH:MM:SS)
-        hours, remainder = divmod(CONFIG.timeout_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        crp.set_option("servertimeout", timeout_str)
+        crp.set_option("servertimeout", timedelta(seconds=CONFIG.timeout_seconds))
 
     # Apply any additional client request properties provided by the user
     # User properties can override global settings
     if client_request_properties:
         for key, value in client_request_properties.items():
+            # The Azure Kusto SDK expects servertimeout as a timedelta object —
+            # it adds client_server_delta (timedelta) to it in client_base.py.
+            if key == ClientRequestProperties.request_timeout_option_name:
+                value = _parse_timespan_to_timedelta(value)
             crp.set_option(key, value)
 
     return crp

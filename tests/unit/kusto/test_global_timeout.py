@@ -54,10 +54,11 @@ def test_global_timeout_applied_to_query(mock_get_connection: Mock) -> None:
     crp = call_args[0][2]  # Third argument should be ClientRequestProperties
 
     assert isinstance(crp, ClientRequestProperties)
-    # The timeout should be set as server timeout option in HH:MM:SS format
-    # 600 seconds = 10 minutes = 00:10:00
-    expected_timeout = "00:10:00"
-    assert crp._options.get("servertimeout") == expected_timeout
+    # The timeout should be set as a timedelta (the Azure Kusto SDK requires this)
+    # 600 seconds = 10 minutes
+    from datetime import timedelta
+
+    assert crp._options.get("servertimeout") == timedelta(seconds=600)
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
