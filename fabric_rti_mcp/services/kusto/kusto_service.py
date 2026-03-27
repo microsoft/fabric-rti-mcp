@@ -148,10 +148,7 @@ def _parse_timespan_to_timedelta(value: Any) -> timedelta:
                 minutes=int(match.group(2)),
                 seconds=int(match.group(3)),
             )
-    raise ValueError(
-        f"Cannot parse servertimeout value: {value!r}. "
-        "Use a timedelta, 'HH:MM:SS', or numeric seconds."
-    )
+    raise ValueError(f"Cannot parse servertimeout value: {value!r}. Use a timedelta, 'HH:MM:SS', or numeric seconds.")
 
 
 def _crp(
