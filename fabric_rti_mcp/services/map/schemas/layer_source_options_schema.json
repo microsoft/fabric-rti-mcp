@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Layer Source Options",
+  "description": "Configuration options for layer sources (data sources). This object should be JSON.stringify'd and stored in layerSources[].options as a string.",
+  "type": "object",
+  "properties": {
+    "cluster": {
+      "type": "boolean",
+      "description": "Whether to cluster point features. Only applicable for GeoJSON sources with point geometries",
+      "default": false
+    },
+    "clusterRadius": {
+      "type": "number",
+      "description": "Radius of each cluster in pixels when clustering is enabled",
+      "minimum": 1,
+      "maximum": 500,
+      "default": 50,
+      "examples": [50, 80, 100]
+    },
+    "clusterMaxZoom": {
+      "type": "number",
+      "description": "Maximum zoom level at which to cluster points. Beyond this zoom, points are shown individually",
+      "minimum": 0,
+      "maximum": 23,
+      "default": 14,
+      "examples": [12, 14, 16]
+    },
+    "clusterField": {
+      "type": "string",
+      "description": "Property name to use for cluster aggregation (custom property)",
+      "examples": ["population", "count", "value"]
+    },
+    "clusterType": {
+      "type": "string",
+      "description": "Type of clustering aggregation (custom property)",
+      "enum": ["sum", "avg", "min", "max", "count"],
+      "examples": ["sum", "avg", "count"]
+    },
+    "tolerance": {
+      "type": "number",
+      "description": "Douglas-Peucker simplification tolerance for GeoJSON sources (higher = more simplified)",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.375,
+      "examples": [0.375, 0.5, 0.75]
+    },
+    "buffer": {
+      "type": "number",
+      "description": "Tile buffer on each side in pixels (helps prevent rendering artifacts at tile boundaries)",
+      "minimum": 0,
+      "maximum": 512,
+      "default": 128,
+      "examples": [64, 128, 256]
+    },
+    "lineMetrics": {
+      "type": "boolean",
+      "description": "Whether to calculate line distance metrics. Required for gradient line styling",
+      "default": false
+    },
+    "generateId": {
+      "type": "boolean",
+      "description": "Whether to automatically generate feature IDs if not present in the data",
+      "default": false
+    },
+    "clusterProperties": {
+      "type": "object",
+      "description": "Object defining custom cluster properties for aggregations. Each property is defined as a two-element array: [reduce_expression, map_expression]. THIS PROPERTY IS LAST RESORT. Use with caution and only when the built-in aggregations are insufficient. For most cases, use the built-in clusterField and clusterType options.",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2
+      },
+      "examples": [
+        {
+          "sum_population": ["+", ["get", "population"]],
+          "max_value": ["max", ["get", "value"]],
+          "avg_score": [
+            ["/", ["+", ["get", "score"]], ["get", "point_count"]],
+            ["get", "score"]
+          ]
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "comment": "Basic GeoJSON source without clustering",
+      "cluster": false,
+      "tolerance": 0.375,
+      "buffer": 128,
+      "generateId": false
+    },
+    {
+      "comment": "GeoJSON source with basic point clustering",
+      "cluster": true,
+      "clusterRadius": 50,
+      "clusterMaxZoom": 14,
+      "tolerance": 0.375,
+      "buffer": 128,
+      "generateId": true
+    },
+    {
+      "comment": "GeoJSON source with advanced clustering and aggregations",
+      "cluster": true,
+      "clusterRadius": 80,
+      "clusterMaxZoom": 16,
+      "clusterProperties": {
+        "sum_population": ["+", ["get", "population"]],
+        "max_temperature": ["max", ["get", "temperature"]],
+        "avg_rating": [
+          ["/", ["+", ["get", "rating"]], ["get", "point_count"]],
+          ["get", "rating"]
+        ]
+      },
+      "tolerance": 0.375,
+      "buffer": 128,
+      "generateId": true
+    },
+    {
+      "comment": "GeoJSON source for lines with gradient support",
+      "cluster": false,
+      "lineMetrics": true,
+      "tolerance": 0.5,
+      "buffer": 256,
+      "generateId": false
+    },
+    {
+      "comment": "High-precision GeoJSON source with minimal simplification",
+      "cluster": false,
+      "tolerance": 0.1,
+      "buffer": 256,
+      "generateId": true
+    },
+    {
+      "comment": "Dense clustering for large datasets",
+      "cluster": true,
+      "clusterRadius": 100,
+      "clusterMaxZoom": 12,
+      "clusterField": "value",
+      "clusterType": "sum",
+      "tolerance": 0.75,
+      "buffer": 64,
+      "generateId": true
+    }
+  ],
+  "notes": {
+    "clustering": "Clustering is only effective for point geometries in GeoJSON sources. It does not apply to LineString or Polygon geometries.",
+    "performance": "Higher tolerance values (0.5-1.0) simplify geometries more aggressively, improving performance but reducing detail. Lower values (0.1-0.3) preserve more detail at the cost of performance.",
+    "clusterProperties": "Custom cluster properties allow you to aggregate numeric data within clusters. Common operations include sum, max, min, and average calculations.",
+    "tileBuffer": "Increasing the buffer (e.g., 256 or 512) can help prevent rendering artifacts at tile boundaries, especially for thick lines or large symbols, but increases memory usage.",
+    "lineMetrics": "Enable lineMetrics if you plan to use gradient line styling or need distance-based line styling. Has a performance cost.",
+    "pmtiles": "PMTiles and vector tile sources do not use these options. They use their own tile-level configuration.",
+    "kusto": "Kusto (real-time) sources do not use these options. Clustering and other source-level configurations are not applicable."
+  }
+}
