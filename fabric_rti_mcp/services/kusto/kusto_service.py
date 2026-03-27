@@ -13,6 +13,7 @@ from fabric_rti_mcp import __version__  # type: ignore
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
+from fabric_rti_mcp.services.kusto.kusto_deeplink import build_web_explorer_url
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
 
 
@@ -207,9 +208,14 @@ def kusto_query(
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
     :param client_request_properties: Optional dictionary of additional client request properties.
-    :return: The result of the query execution as a list of dictionaries (json).
+    :return: The result of the query execution as a dict with format, data, and web_explorer_url.
+        web_explorer_url is a deeplink to open the query in Azure Data Explorer Web UI,
+        or null if the cluster domain is unrecognized.
     """
-    return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
+    result = _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
+    resolved_database = database or get_kusto_connection(cluster_uri).default_database
+    result["web_explorer_url"] = build_web_explorer_url(cluster_uri, resolved_database, query.strip())
+    return result
 
 
 def kusto_graph_query(

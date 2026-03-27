@@ -33,7 +33,7 @@ def test_execute_basic_query(
     result = kusto_query(query, sample_cluster_uri, database=database)
 
     # Assert
-    mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
+    mock_get_kusto_connection.assert_called_with(sample_cluster_uri)
     mock_client.execute.assert_called_once()
 
     # Verify database and stripped query
@@ -51,6 +51,10 @@ def test_execute_basic_query(
     # Verify result format
     assert result["format"] == "columnar"
     assert result["data"]["TestColumn"][0] == "TestValue"
+
+    # Verify deeplink is present for .kusto.windows.net cluster
+    assert result["web_explorer_url"] is not None
+    assert result["web_explorer_url"].startswith("https://dataexplorer.azure.com/clusters/test.kusto.windows.net/databases/test_db?query=")
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
