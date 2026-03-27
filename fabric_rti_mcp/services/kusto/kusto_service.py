@@ -152,6 +152,7 @@ def _execute(
     readonly_override: bool = False,
     database: str | None = None,
     client_request_properties: dict[str, Any] | None = None,
+    show_stats: bool = False,
 ) -> dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
@@ -173,7 +174,14 @@ def _execute(
         database = database.strip()
 
         result_set = client.execute(database, query, crp)
-        return asdict(KustoFormatter.to_columnar(result_set))
+        result = asdict(KustoFormatter.to_columnar(result_set))
+
+        if show_stats:
+            statistics = KustoFormatter.extract_statistics(result_set)
+            if statistics is not None:
+                result["statistics"] = statistics
+
+        return result
 
     except Exception as e:
         error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"
@@ -198,6 +206,7 @@ def kusto_query(
     cluster_uri: str,
     database: str | None = None,
     client_request_properties: dict[str, Any] | None = None,
+    show_stats: bool = False,
 ) -> dict[str, Any]:
     """
     Executes a KQL query on the specified database. If no database is provided,
@@ -207,9 +216,16 @@ def kusto_query(
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
     :param client_request_properties: Optional dictionary of additional client request properties.
+    :param show_stats: Optional flag to include query execution statistics.
     :return: The result of the query execution as a list of dictionaries (json).
     """
-    return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
+    return _execute(
+        query,
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+        show_stats=show_stats,
+    )
 
 
 def kusto_graph_query(
@@ -218,6 +234,7 @@ def kusto_graph_query(
     cluster_uri: str,
     database: str | None,
     client_request_properties: dict[str, Any] | None = None,
+    show_stats: bool = False,
 ) -> dict[str, Any]:
     """
     Intelligently executes a graph query using snapshots if they exist,
@@ -230,6 +247,7 @@ def kusto_graph_query(
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
     :param client_request_properties: Optional dictionary of additional client request properties.
+    :param show_stats: Optional flag to include query execution statistics.
     :return: List of dictionaries containing query results.
 
     Critical:
@@ -284,7 +302,13 @@ def kusto_graph_query(
     query = (
         f"graph('{graph_name}') {query}"  # todo: this should properly choose between graph() and make-graph operator
     )
-    return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
+    return _execute(
+        query,
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+        show_stats=show_stats,
+    )
 
 
 @destructive_operation

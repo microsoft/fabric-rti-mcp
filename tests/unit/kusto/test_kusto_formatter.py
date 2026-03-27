@@ -1,3 +1,4 @@
+import json
 from typing import Any
 from unittest.mock import Mock
 
@@ -381,3 +382,95 @@ class TestParsingFunctionality:
         header_arrays_result = KustoFormatter.to_header_arrays(mock_result_set)
         parsed_header_arrays = KustoFormatter.parse(header_arrays_result)
         assert parsed_header_arrays == expected_data
+
+
+class TestStatisticsExtraction:
+    def test_extract_statistics_from_query_completion_information(self) -> None:
+        stats_payload = {
+            "ExecutionTime": 1.234,
+            "resource_usage": {
+                "cpu": {
+                    "total cpu": "00:00:01.5",
+                    "breakdown": {"query execution": "00:00:01.2", "query planning": "00:00:00.3"},
+                },
+                "memory": {"peak_per_node": 47395635},
+                "cache": {"shards": {"hot": {"hitbytes": 126353408, "missbytes": 3355443}}},
+                "network": {"cross_cluster_total_bytes": 5452595, "inter_cluster_total_bytes": 0},
+            },
+            "input_dataset_statistics": {
+                "extents": {"scanned": 42, "total": 1000},
+                "rows": {"scanned": 50000, "total": 1000000},
+            },
+            "dataset_statistics": [{"table_row_count": 150, "table_size": 12800}],
+            "cross_cluster_resource_usage": {
+                "https://clustername.region.kusto.windows.net/": {
+                    "cpu": {"total cpu": "00:00:00.8"},
+                    "memory": {"peak_per_node": 23173530},
+                    "cache": {"shards": {"hot": {"hitbytes": 52428800, "missbytes": 1048576}}},
+                }
+            },
+        }
+
+        severity_name = Mock()
+        severity_name.column_name = "SeverityName"
+        status_description = Mock()
+        status_description.column_name = "StatusDescription"
+
+        stats_table = Mock()
+        stats_table.table_kind = Mock(value="QueryCompletionInformation")
+        stats_table.columns = [severity_name, status_description]
+        stats_table.raw_rows = [
+            ["Info", "Query completed"],
+            ["Stats", json.dumps(stats_payload)],
+        ]
+
+        result_set = Mock(spec=KustoResponseDataSet)
+        result_set.tables = [stats_table]
+
+        result = KustoFormatter.extract_statistics(result_set)
+
+        assert result is not None
+        assert result["execution_time_sec"] == 1.234
+        assert result["memory_peak_per_node_mb"] == 45.2
+        assert result["network"]["cross_cluster_mb"] == 5.2
+        assert result["cross_cluster_breakdown"]["clustername.region.kusto.windows.net"]["cpu_total"] == "00:00:00.8"
+        assert result["cross_cluster_breakdown"]["clustername.region.kusto.windows.net"]["memory_peak_mb"] == 22.1
+        assert result["cross_cluster_breakdown"]["clustername.region.kusto.windows.net"]["cache_hit_mb"] == 50.0
+        assert result["cross_cluster_breakdown"]["clustername.region.kusto.windows.net"]["cache_miss_mb"] == 1.0
+
+    def test_extract_statistics_with_payload_column(self) -> None:
+        stats_payload = {"ExecutionTime": 2.5}
+
+        event_type_name = Mock()
+        event_type_name.column_name = "EventTypeName"
+        payload = Mock()
+        payload.column_name = "Payload"
+
+        stats_table = Mock()
+        stats_table.table_kind = Mock(value="QueryCompletionInformation")
+        stats_table.columns = [event_type_name, payload]
+        stats_table.raw_rows = [["QueryResourceConsumption", json.dumps(stats_payload)]]
+
+        result_set = Mock(spec=KustoResponseDataSet)
+        result_set.tables = [stats_table]
+
+        result = KustoFormatter.extract_statistics(result_set)
+
+        assert result is not None
+        assert result["execution_time_sec"] == 2.5
+
+    def test_extract_statistics_returns_none_when_unavailable(self) -> None:
+        severity_name = Mock()
+        severity_name.column_name = "SeverityName"
+        status_description = Mock()
+        status_description.column_name = "StatusDescription"
+
+        stats_table = Mock()
+        stats_table.table_kind = Mock(value="QueryCompletionInformation")
+        stats_table.columns = [severity_name, status_description]
+        stats_table.raw_rows = [["Info", "Query completed"]]
+
+        result_set = Mock(spec=KustoResponseDataSet)
+        result_set.tables = [stats_table]
+
+        assert KustoFormatter.extract_statistics(result_set) is None
