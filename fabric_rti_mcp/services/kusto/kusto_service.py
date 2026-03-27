@@ -122,53 +122,35 @@ def destructive_operation(func: F) -> F:
     return wrapper  # type: ignore
 
 
-def _parse_timespan_to_timedelta(value: Any) -> timedelta:
-    """Convert a timespan string or numeric value to a timedelta.
+_TIMESPAN_RE = re.compile(r"^(\d+):(\d+):(\d+)$")
 
-    The Azure Kusto SDK expects ``servertimeout`` to be a ``timedelta`` object
-    (it performs arithmetic with it in ``client_base.py``).  Users, however,
-    commonly pass strings like ``"00:03:00"`` or ``"3m"`` via
-    ``client_request_properties``.  This helper bridges that gap.
+
+def _parse_timespan_to_timedelta(value: Any) -> timedelta:
+    """Convert a timespan value to a timedelta for the Azure Kusto SDK.
+
+    The SDK expects ``servertimeout`` to be a ``timedelta`` object
+    (it performs arithmetic with it in ``client_base.py``).
 
     Supported formats:
     - ``timedelta`` — returned as-is.
     - ``int`` / ``float`` — interpreted as seconds.
-    - ``"HH:MM:SS"`` or ``"H:MM:SS"`` — standard timespan.
-    - ``"Xh"`` / ``"Xm"`` / ``"Xs"`` — shorthand.
-    - Numeric string — interpreted as seconds.
+    - ``"HH:MM:SS"`` — standard timespan string.
     """
     if isinstance(value, timedelta):
         return value
     if isinstance(value, (int, float)):
         return timedelta(seconds=value)
     if isinstance(value, str):
-        text = value.strip()
-        # "HH:MM:SS" or "H:MM:SS"
-        match = re.match(r"^(\d+):(\d+):(\d+)$", text)
+        match = _TIMESPAN_RE.match(value.strip())
         if match:
             return timedelta(
                 hours=int(match.group(1)),
                 minutes=int(match.group(2)),
                 seconds=int(match.group(3)),
             )
-        # Shorthand: "3m", "180s", "1h"
-        match = re.match(r"^(\d+)\s*([hms])$", text, re.IGNORECASE)
-        if match:
-            amount = int(match.group(1))
-            unit = match.group(2).lower()
-            if unit == "h":
-                return timedelta(hours=amount)
-            if unit == "m":
-                return timedelta(minutes=amount)
-            return timedelta(seconds=amount)
-        # Plain numeric string
-        try:
-            return timedelta(seconds=float(text))
-        except ValueError:
-            pass
     raise ValueError(
         f"Cannot parse servertimeout value: {value!r}. "
-        "Use a timedelta, 'HH:MM:SS', 'Xm', 'Xs', 'Xh', or numeric seconds."
+        "Use a timedelta, 'HH:MM:SS', or numeric seconds."
     )
 
 

@@ -1,6 +1,7 @@
 """Test global timeout configuration for Kusto tools."""
 
 import os
+from datetime import timedelta
 from unittest.mock import Mock, patch
 
 from azure.kusto.data import ClientRequestProperties
@@ -32,8 +33,7 @@ def test_config_no_timeout_env() -> None:
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_global_timeout_applied_to_query(mock_get_connection: Mock) -> None:
-    """Test that global timeout is applied to Kusto queries."""
-    # Mock connection
+    """Test that global timeout is applied to Kusto queries as timedelta."""
     mock_connection = Mock()
     mock_connection.default_database = "TestDB"
     mock_client = Mock()
@@ -43,28 +43,20 @@ def test_global_timeout_applied_to_query(mock_get_connection: Mock) -> None:
     mock_connection.query_client = mock_client
     mock_get_connection.return_value = mock_connection
 
-    # Mock the kusto config with timeout
     with patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG") as mock_config:
         mock_config.timeout_seconds = 600
         kusto_query("TestQuery", "https://test.kusto.windows.net")
 
-    # Verify that execute was called with ClientRequestProperties
     mock_client.execute.assert_called_once()
-    call_args = mock_client.execute.call_args
-    crp = call_args[0][2]  # Third argument should be ClientRequestProperties
+    crp = mock_client.execute.call_args[0][2]
 
     assert isinstance(crp, ClientRequestProperties)
-    # The timeout should be set as a timedelta (the Azure Kusto SDK requires this)
-    # 600 seconds = 10 minutes
-    from datetime import timedelta
-
     assert crp._options.get("servertimeout") == timedelta(seconds=600)
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_no_timeout_when_not_configured(mock_get_connection: Mock) -> None:
     """Test that no timeout is set when not configured."""
-    # Mock connection
     mock_connection = Mock()
     mock_connection.default_database = "TestDB"
     mock_client = Mock()
@@ -74,18 +66,12 @@ def test_no_timeout_when_not_configured(mock_get_connection: Mock) -> None:
     mock_connection.query_client = mock_client
     mock_get_connection.return_value = mock_connection
 
-    # Mock format_results_as_json to return expected result
-
-    # Mock the kusto config without timeout
     with patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG") as mock_config:
         mock_config.timeout_seconds = None
         kusto_query("TestQuery", "https://test.kusto.windows.net")
 
-    # Verify that execute was called with ClientRequestProperties
     mock_client.execute.assert_called_once()
-    call_args = mock_client.execute.call_args
-    crp = call_args[0][2]  # Third argument should be ClientRequestProperties
+    crp = mock_client.execute.call_args[0][2]
 
     assert isinstance(crp, ClientRequestProperties)
-    # No timeout should be set
     assert "servertimeout" not in crp._options
