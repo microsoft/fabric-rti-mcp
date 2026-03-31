@@ -345,7 +345,7 @@ def kusto_deeplink_from_query(
     cluster_uri: str,
     database: str,
     query: str,
-) -> dict[str, Any]:
+) -> str | None:
     """
     Build a deeplink URL that opens the given KQL query in the appropriate web explorer UI.
 
@@ -358,13 +358,7 @@ def kusto_deeplink_from_query(
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: The database name.
     :param query: The KQL query text.
-    :return: A dict with 'web_explorer_url' (string or null) and 'offering' (the detected cluster type).
-
-    Example output:
-    {
-        "web_explorer_url": "https://dataexplorer.azure.com/clusters/help.kusto.windows.net/databases/Samples?query=...",
-        "offering": "Azure Data Explorer"
-    }
+    :return: A deeplink URL string, or None if the cluster type could not be determined.
     """
     _validate_deeplink_inputs(cluster_uri, database, query)
 
@@ -376,17 +370,13 @@ def kusto_deeplink_from_query(
         if offering is None:
             offering = _detect_offering_via_show_version(cluster_uri)
 
-    url = None
     query = query.strip()
     if offering == OFFERING_ADX:
-        url = _build_adx_deeplink(cluster_uri, database, query)
+        return _build_adx_deeplink(cluster_uri, database, query)
     elif offering == OFFERING_FABRIC:
-        url = _build_fabric_deeplink(global_config.fabric_base_url, cluster_uri, database, query)
+        return _build_fabric_deeplink(global_config.fabric_base_url, cluster_uri, database, query)
 
-    return {
-        "web_explorer_url": url,
-        "offering": offering,
-    }
+    return None
 
 
 def _validate_deeplink_inputs(cluster_uri: str, database: str, query: str) -> None:
