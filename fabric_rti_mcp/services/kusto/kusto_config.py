@@ -24,6 +24,7 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
+    deeplink_style = "FABRIC_RTI_KUSTO_DEEPLINK_STYLE"
 
     @staticmethod
     def all() -> list[str]:
@@ -36,6 +37,7 @@ class KustoEnvVarNames:
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
+            KustoEnvVarNames.deeplink_style,
         ]
 
 
@@ -55,6 +57,8 @@ class KustoConfig:
     allow_unknown_services: bool = True
     # Global timeout for all Kusto operations in seconds
     timeout_seconds: int | None = None
+    # Override deeplink style detection. Valid values: "adx", "fabric".
+    deeplink_style: str | None = None
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -92,6 +96,18 @@ class KustoConfig:
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse {KustoEnvVarNames.known_services}: {e}. Skipping known services.")
 
+        deeplink_style = None
+        deeplink_style_env = os.getenv(KustoEnvVarNames.deeplink_style)
+        if deeplink_style_env:
+            normalized = deeplink_style_env.strip().lower()
+            if normalized in ("adx", "fabric"):
+                deeplink_style = normalized
+            else:
+                logger.warning(
+                    f"Invalid {KustoEnvVarNames.deeplink_style}='{deeplink_style_env}'. "
+                    "Expected 'adx' or 'fabric'. Ignoring override."
+                )
+
         return KustoConfig(
             default_service,
             open_ai_embedding_endpoint,
@@ -99,6 +115,7 @@ class KustoConfig:
             eager_connect,
             allow_unknown_services,
             timeout_seconds,
+            deeplink_style,
         )
 
     @staticmethod

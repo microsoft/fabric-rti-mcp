@@ -1,19 +1,148 @@
 from __future__ import annotations
 
+import base64
 import functools
+import gzip
 import inspect
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict
 from typing import Any, TypeVar
+from urllib.parse import quote, urlparse
 
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
-from fabric_rti_mcp.config import logger
+from fabric_rti_mcp.config import global_config, logger
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
+
+# ── Deeplink constants ──────────────────────────────────────────────────────────
+
+_MAX_URL_LENGTH = 8000
+
+OFFERING_ADX = "Azure Data Explorer"
+OFFERING_FABRIC = "Microsoft Fabric Eventhouse"
+
+_DEEPLINK_STYLE_MAP: dict[str, str] = {
+    "adx": OFFERING_ADX,
+    "fabric": OFFERING_FABRIC,
+}
+
+_PUBLIC_EXPLORER_BASE = "https://dataexplorer.azure.com"
+
+# Cloud domain suffix → Web Explorer base URL mapping.
+# .kusto.fabric.microsoft.com is intentionally excluded — Fabric uses a different deeplink format.
+_ADX_CLOUD_MAPPINGS: list[tuple[str, str]] = [
+    (".kusto.windows.net", _PUBLIC_EXPLORER_BASE),
+    (".kustodev.windows.net", _PUBLIC_EXPLORER_BASE),
+    (".kustomfa.windows.net", _PUBLIC_EXPLORER_BASE),
+    (".kusto.data.microsoft.com", _PUBLIC_EXPLORER_BASE),
+    (".kusto.azuresynapse.net", _PUBLIC_EXPLORER_BASE),
+]
+
+
+# ── Deeplink helpers ────────────────────────────────────────────────────────────
+
+
+def _encode_query(query: str) -> str:
+    """Encode a KQL query via UTF-8 → gzip → base64 → URL-encode for deeplink URLs."""
+    compressed = gzip.compress(query.encode("utf-8"))
+    b64 = base64.b64encode(compressed).decode("ascii")
+    return quote(b64, safe="")
+
+
+def _detect_offering_from_uri(cluster_uri: str) -> str | None:
+    """
+    Detect the cluster offering type from its URI.
+
+    Returns OFFERING_FABRIC if the host contains '.fabric.',
+    OFFERING_ADX if it matches a known ADX domain suffix, or None.
+    """
+    try:
+        parsed = urlparse(cluster_uri)
+        host = parsed.hostname
+        if not host:
+            return None
+    except Exception:
+        return None
+
+    host_lower = host.lower()
+
+    if ".fabric." in host_lower:
+        return OFFERING_FABRIC
+
+    for suffix, _ in _ADX_CLOUD_MAPPINGS:
+        if host_lower.endswith(suffix):
+            return OFFERING_ADX
+
+    return None
+
+
+def _get_adx_explorer_base(host: str) -> str | None:
+    host_lower = host.lower()
+    for suffix, explorer_base in _ADX_CLOUD_MAPPINGS:
+        if host_lower.endswith(suffix):
+            return explorer_base
+    return None
+
+
+def _build_adx_deeplink(cluster_uri: str, database: str, query: str) -> str | None:
+    """
+    Build an Azure Data Explorer Web Explorer deeplink URL.
+
+    Returns None if the cluster URI is invalid, the domain is unrecognized,
+    or the resulting URL exceeds the browser limit.
+    """
+    try:
+        parsed = urlparse(cluster_uri)
+        if not parsed.scheme or not parsed.hostname:
+            return None
+    except Exception:
+        return None
+
+    host = parsed.hostname
+    explorer_base = _get_adx_explorer_base(host)
+    if explorer_base is None:
+        return None
+
+    encoded_query = _encode_query(query)
+    encoded_db = quote(database, safe="")
+
+    url = f"{explorer_base}/clusters/{host}/databases/{encoded_db}?query={encoded_query}"
+
+    if len(url) > _MAX_URL_LENGTH:
+        return None
+
+    return url
+
+
+def _build_fabric_deeplink(fabric_base_url: str, cluster_uri: str, database: str, query: str) -> str | None:
+    """
+    Build a Microsoft Fabric Eventhouse query workbench deeplink URL.
+
+    Returns None if the resulting URL exceeds the browser limit.
+    """
+    encoded_query = _encode_query(query)
+    encoded_cluster = quote(cluster_uri, safe="")
+    encoded_db = quote(database, safe="")
+
+    url = (
+        f"{fabric_base_url}/groups/me/queryworkbenches/querydeeplink"
+        f"?experience=fabric-developer"
+        f"&cluster={encoded_cluster}"
+        f"&databaseItemId={encoded_db}"
+        f"&query={encoded_query}"
+    )
+
+    if len(url) > _MAX_URL_LENGTH:
+        return None
+
+    return url
+
+
+# ── Kusto service ───────────────────────────────────────────────────────────────
 
 
 def canonical_entity_type(entity_type: str) -> str:
@@ -210,6 +339,84 @@ def kusto_query(
     :return: The result of the query execution as a list of dictionaries (json).
     """
     return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+
+def kusto_deeplink_from_query(
+    cluster_uri: str,
+    database: str,
+    query: str,
+) -> str | None:
+    """
+    Build a deeplink URL that opens the given KQL query in the appropriate web explorer UI.
+
+    For Azure Data Explorer clusters, opens in Kusto Web Explorer (dataexplorer.azure.com).
+    For Microsoft Fabric Eventhouse clusters, opens in the Fabric query workbench.
+
+    The cluster type is auto-detected from the URI. If detection fails,
+    falls back to querying the cluster with `.show version`.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: The database name.
+    :param query: The KQL query text.
+    :return: A deeplink URL string, or None if the cluster type could not be determined.
+    """
+    _validate_deeplink_inputs(cluster_uri, database, query)
+
+    deeplink_style = CONFIG.deeplink_style
+    if deeplink_style:
+        offering = _DEEPLINK_STYLE_MAP.get(deeplink_style)
+    else:
+        offering = _detect_offering_from_uri(cluster_uri)
+        if offering is None:
+            offering = _detect_offering_via_show_version(cluster_uri)
+
+    query = query.strip()
+    if offering == OFFERING_ADX:
+        return _build_adx_deeplink(cluster_uri, database, query)
+    elif offering == OFFERING_FABRIC:
+        return _build_fabric_deeplink(global_config.fabric_base_url, cluster_uri, database, query)
+
+    return None
+
+
+def _validate_deeplink_inputs(cluster_uri: str, database: str, query: str) -> None:
+    if not cluster_uri or not cluster_uri.strip():
+        raise ValueError("cluster_uri is required and cannot be empty.")
+
+    if not database or not database.strip():
+        raise ValueError("database is required and cannot be empty.")
+
+    if not query or not query.strip():
+        raise ValueError("query is required and cannot be empty.")
+
+    try:
+        parsed = urlparse(cluster_uri.strip())
+    except Exception:
+        raise ValueError(f"cluster_uri is not a valid URL: '{cluster_uri}'")
+
+    if not parsed.scheme or parsed.scheme not in ("http", "https"):
+        raise ValueError(f"cluster_uri must use http or https scheme, got: '{cluster_uri}'")
+
+    if not parsed.hostname:
+        raise ValueError(f"cluster_uri is missing a hostname: '{cluster_uri}'")
+
+
+def _detect_offering_via_show_version(cluster_uri: str) -> str | None:
+    """Detect cluster offering by executing `.show version` and examining the ServiceOffering column."""
+    try:
+        result = _execute(".show version", cluster_uri, readonly_override=True)
+        data = result.get("data", {})
+        service_offering = data.get("ServiceOffering", [])
+        if not service_offering:
+            return None
+        value = service_offering[0]
+        if OFFERING_FABRIC in value:
+            return OFFERING_FABRIC
+        if OFFERING_ADX in value:
+            return OFFERING_ADX
+        return None
+    except Exception:
+        return None
 
 
 def kusto_graph_query(
