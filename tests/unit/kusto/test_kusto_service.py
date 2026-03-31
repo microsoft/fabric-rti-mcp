@@ -291,3 +291,54 @@ def test_successful_operations_do_not_log_correlation_id(
     # Assert - verify no info or debug logging occurs for successful operations
     assert not mock_logger.info.called
     assert not mock_logger.debug.called
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_execute_respects_response_format_config(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that _execute uses the configured response format."""
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    mock_config.response_format = "json"
+    mock_config.timeout_seconds = None
+
+    result = kusto_query("TestTable | take 10", sample_cluster_uri, database="test_db")
+
+    assert result["format"] == "json"
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_execute_defaults_to_columnar(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that _execute defaults to columnar when no format override."""
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    mock_config.response_format = "columnar"
+    mock_config.timeout_seconds = None
+
+    result = kusto_query("TestTable | take 10", sample_cluster_uri, database="test_db")
+
+    assert result["format"] == "columnar"
+    assert result["data"]["TestColumn"][0] == "TestValue"
