@@ -1,6 +1,9 @@
 # Release History
 
 ## 0.0.10 (Unreleased)
+### Features
+- Added `kusto_deeplink_from_query` tool to generate deeplink URLs for opening KQL queries in the appropriate web explorer UI (Azure Data Explorer Web Explorer or Microsoft Fabric query workbench). Auto-detects cluster type from URI with `.show version` fallback.
+
 ### Other Changes
 - Use docstring as tool description
 - Add annotations (readonly, destructive)
