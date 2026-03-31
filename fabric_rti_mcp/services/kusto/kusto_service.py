@@ -4,7 +4,6 @@ import base64
 import functools
 import gzip
 import inspect
-import os
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict
@@ -14,7 +13,7 @@ from urllib.parse import quote, urlparse
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
-from fabric_rti_mcp.config import DEFAULT_FABRIC_BASE_URL, GlobalFabricRTIEnvVarNames, logger
+from fabric_rti_mcp.config import global_config, logger
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
@@ -26,8 +25,7 @@ _MAX_URL_LENGTH = 8000
 OFFERING_ADX = "Azure Data Explorer"
 OFFERING_FABRIC = "Microsoft Fabric Eventhouse"
 
-_DEEPLINK_STYLE_ENV_VAR = "FABRIC_RTI_KUSTO_DEEPLINK_STYLE"
-_DEEPLINK_STYLE_MAP = {
+_DEEPLINK_STYLE_MAP: dict[str, str] = {
     "adx": OFFERING_ADX,
     "fabric": OFFERING_FABRIC,
 }
@@ -370,14 +368,9 @@ def kusto_deeplink_from_query(
     """
     _validate_deeplink_inputs(cluster_uri, database, query)
 
-    override = os.getenv(_DEEPLINK_STYLE_ENV_VAR)
-    if override:
-        offering = _DEEPLINK_STYLE_MAP.get(override.lower())
-        if offering is None:
-            logger.warning(
-                f"Invalid {_DEEPLINK_STYLE_ENV_VAR}='{override}'. "
-                f"Expected one of: {', '.join(_DEEPLINK_STYLE_MAP.keys())}. Ignoring override."
-            )
+    deeplink_style = CONFIG.deeplink_style
+    if deeplink_style:
+        offering = _DEEPLINK_STYLE_MAP.get(deeplink_style)
     else:
         offering = _detect_offering_from_uri(cluster_uri)
         if offering is None:
@@ -388,8 +381,7 @@ def kusto_deeplink_from_query(
     if offering == OFFERING_ADX:
         url = _build_adx_deeplink(cluster_uri, database, query)
     elif offering == OFFERING_FABRIC:
-        fabric_base_url = os.getenv(GlobalFabricRTIEnvVarNames.fabric_base_url, DEFAULT_FABRIC_BASE_URL)
-        url = _build_fabric_deeplink(fabric_base_url, cluster_uri, database, query)
+        url = _build_fabric_deeplink(global_config.fabric_base_url, cluster_uri, database, query)
 
     return {
         "web_explorer_url": url,
@@ -420,17 +412,18 @@ def _validate_deeplink_inputs(cluster_uri: str, database: str, query: str) -> No
 
 
 def _detect_offering_via_show_version(cluster_uri: str) -> str | None:
-    """Detect cluster offering by executing `.show version` and examining the result."""
+    """Detect cluster offering by executing `.show version` and examining the ServiceOffering column."""
     try:
         result = _execute(".show version", cluster_uri, readonly_override=True)
         data = result.get("data", {})
-        for column_values in data.values():
-            if column_values and isinstance(column_values[0], str):
-                value = column_values[0]
-                if OFFERING_FABRIC in value:
-                    return OFFERING_FABRIC
-                if OFFERING_ADX in value:
-                    return OFFERING_ADX
+        service_offering = data.get("ServiceOffering", [])
+        if not service_offering:
+            return None
+        value = service_offering[0]
+        if OFFERING_FABRIC in value:
+            return OFFERING_FABRIC
+        if OFFERING_ADX in value:
+            return OFFERING_ADX
         return None
     except Exception:
         return None

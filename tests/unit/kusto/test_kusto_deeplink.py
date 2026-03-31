@@ -149,7 +149,7 @@ class TestKustoGetWebExplorerUrl:
     def test_unknown_domain_falls_back_to_show_version_adx(self, mock_execute: MagicMock) -> None:
         mock_execute.return_value = {
             "format": "columnar",
-            "data": {"ServiceType": ["Azure Data Explorer"]},
+            "data": {"ServiceOffering": ["{\"Type\":\"Azure Data Explorer\"}"]},
         }
         result = kusto_deeplink_from_query("https://unknown.example.com", "db", "T | take 10")
         mock_execute.assert_called_once()
@@ -161,7 +161,7 @@ class TestKustoGetWebExplorerUrl:
     def test_unknown_domain_falls_back_to_show_version_fabric(self, mock_execute: MagicMock) -> None:
         mock_execute.return_value = {
             "format": "columnar",
-            "data": {"ServiceType": ["Microsoft Fabric Eventhouse"]},
+            "data": {"ServiceOffering": ["{\"Type\":\"Microsoft Fabric Eventhouse\"}"]},
         }
         result = kusto_deeplink_from_query("https://unknown.example.com", "db", "T | take 10")
         assert result["offering"] == OFFERING_FABRIC
@@ -182,30 +182,37 @@ class TestKustoGetWebExplorerUrl:
         decoded = _decode_query(_extract_query_param(result["web_explorer_url"], "query"))
         assert decoded == "T | take 10"
 
-    @patch.dict("os.environ", {"FABRIC_RTI_KUSTO_DEEPLINK_STYLE": "fabric"})
+    @patch("fabric_rti_mcp.services.kusto.kusto_service.global_config")
+    @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-    def test_env_override_forces_fabric_for_adx_cluster(self, mock_get_conn: MagicMock) -> None:
+    def test_config_override_forces_fabric_for_adx_cluster(
+        self, mock_get_conn: MagicMock, mock_config: MagicMock, mock_global_config: MagicMock
+    ) -> None:
+        mock_config.deeplink_style = "fabric"
+        mock_global_config.fabric_base_url = "https://fabric.microsoft.com"
         result = kusto_deeplink_from_query("https://help.kusto.windows.net", "Samples", "T | take 10")
         assert result["offering"] == OFFERING_FABRIC
         assert result["web_explorer_url"] is not None
         assert result["web_explorer_url"].startswith("https://fabric.microsoft.com/groups/me/queryworkbenches/querydeeplink")
         mock_get_conn.assert_not_called()
 
-    @patch.dict("os.environ", {"FABRIC_RTI_KUSTO_DEEPLINK_STYLE": "adx"})
+    @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-    def test_env_override_forces_adx_for_fabric_cluster(self, mock_get_conn: MagicMock) -> None:
+    def test_config_override_forces_adx_for_fabric_cluster(self, mock_get_conn: MagicMock, mock_config: MagicMock) -> None:
+        mock_config.deeplink_style = "adx"
         result = kusto_deeplink_from_query("https://mycluster.kusto.fabric.microsoft.com", "MyDb", "T | take 10")
         assert result["offering"] == OFFERING_ADX
         # URL is None because fabric domain is not in ADX cloud mappings
         assert result["web_explorer_url"] is None
         mock_get_conn.assert_not_called()
 
-    @patch.dict("os.environ", {"FABRIC_RTI_KUSTO_DEEPLINK_STYLE": "invalid"})
+    @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-    def test_env_override_invalid_value_returns_none(self, mock_get_conn: MagicMock) -> None:
+    def test_config_no_override_uses_auto_detection(self, mock_get_conn: MagicMock, mock_config: MagicMock) -> None:
+        mock_config.deeplink_style = None
         result = kusto_deeplink_from_query("https://help.kusto.windows.net", "Samples", "T | take 10")
-        assert result["offering"] is None
-        assert result["web_explorer_url"] is None
+        assert result["offering"] == OFFERING_ADX
+        assert result["web_explorer_url"] is not None
 
 
 class TestDeeplinkInputValidation:

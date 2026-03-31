@@ -70,7 +70,7 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 
 ### Available tools
 
-#### Eventhouse (Kusto) - 12 Tools:
+#### Eventhouse (Kusto) - 13 Tools:
 - **`kusto_known_services`** - List all available Kusto services configured in the MCP
 - **`kusto_query`** - Execute KQL queries on the specified database
 - **`kusto_command`** - Execute Kusto management commands (destructive operations)
@@ -83,6 +83,7 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - **`kusto_sample_function_data`** - Retrieve random sample records from the result of a function call
 - **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
 - **`kusto_get_shots`** - Retrieve semantically similar query examples from a shots table using AI embeddings
+- **`kusto_deeplink_from_query`** - Generate a deeplink URL to open a KQL query in Azure Data Explorer Web Explorer or Microsoft Fabric query workbench
 
 #### Eventstreams - 17 Tools:
 
@@ -302,6 +303,7 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
+| `FABRIC_RTI_KUSTO_DEEPLINK_STYLE` | Kusto | Override auto-detection of deeplink style | None | `adx` or `fabric` |
 
 ### Embedding Endpoint Configuration
 
