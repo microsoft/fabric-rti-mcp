@@ -16,7 +16,7 @@ from fabric_rti_mcp import __version__  # type: ignore
 from fabric_rti_mcp.config import global_config, logger
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
-from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter, KustoResponseFormat
 
 # ── Deeplink constants ──────────────────────────────────────────────────────────
 
@@ -275,6 +275,20 @@ def _crp(
     return crp
 
 
+_FORMAT_DISPATCH: dict[str, Any] = {
+    "columnar": KustoFormatter.to_columnar,
+    "json": KustoFormatter.to_json,
+    "csv": KustoFormatter.to_csv,
+    "tsv": KustoFormatter.to_tsv,
+    "header_arrays": KustoFormatter.to_header_arrays,
+}
+
+
+def _format_result(result_set: Any) -> KustoResponseFormat:
+    formatter = _FORMAT_DISPATCH.get(CONFIG.response_format, KustoFormatter.to_columnar)
+    return formatter(result_set)
+
+
 def _execute(
     query: str,
     cluster_uri: str,
@@ -302,7 +316,7 @@ def _execute(
         database = database.strip()
 
         result_set = client.execute(database, query, crp)
-        return asdict(KustoFormatter.to_columnar(result_set))
+        return asdict(_format_result(result_set))
 
     except Exception as e:
         error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"

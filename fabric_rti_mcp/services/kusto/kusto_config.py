@@ -25,6 +25,7 @@ class KustoEnvVarNames:
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
     deeplink_style = "FABRIC_RTI_KUSTO_DEEPLINK_STYLE"
+    response_format = "FABRIC_RTI_KUSTO_RESPONSE_FORMAT"
 
     @staticmethod
     def all() -> list[str]:
@@ -38,6 +39,7 @@ class KustoEnvVarNames:
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
             KustoEnvVarNames.deeplink_style,
+            KustoEnvVarNames.response_format,
         ]
 
 
@@ -59,6 +61,8 @@ class KustoConfig:
     timeout_seconds: int | None = None
     # Override deeplink style detection. Valid values: "adx", "fabric".
     deeplink_style: str | None = None
+    # Response format for Kusto query results. Default: "columnar".
+    response_format: str = "columnar"
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -108,6 +112,19 @@ class KustoConfig:
                     "Expected 'adx' or 'fabric'. Ignoring override."
                 )
 
+        valid_formats = ("columnar", "json", "csv", "tsv", "header_arrays")
+        response_format = "columnar"
+        response_format_env = os.getenv(KustoEnvVarNames.response_format)
+        if response_format_env:
+            normalized_fmt = response_format_env.strip().lower()
+            if normalized_fmt in valid_formats:
+                response_format = normalized_fmt
+            else:
+                logger.warning(
+                    f"Invalid {KustoEnvVarNames.response_format}='{response_format_env}'. "
+                    f"Expected one of: {', '.join(valid_formats)}. Using default 'columnar'."
+                )
+
         return KustoConfig(
             default_service,
             open_ai_embedding_endpoint,
@@ -116,6 +133,7 @@ class KustoConfig:
             allow_unknown_services,
             timeout_seconds,
             deeplink_style,
+            response_format,
         )
 
     @staticmethod
