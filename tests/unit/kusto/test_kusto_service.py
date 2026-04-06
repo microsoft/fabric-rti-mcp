@@ -9,21 +9,26 @@ from fabric_rti_mcp import __version__
 from fabric_rti_mcp.services.kusto.kusto_service import kusto_command, kusto_query
 
 
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_execute_basic_query(
     mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
     sample_cluster_uri: str,
     mock_kusto_response: KustoResponseDataSet,
 ) -> None:
     """Test that _execute properly calls the Kusto client with correct parameters."""
     # Arrange
+    mock_config.response_format = "columnar"
+    mock_config.timeout_seconds = None
+
     mock_client = MagicMock()
     mock_client.execute.return_value = mock_kusto_response
 
     mock_connection = MagicMock()
     mock_connection.query_client = mock_client
     mock_connection.default_database = "default_db"
-    mock_connection.timeout_seconds = None  # Add timeout_seconds attribute
+    mock_connection.timeout_seconds = None
     mock_get_kusto_connection.return_value = mock_connection
 
     query = "  TestTable | take 10  "  # Added whitespace to test stripping
@@ -53,14 +58,19 @@ def test_execute_basic_query(
     assert result["data"]["TestColumn"][0] == "TestValue"
 
 
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_execute_with_custom_client_request_properties(
     mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
     sample_cluster_uri: str,
     mock_kusto_response: KustoResponseDataSet,
 ) -> None:
     """Test that custom client request properties are properly applied."""
     # Arrange
+    mock_config.response_format = "columnar"
+    mock_config.timeout_seconds = None
+
     mock_client = MagicMock()
     mock_client.execute.return_value = mock_kusto_response
 
@@ -110,14 +120,19 @@ def test_execute_with_custom_client_request_properties(
     assert result["data"]["TestColumn"] == ["TestValue"]
 
 
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_execute_without_client_request_properties_preserves_behavior(
     mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
     sample_cluster_uri: str,
     mock_kusto_response: KustoResponseDataSet,
 ) -> None:
     """Test that behavior is unchanged when no custom client request properties are provided."""
     # Arrange
+    mock_config.response_format = "columnar"
+    mock_config.timeout_seconds = None
+
     mock_client = MagicMock()
     mock_client.execute.return_value = mock_kusto_response
 
@@ -150,14 +165,19 @@ def test_execute_without_client_request_properties_preserves_behavior(
     assert result["data"]["TestColumn"] == ["TestValue"]
 
 
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
 def test_destructive_operation_with_custom_client_request_properties(
     mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
     sample_cluster_uri: str,
     mock_kusto_response: KustoResponseDataSet,
 ) -> None:
     """Test that destructive operations correctly handle custom client request properties."""
     # Arrange
+    mock_config.response_format = "columnar"
+    mock_config.timeout_seconds = None
+
     mock_client = MagicMock()
     mock_client.execute.return_value = mock_kusto_response
 
@@ -320,13 +340,13 @@ def test_execute_respects_response_format_config(
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-def test_execute_defaults_to_columnar(
+def test_execute_columnar_format(
     mock_get_kusto_connection: Mock,
     mock_config: MagicMock,
     sample_cluster_uri: str,
     mock_kusto_response: KustoResponseDataSet,
 ) -> None:
-    """Test that _execute defaults to columnar when no format override."""
+    """Test that _execute returns columnar format when configured."""
     mock_client = MagicMock()
     mock_client.execute.return_value = mock_kusto_response
 
@@ -342,3 +362,32 @@ def test_execute_defaults_to_columnar(
 
     assert result["format"] == "columnar"
     assert result["data"]["TestColumn"][0] == "TestValue"
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_execute_kusto_response_format(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that _execute returns kusto_response format with raw columns and rows."""
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    mock_config.response_format = "kusto_response"
+    mock_config.timeout_seconds = None
+
+    result = kusto_query("TestTable | take 10", sample_cluster_uri, database="test_db")
+
+    assert result["format"] == "kusto_response"
+    assert "columns" in result["data"]
+    assert "rows" in result["data"]
+    assert isinstance(result["data"]["columns"], list)
+    assert isinstance(result["data"]["rows"], list)
