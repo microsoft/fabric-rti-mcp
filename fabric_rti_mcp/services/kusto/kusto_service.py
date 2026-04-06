@@ -4,9 +4,11 @@ import base64
 import functools
 import gzip
 import inspect
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict
+from datetime import timedelta
 from typing import Any, TypeVar
 from urllib.parse import quote, urlparse
 
@@ -249,6 +251,35 @@ def destructive_operation(func: F) -> F:
     return wrapper  # type: ignore
 
 
+_TIMESPAN_RE = re.compile(r"^(\d+):(\d+):(\d+)$")
+
+
+def _parse_timespan_to_timedelta(value: Any) -> timedelta:
+    """Convert a timespan value to a timedelta for the Azure Kusto SDK.
+
+    The SDK expects ``servertimeout`` to be a ``timedelta`` object
+    (it performs arithmetic with it in ``client_base.py``).
+
+    Supported formats:
+    - ``timedelta`` — returned as-is.
+    - ``int`` / ``float`` — interpreted as seconds.
+    - ``"HH:MM:SS"`` — standard timespan string.
+    """
+    if isinstance(value, timedelta):
+        return value
+    if isinstance(value, (int, float)):
+        return timedelta(seconds=value)
+    if isinstance(value, str):
+        match = _TIMESPAN_RE.match(value.strip())
+        if match:
+            return timedelta(
+                hours=int(match.group(1)),
+                minutes=int(match.group(2)),
+                seconds=int(match.group(3)),
+            )
+    raise ValueError(f"Cannot parse servertimeout value: {value!r}. Use a timedelta, 'HH:MM:SS', or numeric seconds.")
+
+
 def _crp(
     action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: dict[str, Any] | None = None
 ) -> ClientRequestProperties:
@@ -260,16 +291,16 @@ def _crp(
 
     # Set global timeout if configured
     if CONFIG.timeout_seconds is not None:
-        # Convert seconds to timespan format (HH:MM:SS)
-        hours, remainder = divmod(CONFIG.timeout_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        crp.set_option("servertimeout", timeout_str)
+        crp.set_option("servertimeout", timedelta(seconds=CONFIG.timeout_seconds))
 
     # Apply any additional client request properties provided by the user
     # User properties can override global settings
     if client_request_properties:
         for key, value in client_request_properties.items():
+            # The Azure Kusto SDK expects servertimeout as a timedelta object —
+            # it adds client_server_delta (timedelta) to it in client_base.py.
+            if key == ClientRequestProperties.request_timeout_option_name:
+                value = _parse_timespan_to_timedelta(value)
             crp.set_option(key, value)
 
     return crp
