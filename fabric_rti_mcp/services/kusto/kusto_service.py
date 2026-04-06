@@ -281,11 +281,12 @@ _FORMAT_DISPATCH: dict[str, Any] = {
     "csv": KustoFormatter.to_csv,
     "tsv": KustoFormatter.to_tsv,
     "header_arrays": KustoFormatter.to_header_arrays,
+    "kusto_response": KustoFormatter.to_kusto_response,
 }
 
 
 def _format_result(result_set: Any) -> KustoResponseFormat:
-    formatter = _FORMAT_DISPATCH.get(CONFIG.response_format, KustoFormatter.to_columnar)
+    formatter = _FORMAT_DISPATCH.get(CONFIG.response_format, KustoFormatter.to_kusto_response)
     return formatter(result_set)
 
 

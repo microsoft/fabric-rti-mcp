@@ -381,3 +381,48 @@ class TestParsingFunctionality:
         header_arrays_result = KustoFormatter.to_header_arrays(mock_result_set)
         parsed_header_arrays = KustoFormatter.parse(header_arrays_result)
         assert parsed_header_arrays == expected_data
+
+    def test_KustoFormatter_to_kusto_response_with_valid_data(self) -> None:
+        """Test to_kusto_response passes through raw_columns and raw_rows."""
+        mock_primary_result = Mock()
+        mock_primary_result.raw_columns = [
+            {"ColumnName": "State", "DataType": "String"},
+            {"ColumnName": "Count", "DataType": "Int64"},
+        ]
+        mock_primary_result.raw_rows = [["TEXAS", 4701], ["KANSAS", 3166]]
+
+        mock_result_set = Mock(spec=KustoResponseDataSet)
+        mock_result_set.primary_results = [mock_primary_result]
+
+        result = KustoFormatter.to_kusto_response(mock_result_set)
+
+        assert result.format == "kusto_response"
+        assert result.data["columns"] == mock_primary_result.raw_columns
+        assert result.data["rows"] == mock_primary_result.raw_rows
+
+    def test_KustoFormatter_to_kusto_response_empty(self) -> None:
+        """Test to_kusto_response with no results."""
+        result = KustoFormatter.to_kusto_response(None)
+
+        assert result.format == "kusto_response"
+        assert result.data == {"columns": [], "rows": []}
+
+    def test_parse_kusto_response_format(self) -> None:
+        """Test parsing kusto_response format back to canonical JSON."""
+        data = {
+            "columns": [
+                {"ColumnName": "State", "DataType": "String"},
+                {"ColumnName": "Count", "DataType": "Int64"},
+            ],
+            "rows": [["TEXAS", 4701], ["KANSAS", 3166]],
+        }
+        result = KustoFormatter.parse({"format": "kusto_response", "data": data})
+        assert result == [
+            {"State": "TEXAS", "Count": 4701},
+            {"State": "KANSAS", "Count": 3166},
+        ]
+
+    def test_parse_kusto_response_empty(self) -> None:
+        """Test parsing kusto_response with empty columns."""
+        result = KustoFormatter.parse({"format": "kusto_response", "data": {"columns": [], "rows": []}})
+        assert result == []

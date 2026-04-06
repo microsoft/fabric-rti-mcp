@@ -104,6 +104,21 @@ class KustoFormatter:
         return KustoResponseFormat(format="columnar", data=columnar_data)
 
     @staticmethod
+    def to_kusto_response(result_set: KustoResponseDataSet | None) -> KustoResponseFormat:
+        if not result_set or not getattr(result_set, "primary_results", None):
+            return KustoResponseFormat(format="kusto_response", data={"columns": [], "rows": []})
+
+        first_result = result_set.primary_results[0]
+
+        return KustoResponseFormat(
+            format="kusto_response",
+            data={
+                "columns": first_result.raw_columns,
+                "rows": first_result.raw_rows,
+            },
+        )
+
+    @staticmethod
     def to_header_arrays(result_set: KustoResponseDataSet | None) -> KustoResponseFormat:
         if not result_set or not getattr(result_set, "primary_results", None):
             return KustoResponseFormat(format="header_arrays", data=[])
@@ -159,6 +174,8 @@ class KustoFormatter:
             return KustoFormatter._parse_columnar(data)
         elif format_type == "header_arrays":
             return KustoFormatter._parse_header_arrays(data)
+        elif format_type == "kusto_response":
+            return KustoFormatter._parse_kusto_response(data)
         else:
             raise ValueError(f"Unsupported format: {format_type}")
 
@@ -301,3 +318,19 @@ class KustoFormatter:
 
         except json.JSONDecodeError:
             return []
+
+    @staticmethod
+    def _parse_kusto_response(data: Any) -> list[dict[str, Any]]:
+        """Parse kusto_response format (columns + rows) back to canonical JSON."""
+        if not isinstance(data, dict):
+            raise ValueError("Invalid kusto_response format")
+
+        columns = data.get("columns", [])
+        rows = data.get("rows", [])
+
+        if not columns:
+            return []
+
+        column_names = [col["ColumnName"] for col in columns]
+
+        return [{column_names[i]: row[i] if i < len(row) else None for i in range(len(column_names))} for row in rows]

@@ -61,8 +61,8 @@ class KustoConfig:
     timeout_seconds: int | None = None
     # Override deeplink style detection. Valid values: "adx", "fabric".
     deeplink_style: str | None = None
-    # Response format for Kusto query results. Default: "columnar".
-    response_format: str = "columnar"
+    # Response format for Kusto query results. Default: "kusto_response".
+    response_format: str = "kusto_response"
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -112,8 +112,8 @@ class KustoConfig:
                     "Expected 'adx' or 'fabric'. Ignoring override."
                 )
 
-        valid_formats = ("columnar", "json", "csv", "tsv", "header_arrays")
-        response_format = "columnar"
+        valid_formats = ("columnar", "json", "csv", "tsv", "header_arrays", "kusto_response")
+        response_format = "kusto_response"
         response_format_env = os.getenv(KustoEnvVarNames.response_format)
         if response_format_env:
             normalized_fmt = response_format_env.strip().lower()
@@ -122,7 +122,7 @@ class KustoConfig:
             else:
                 logger.warning(
                     f"Invalid {KustoEnvVarNames.response_format}='{response_format_env}'. "
-                    f"Expected one of: {', '.join(valid_formats)}. Using default 'columnar'."
+                    f"Expected one of: {', '.join(valid_formats)}. Using default 'kusto_response'."
                 )
 
         return KustoConfig(
