@@ -170,6 +170,64 @@ def canonical_entity_type(entity_type: str) -> str:
         )
 
 
+def kql_escape_entity_name(name: str) -> str:
+    """
+    Sanitize an entity name for safe use in KQL commands and queries.
+
+    Accepts either:
+    - Already escaped: ['entity'] or ["entity"] — validated and passed through
+    - Unescaped: entity — auto-wrapped in ['...']
+
+    Raises ValueError if escape characters (['"]]) appear inside the name
+    in an inconsistent way (partial escaping).
+    """
+    name = name.strip()
+
+    if (name.startswith("['") and name.endswith("']")) or (name.startswith('["') and name.endswith('"]')):
+        inner = name[2:-2]
+        _validate_no_escape_chars(inner)
+        return name
+
+    _validate_no_escape_chars(name)
+    return f"['{name}']"
+
+
+def _validate_no_escape_chars(name: str) -> None:
+    escape_sequences = ["['", "']", '["', '"]']
+    found = [seq for seq in escape_sequences if seq in name]
+    if found:
+        raise ValueError(
+            f"Entity name '{name}' contains KQL escape sequences ({', '.join(repr(s) for s in found)}). "
+            "Entities must be either properly escaped (['entity'], [\"entity\"]) or unescaped. "
+            "Mixing escape sequences inside the entity name is not allowed."
+        )
+
+
+def _find_first_statement(text: str) -> str:
+    """
+    Find the first meaningful KQL statement, skipping comments (//), directives (#), and set hints.
+
+    Returns the first non-skippable line stripped, or empty string if none found.
+    """
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("//"):
+            continue
+        if stripped.startswith("#"):
+            continue
+        if stripped.startswith("set "):
+            continue
+        return stripped
+    return ""
+
+
+def kql_escape_string(value: str) -> str:
+    """Escape a value for use inside KQL single-quoted string literals."""
+    return value.replace("'", "''")
+
+
 CONFIG = KustoConfig.from_env()
 _DEFAULT_DB_NAME = (
     CONFIG.default_service.default_database
@@ -353,6 +411,12 @@ def kusto_query(
     :param client_request_properties: Optional dictionary of additional client request properties.
     :return: The result of the query execution as a list of dictionaries (json).
     """
+    first_stmt = _find_first_statement(query)
+    if first_stmt.startswith("."):
+        raise ValueError(
+            "kusto_query is for KQL queries, not management commands. "
+            "Management commands (starting with '.') should use kusto_command instead."
+        )
     return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
@@ -503,9 +567,7 @@ def kusto_graph_query(
         cluster_uri
     )
     """
-    query = (
-        f"graph('{graph_name}') {query}"  # todo: this should properly choose between graph() and make-graph operator
-    )
+    query = f"graph('{kql_escape_string(graph_name)}') {query}"
     return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
@@ -526,6 +588,12 @@ def kusto_command(
     :param client_request_properties: Optional dictionary of additional client request properties.
     :return: The result of the command execution as a list of dictionaries (json).
     """
+    first_stmt = _find_first_statement(command)
+    if not first_stmt.startswith("."):
+        raise ValueError(
+            "kusto_command is for management commands (starting with '.'). "
+            "KQL queries should use kusto_query instead."
+        )
     return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
@@ -609,7 +677,7 @@ def kusto_describe_database(
     """
     return _execute(
         ".show databases entities with (showObfuscatedStrings=true) "
-        f"| where DatabaseName == '{database or _DEFAULT_DB_NAME}' "
+        f"| where DatabaseName == '{kql_escape_string(database or _DEFAULT_DB_NAME)}' "
         "| project EntityName, EntityType, Folder, DocString, CslInputSchema, Content, CslOutputSchema",
         cluster_uri,
         database=database,
@@ -638,30 +706,31 @@ def kusto_describe_database_entity(
     """
 
     entity_type = canonical_entity_type(entity_type)
+    escaped = kql_escape_entity_name(entity_name)
     if entity_type.lower() == "table":
         return _execute(
-            f".show table {entity_name} cslschema",
+            f".show table {escaped} cslschema",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
         )
     elif entity_type.lower() == "external-table":
         return _execute(
-            f".show external table {entity_name} cslschema",
+            f".show external table {escaped} cslschema",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
         )
     elif entity_type.lower() == "function":
         return _execute(
-            f".show function {entity_name}",
+            f".show function {escaped}",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
         )
     elif entity_type.lower() == "materialized-view":
         return _execute(
-            f".show materialized-view {entity_name} "
+            f".show materialized-view {escaped} "
             "| project Name, SourceTable, Query, LastRun, LastRunResult, IsHealthy, IsEnabled, DocString",
             cluster_uri,
             database=database,
@@ -669,7 +738,7 @@ def kusto_describe_database_entity(
         )
     elif entity_type.lower() == "graph":
         return _execute(
-            f".show graph_model {entity_name} details | project Name, Model",
+            f".show graph_model {escaped} details | project Name, Model",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
@@ -699,23 +768,24 @@ def kusto_sample_entity(
     :return: List of dictionaries containing sampled records.
     """
     entity_type = canonical_entity_type(entity_type)
+    escaped = kql_escape_entity_name(entity_name)
     if entity_type.lower() in ["table", "materialized-view", "external-table", "function"]:
         return _execute(
-            f"{entity_name} | sample {sample_size}",
+            f"{escaped} | sample {sample_size}",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
         )
     if entity_type.lower() == "graph":
-        # TODO: handle transient graphs properly
-        sample_size_node = max(1, sample_size // 2)  # at least 5 of each
-        sample_size_edge = max(1, sample_size - sample_size_node)  # at least 5 of each
+        escaped_str = kql_escape_string(entity_name)
+        sample_size_node = max(1, sample_size // 2)
+        sample_size_edge = max(1, sample_size - sample_size_node)
         return _execute(
-            f"""let NodeSample = graph('{entity_name}')
+            f"""let NodeSample = graph('{escaped_str}')
 | graph-to-table nodes
 | take {sample_size_node}
 | project PackedEntity=pack_all(), EntityType='Node';
-let EdgeSample = graph('{entity_name}')
+let EdgeSample = graph('{escaped_str}')
 | graph-to-table edges
 | take {sample_size_edge}
 | project PackedEntity=pack_all(), EntityType='Edge';
@@ -750,7 +820,7 @@ def kusto_ingest_inline_into_table(
     :return: List of dictionaries containing the ingestion result.
     """
     return _execute(
-        f".ingest inline into table {table_name} <| {data_comma_separator}",
+        f".ingest inline into table {kql_escape_entity_name(table_name)} <| {data_comma_separator}",
         cluster_uri,
         database=database,
         client_request_properties=client_request_properties,
@@ -787,9 +857,9 @@ def kusto_get_shots(
     endpoint = embedding_endpoint or CONFIG.open_ai_embedding_endpoint
 
     kql_query = f"""
-        let model_endpoint = '{endpoint}';
-        let embedded_term = toscalar(evaluate ai_embeddings('{prompt}', model_endpoint));
-        {shots_table_name}
+        let model_endpoint = '{kql_escape_string(endpoint or "")}';
+        let embedded_term = toscalar(evaluate ai_embeddings('{kql_escape_string(prompt)}', model_endpoint));
+        {kql_escape_entity_name(shots_table_name)}
         | extend similarity = series_cosine_similarity(embedded_term, EmbeddingVector)
         | top {sample_size} by similarity
         | project similarity, EmbeddingText, AugmentedText
