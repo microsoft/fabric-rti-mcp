@@ -22,16 +22,13 @@ def get_auth_token() -> str | None:
 
 
 class BearerTokenCredential(TokenCredential):
-    """A credential that uses a bearer token directly."""
-
-    def __init__(self, token: str):
-        self.token = token
+    """A credential that reads the bearer token from the current request's ContextVar on each call."""
 
     def get_token(self, *scopes: str, **kwargs: Any) -> AccessToken:
-        """Get the token for the specified scopes."""
-        # Create an AccessToken with a far future expiration
-        actoken = AccessToken(token=self.token, expires_on=int(time.time()) + 3600)
-        return actoken
+        token = get_auth_token()
+        if not token:
+            raise ValueError("No auth token available in request context")
+        return AccessToken(token=token, expires_on=int(time.time()) + 3600)
 
 
 class KustoConnection:
@@ -56,8 +53,7 @@ class KustoConnection:
         # Check if we have a bearer token from HTTP auth
         token = get_auth_token()
         if token:
-            # Use the bearer token directly if available (HTTP mode)
-            return BearerTokenCredential(token)
+            return BearerTokenCredential()
 
         return DefaultAzureCredential(
             exclude_shared_token_cache_credential=True,
