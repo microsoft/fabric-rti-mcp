@@ -40,6 +40,19 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - List Map items in workspaces
 - Delete Map items
 
+### 🧠 Copilot Skills
+
+This repository includes a **KQL Copilot Skill** (`.github/skills/kql/`) that gives AI agents deep KQL expertise when writing, debugging, or reviewing Kusto queries. The skill covers:
+
+- Syntax gotchas and self-correction patterns for common KQL errors
+- Dynamic type discipline, join patterns, datetime pitfalls
+- Memory-safe query patterns and result-size discipline
+- Advanced functions: graph queries, vector similarity, geospatial operations, time series
+- Query templates for deduplication, top-N, sessionization, pivoting, and more
+- Full error-to-fix mapping for rapid recovery
+
+The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `kusto_sample_entity`, etc.) so agents know how to execute queries through this MCP server.
+
 ## 🚧 Coming soon
 - **Other RTI items**
 
