@@ -591,8 +591,7 @@ def kusto_command(
     first_stmt = _find_first_statement(command)
     if not first_stmt.startswith("."):
         raise ValueError(
-            "kusto_command is for management commands (starting with '.'). "
-            "KQL queries should use kusto_query instead."
+            "kusto_command is for management commands (starting with '.'). KQL queries should use kusto_query instead."
         )
     return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)
 
@@ -677,7 +676,7 @@ def kusto_describe_database(
     """
     return _execute(
         ".show databases entities with (showObfuscatedStrings=true) "
-        f"| where DatabaseName == '{kql_escape_string(database or _DEFAULT_DB_NAME)}' "
+        f"| where DatabaseName == '{kql_escape_string(database or _DEFAULT_DB_NAME or '')}' "
         "| project EntityName, EntityType, Folder, DocString, CslInputSchema, Content, CslOutputSchema",
         cluster_uri,
         database=database,
