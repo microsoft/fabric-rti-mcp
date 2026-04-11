@@ -49,3 +49,11 @@ def register_tools(mcp: FastMCP) -> None:
         kusto_service.kusto_deeplink_from_query,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
+    mcp.add_tool(
+        kusto_service.kusto_show_queryplan,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )
+    mcp.add_tool(
+        kusto_service.kusto_diagnostics,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+    )

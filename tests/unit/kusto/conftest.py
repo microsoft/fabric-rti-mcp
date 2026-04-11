@@ -59,3 +59,54 @@ def mock_kusto_cache(mock_kusto_connection: KustoConnection) -> Mock:
 def sample_cluster_uri() -> str:
     """Sample cluster URI for tests."""
     return "https://test.kusto.windows.net"
+
+
+@pytest.fixture
+def mock_queryplan_response() -> KustoResponseDataSetV1:
+    """Create a mock .show queryplan response for testing."""
+    import json
+
+    physical_plan = json.dumps(
+        {
+            "TotalRowCount": 59066,
+            "RootOperator": {
+                "Operators": [
+                    {
+                        "Source": {
+                            "Source": {
+                                "StrategyHint": {"Concurrency": 1, "Spread": 1},
+                                "Operands": [{"TotalRowCount": 59066, "HasSelection": False}],
+                            }
+                        }
+                    }
+                ]
+            },
+        }
+    )
+    json_response: dict[str, list[dict[str, Any]]] = {
+        "Tables": [
+            {
+                "TableName": "Table_0",
+                "Columns": [
+                    {"ColumnName": "ResultType", "DataType": "string"},
+                    {"ColumnName": "Format", "DataType": "string"},
+                    {"ColumnName": "Content", "DataType": "string"},
+                ],
+                "Rows": [
+                    ["QueryText", "text", "StormEvents | count"],
+                    [
+                        "RelopTree",
+                        "json",
+                        '{"type":"CrossTableUnionOperator","output":["Count:Int64"]}',
+                    ],
+                    ["QueryPlan", "json", physical_plan],
+                    [
+                        "Stats",
+                        "json",
+                        '{"Duration":"00:00:00.001","PlanSize":9487,"RelopSize":229}',
+                    ],
+                ],
+            }
+        ]
+    }
+    return KustoResponseDataSetV1(json_response)
