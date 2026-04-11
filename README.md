@@ -64,6 +64,9 @@ The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `
 - "What can you tell me about StormEvents data?"
 - "Analyze the StormEvents to come up with trend analysis across past 10 years of data"
 - "Analyze the commands in 'CommandExecution' table and categorize them as low/medium/high risks"
+- "Before running this query, check the execution plan and tell me if it's expensive"
+- "Compare these two query approaches and tell me which is more efficient"
+- "Check the cluster health — do we have enough capacity for a heavy analytics job?"
 
 **Eventstream Management:**
 - "List all Eventstreams in my workspace"
@@ -83,7 +86,7 @@ The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `
 
 ### Available tools
 
-#### Eventhouse (Kusto) - 11 Tools:
+#### Eventhouse (Kusto) - 13 Tools:
 - **`kusto_known_services`** - List all available Kusto services configured in the MCP
 - **`kusto_query`** - Execute KQL queries on the specified database
 - **`kusto_command`** - Execute Kusto management commands (`.show`, `.create`, `.alter`, `.drop`)
@@ -95,6 +98,8 @@ The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `
 - **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
 - **`kusto_get_shots`** - Retrieve semantically similar query examples from a shots table using AI embeddings
 - **`kusto_deeplink_from_query`** - Generate a deeplink URL to open a KQL query in Azure Data Explorer Web Explorer or Microsoft Fabric query workbench
+- **`kusto_show_queryplan`** - Retrieve the execution plan for a KQL query without running it. Returns planning stats (PlanSize, RelopSize), the logical operator tree, and execution hints (estimated row counts, concurrency/spread hints, per-shard scan info with filter detection). Useful for comparing query approaches, catching expensive joins, and validating query syntax before execution.
+- **`kusto_diagnostics`** - Run a best-effort suite of cluster diagnostic commands and return a unified summary. Sections: capacity (resource slots), cluster (nodes/hardware), principal roles (caller permissions), internal diagnostics (health/utilization), workload groups, rowstores, and ingestion failures (last 24h). Each section runs independently — permission failures on one section don't block others.
 
 #### Eventstreams - 17 Tools:
 

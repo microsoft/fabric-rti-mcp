@@ -6,7 +6,7 @@ from azure.kusto.data import ClientRequestProperties
 from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
-from fabric_rti_mcp.services.kusto.kusto_service import kusto_command, kusto_query
+from fabric_rti_mcp.services.kusto.kusto_service import kusto_command, kusto_diagnostics, kusto_query, kusto_show_queryplan
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
@@ -391,3 +391,212 @@ def test_execute_kusto_response_format(
     assert "rows" in result["data"]
     assert isinstance(result["data"]["columns"], list)
     assert isinstance(result["data"]["rows"], list)
+
+
+# ── kusto_show_queryplan tests ───────────────────────────────────────────────────
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_show_queryplan_constructs_correct_command(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_queryplan_response: KustoResponseDataSet,
+) -> None:
+    """Test that kusto_show_queryplan wraps the query in .show queryplan <| syntax."""
+    mock_config.response_format = "kusto_response"
+    mock_config.timeout_seconds = None
+
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_queryplan_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    result = kusto_show_queryplan("StormEvents | count", sample_cluster_uri, database="test_db")
+
+    mock_client.execute.assert_called_once()
+    args = mock_client.execute.call_args[0]
+    assert args[0] == "test_db"
+    assert args[1] == ".show queryplan <| StormEvents | count"
+
+    crp = args[2]
+    assert isinstance(crp, ClientRequestProperties)
+    assert crp.client_request_id.startswith("KFRTI_MCP.kusto_show_queryplan:")
+
+    assert result["query_text"] == "StormEvents | count"
+    assert result["stats"]["PlanSize"] == 9487
+    assert result["stats"]["RelopSize"] == 229
+    assert result["relop_tree"]["type"] == "CrossTableUnionOperator"
+
+    # Verify execution hints extracted from physical plan
+    hints = result["execution_hints"]
+    assert hints["estimated_rows"] == 59066
+    assert hints["concurrency"] == 1
+    assert hints["spread"] == 1
+    assert len(hints["shard_scans"]) == 1
+    assert hints["shard_scans"][0]["total_rows"] == 59066
+    assert hints["shard_scans"][0]["has_selection"] is False
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_show_queryplan_strips_query_whitespace(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_queryplan_response: KustoResponseDataSet,
+) -> None:
+    """Test that leading/trailing whitespace in the query is stripped before wrapping."""
+    mock_config.response_format = "kusto_response"
+    mock_config.timeout_seconds = None
+
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_queryplan_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    kusto_show_queryplan("  StormEvents | take 10  ", sample_cluster_uri, database="test_db")
+
+    args = mock_client.execute.call_args[0]
+    assert args[1] == ".show queryplan <| StormEvents | take 10"
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_show_queryplan_uses_default_database(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_queryplan_response: KustoResponseDataSet,
+) -> None:
+    """Test that kusto_show_queryplan falls back to default database when none provided."""
+    mock_config.response_format = "kusto_response"
+    mock_config.timeout_seconds = None
+
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_queryplan_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "my_default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    kusto_show_queryplan("T | count", sample_cluster_uri)
+
+    args = mock_client.execute.call_args[0]
+    assert args[0] == "my_default_db"
+
+
+# ── kusto_diagnostics tests ──────────────────────────────────────────────────────
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_diagnostics_all_sections_succeed(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that kusto_diagnostics returns all 5 sections as lists of row-dicts."""
+    mock_config.response_format = "columnar"
+    mock_config.timeout_seconds = None
+
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    result = kusto_diagnostics(sample_cluster_uri, database="test_db")
+
+    expected_sections = {"capacity", "cluster", "principal_roles", "diagnostics", "workload_groups", "rowstores", "ingestion_failures"}
+    assert set(result.keys()) == expected_sections
+
+    for section in expected_sections:
+        assert isinstance(result[section], list), f"Section '{section}' should be a list of row-dicts"
+        assert len(result[section]) == 1
+        assert result[section][0]["TestColumn"] == "TestValue"
+
+    assert mock_client.execute.call_count == 7
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_diagnostics_partial_failure(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that a failing command results in an error for that section while others succeed."""
+    mock_config.response_format = "columnar"
+    mock_config.timeout_seconds = None
+
+    call_count = 0
+
+    def execute_side_effect(database: str, query: str, crp: ClientRequestProperties) -> KustoResponseDataSet:
+        nonlocal call_count
+        call_count += 1
+        if ".show cluster" in query and "| project" not in query:
+            raise RuntimeError("Permission denied for .show cluster")
+        return mock_kusto_response
+
+    mock_client = MagicMock()
+    mock_client.execute.side_effect = execute_side_effect
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    result = kusto_diagnostics(sample_cluster_uri, database="test_db")
+
+    assert "error" in result["cluster"]
+    assert "Permission denied" in result["cluster"]["error"]
+
+    for section in ["capacity", "principal_roles", "diagnostics", "workload_groups", "rowstores", "ingestion_failures"]:
+        assert isinstance(result[section], list), f"Section '{section}' should have succeeded"
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_diagnostics_commands_are_correct(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that the diagnostic sub-commands match expected command strings."""
+    mock_config.response_format = "columnar"
+    mock_config.timeout_seconds = None
+
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    kusto_diagnostics(sample_cluster_uri)
+
+    executed_commands = [call[0][1] for call in mock_client.execute.call_args_list]
+
+    assert ".show capacity | project Resource, Total, Consumed, Remaining" in executed_commands
+    assert ".show cluster" in executed_commands
+    assert ".show principal roles | project Scope, Role" in executed_commands
+    assert ".show diagnostics" in executed_commands
+    assert ".show workload_groups" in executed_commands
+    assert ".show rowstores" in executed_commands
+    assert any("ingestion failures" in cmd for cmd in executed_commands)
+
