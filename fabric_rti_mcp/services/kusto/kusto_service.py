@@ -945,7 +945,7 @@ def _parse_queryplan_content(rows: list[list[Any]]) -> dict[str, Any]:
                 if hints:
                     plan["execution_hints"] = hints
             except Exception:
-                pass
+                plan["query_plan"] = content
     return plan
 
 
