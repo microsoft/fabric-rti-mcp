@@ -4,6 +4,7 @@ import base64
 import functools
 import gzip
 import inspect
+import json
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict
@@ -865,3 +866,184 @@ def kusto_get_shots(
     """
 
     return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+
+def _rows_to_dicts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert a kusto_response result into a compact list of row-dicts."""
+    data = result.get("data", {})
+    fmt = result.get("format", "")
+    if fmt == "kusto_response":
+        columns = [c["ColumnName"] for c in data.get("columns", [])]
+        return [dict(zip(columns, row)) for row in data.get("rows", [])]
+    if isinstance(data, dict):
+        columns = list(data.keys())
+        if not columns:
+            return []
+        row_count = len(data[columns[0]]) if data[columns[0]] else 0
+        return [{col: data[col][i] for col in columns} for i in range(row_count)]
+    return []
+
+
+def _extract_physical_plan_hints(plan_json: dict[str, Any]) -> dict[str, Any]:
+    """Extract execution hints from the physical QueryPlan: row counts, selection flags, concurrency."""
+    hints: dict[str, Any] = {}
+    if "TotalRowCount" in plan_json:
+        hints["estimated_rows"] = plan_json["TotalRowCount"]
+
+    # Walk the operator tree to collect shard-level hints
+    shards: list[dict[str, Any]] = []
+
+    def _walk(obj: Any) -> None:
+        if not isinstance(obj, dict):
+            if isinstance(obj, list):
+                for item in obj:
+                    _walk(item)
+            return
+        if "TotalRowCount" in obj and "HasSelection" in obj:
+            shard: dict[str, Any] = {
+                "total_rows": obj["TotalRowCount"],
+                "has_selection": obj["HasSelection"],
+            }
+            shards.append(shard)
+        if "StrategyHint" in obj:
+            sh = obj["StrategyHint"]
+            hints.setdefault("concurrency", sh.get("Concurrency"))
+            hints.setdefault("spread", sh.get("Spread"))
+        for v in obj.values():
+            _walk(v)
+
+    _walk(plan_json.get("RootOperator", {}))
+    if shards:
+        hints["shard_scans"] = shards
+    return hints
+
+
+def _parse_queryplan_content(rows: list[list[Any]]) -> dict[str, Any]:
+    """Parse .show queryplan rows into a compact, agent-friendly dict."""
+    plan: dict[str, Any] = {}
+    for row in rows:
+        result_type, _, content = row[0], row[1], row[2]
+        if result_type == "QueryText":
+            plan["query_text"] = content.strip()
+        elif result_type == "Error":
+            first_line = content.strip().split("\n")[0].split("\r")[0]
+            plan["error"] = first_line
+        elif result_type == "Stats":
+            try:
+                plan["stats"] = json.loads(content)
+            except Exception:
+                plan["stats"] = content
+        elif result_type == "RelopTree":
+            try:
+                plan["relop_tree"] = json.loads(content)
+            except Exception:
+                plan["relop_tree"] = content
+        elif result_type == "QueryPlan":
+            try:
+                physical = json.loads(content)
+                hints = _extract_physical_plan_hints(physical)
+                if hints:
+                    plan["execution_hints"] = hints
+            except Exception:
+                plan["query_plan"] = content
+    return plan
+
+
+def kusto_show_queryplan(
+    query: str,
+    cluster_uri: str,
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Retrieves the query execution plan without actually running the query.
+    This is significantly lighter than execution and useful for understanding
+    performance characteristics and estimating query impact.
+
+    :param query: The KQL query to get the execution plan for.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
+    :return: A compact dictionary with the following keys:
+        * query_text — the query as received by the engine
+        * stats — planning statistics: Duration, PlanSize (bytes), RelopSize (bytes)
+        * relop_tree — the logical operator tree (compact JSON)
+        * execution_hints — extracted from the physical plan:
+            * estimated_rows — total row count the engine expects to process
+            * concurrency — parallelism hint (-1 = auto, 1 = parallel partitions)
+            * spread — node spread hint (-1 = auto, 1 = distributed)
+            * shard_scans — per-shard info: total_rows and has_selection (filter applied)
+        * error — if the query has semantic errors (e.g., bad column name), this contains
+            the error message. The query is NOT executed.
+
+    Critical:
+    * This does NOT execute the query — it only generates the plan.
+    * The plan shows the logical operators the engine would use.
+    * Use this to estimate cost and understand performance before running expensive queries.
+    * PlanSize indicates the overall plan complexity; RelopSize indicates the logical tree size.
+    * execution_hints.estimated_rows and shard_scans reveal the data volume the engine expects to scan.
+    * has_selection=true in shard_scans means a filter narrows the scan (extent pruning applies).
+    """
+    raw = _execute(
+        f".show queryplan <| {query.strip()}",
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+    )
+    data = raw.get("data", {})
+    rows = data.get("rows", []) if raw.get("format") == "kusto_response" else []
+    if not rows:
+        return raw
+    return _parse_queryplan_content(rows)
+
+
+_DIAGNOSTICS_COMMANDS: dict[str, str] = {
+    "capacity": ".show capacity | project Resource, Total, Consumed, Remaining",
+    "cluster": ".show cluster",
+    "principal_roles": ".show principal roles | project Scope, Role",
+    "diagnostics": ".show diagnostics",
+    "workload_groups": ".show workload_groups",
+    "rowstores": ".show rowstores",
+    "ingestion_failures": ".show ingestion failures | where FailedOn > ago(1d)",
+}
+
+
+def kusto_diagnostics(
+    cluster_uri: str,
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Runs a suite of diagnostic commands and returns a JSON summary of the cluster's
+    current state. Each section runs independently — if a command fails (e.g., due to
+    permissions or unsupported features), that section returns an error while others
+    continue normally.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
+    :return: A dictionary with keys for each diagnostic area. Each value is either a list
+             of row-dicts or {"error": "<message>"} if that command failed.
+
+    Sections returned:
+    * capacity — resource utilization limits (total, consumed, remaining per resource)
+    * cluster — cluster node info and state
+    * principal_roles — caller's permission scope and role
+    * diagnostics — internal cluster diagnostics (health, latency, utilization)
+    * workload_groups — configured workload groups and their policies
+    * rowstores — rowstore state and memory usage
+    * ingestion_failures — ingestion failures from the last 24 hours
+    """
+    results: dict[str, Any] = {}
+    for section, command in _DIAGNOSTICS_COMMANDS.items():
+        try:
+            raw = _execute(
+                command,
+                cluster_uri,
+                database=database,
+                client_request_properties=client_request_properties,
+            )
+            results[section] = _rows_to_dicts(raw)
+        except Exception as e:
+            results[section] = {"error": str(e)}
+    return results

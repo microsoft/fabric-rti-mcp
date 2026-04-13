@@ -24,6 +24,8 @@ Fabric RTI MCP exposes Kusto functionality as MCP tools. Authentication is handl
 | `kusto_known_services` | List configured Kusto services |
 | `kusto_get_shots` | Retrieve semantically similar shots from a shots table |
 | `kusto_deeplink_from_query` | Build a deeplink URL to open a query in the web explorer |
+| `kusto_show_queryplan` | Get the execution plan for a query without running it |
+| `kusto_diagnostics` | Get a best-effort cluster health and capacity summary |
 
 ### Query vs management commands
 
@@ -468,3 +470,90 @@ Before running any KQL query, mentally check:
 8. **Complex by-expressions?** Use `| extend` first, then `| summarize by` the computed column
 9. **Error recovery plan?** If a query fails, fix the specific error — don't change strategy
 10. **Right tool?** Use `kusto_query` for queries, `kusto_command` for management commands, `kusto_sample_entity` for quick previews
+11. **Checked the plan?** For expensive queries (joins, large tables), use `kusto_show_queryplan` to compare approaches before executing
+12. **Cluster healthy?** Before heavy workloads, use `kusto_diagnostics` to check capacity and permissions
+
+## 15. Diagnostics & Query Optimization
+
+Two tools let you look before you leap: `kusto_show_queryplan` for query cost estimation and `kusto_diagnostics` for cluster health.
+
+### Query plan analysis
+
+`kusto_show_queryplan` plans a query without executing it. Returns:
+
+| Field | What it tells you |
+|-------|-------------------|
+| `stats.PlanSize` | Overall plan complexity (bytes). Compare two approaches — higher = heavier. |
+| `stats.RelopSize` | Logical operator tree size. Grows with operator count. |
+| `execution_hints.estimated_rows` | Total rows the engine expects to process. **The strongest cost signal.** |
+| `execution_hints.shard_scans` | Per-shard `{total_rows, has_selection}`. More shards = more parallel scans. |
+| `execution_hints.shard_scans[].has_selection` | `true` = a filter narrows the scan (extent pruning). `false` = full scan. |
+| `execution_hints.concurrency` | Parallelism hint. `-1` = auto (precomputed), `1` = parallel partitions. |
+| `relop_tree` | Logical operator tree. Look for `ConstantDataTable` (precomputed) or `InnerEquiJoin` (expensive). |
+| `error` | Semantic errors caught without executing. Validates column names and table references. |
+
+```
+kusto_show_queryplan(
+    query="Trips | where pickup_datetime > datetime(2014-01-01) | summarize count() by vendor_id",
+    cluster_uri="https://help.kusto.windows.net",
+    database="Samples"
+)
+```
+
+### What queryplan CAN detect
+
+- **Expensive joins**: Self-joins double `estimated_rows` and `shard_scans` count.
+- **Materialize overhead**: `materialize()` + join has higher PlanSize than single-pass multi-aggregation.
+- **Precomputed results**: Bare `| count` returns `estimated_rows=1` and `ConstantDataTable` in the tree — no scan.
+- **Column/table typos**: Returns an `error` field with the semantic error message.
+- **Filter presence**: `has_selection=true` vs `false` shows whether a `where` clause narrows the scan.
+
+### What queryplan CANNOT detect
+
+- **Data volume differences**: Full scan vs filtered scan on the same table show similar `estimated_rows` (both report table size). Use `has_selection` instead — `false` means full scan.
+- **Type mismatches**: KQL auto-casts, so `where fare_amount == "expensive"` plans successfully (returns 0 rows at runtime).
+- **Ambiguous join columns**: KQL resolves these at plan time without error.
+
+### Comparing two query approaches
+
+The pattern: plan both, compare `estimated_rows` and `shard_scans`.
+
+```
+# Plan A: direct summarize
+plan_a = kusto_show_queryplan(query="Trips | summarize count() by vendor_id, payment_type", ...)
+
+# Plan B: self-join (looks "clever" but is worse)
+plan_b = kusto_show_queryplan(query="Trips | as T | join kind=inner (T | summarize by vendor_id) on vendor_id | summarize count() by payment_type", ...)
+
+# Compare: plan_b.execution_hints.estimated_rows will be 2x plan_a's → pick A
+```
+
+**Regression thresholds**: Flag a rewrite as a regression if `estimated_rows` increases >50% or `shard_scans` count increases >30%.
+
+### Cluster diagnostics
+
+`kusto_diagnostics` runs 7 commands (best-effort — permission failures don't block others):
+
+| Section | What it tells you |
+|---------|-------------------|
+| `capacity` | Resource slots: Queries, Ingestions, Merges, etc. Each has Total/Consumed/Remaining. |
+| `cluster` | Node count, cores, RAM (total and available), product version. |
+| `principal_roles` | Your permissions per database (Viewer, Admin, etc.). |
+| `diagnostics` | Cluster health: IsHealthy, merge/ingestion load factors, extent counts. |
+| `workload_groups` | Configured workload policies (requires admin). |
+| `rowstores` | Rowstore memory state (requires admin). |
+| `ingestion_failures` | Failed ingestions in last 24h. |
+
+```
+kusto_diagnostics(
+    cluster_uri="https://help.kusto.windows.net",
+    database="Samples"
+)
+```
+
+### When to use diagnostics
+
+- **Before heavy workloads**: Check `capacity` — if `Queries.Remaining` is low, wait or batch.
+- **Batching decisions**: `batch_size = min(remaining_slots / 2, num_tasks)` — leave 50% headroom.
+- **Permission checks**: `principal_roles` tells you what you can do before you try and fail.
+- **Debugging ingestion issues**: `ingestion_failures` surfaces errors from the last 24h.
