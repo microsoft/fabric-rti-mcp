@@ -308,6 +308,14 @@ def destructive_operation(func: F) -> F:
     return wrapper  # type: ignore
 
 
+_BLOCKED_CRP_KEYS = frozenset(
+    {
+        "request_readonly",
+        "request_readonly_hardline",
+    }
+)
+
+
 def _crp(
     action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: dict[str, Any] | None = None
 ) -> ClientRequestProperties:
@@ -325,9 +333,12 @@ def _crp(
         timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         crp.set_option("servertimeout", timeout_str)
 
-    # Apply any additional client request properties provided by the user
-    # User properties can override global settings
     if client_request_properties:
+        blocked = [k for k in client_request_properties if k.lower() in _BLOCKED_CRP_KEYS]
+        if blocked:
+            raise ValueError(
+                f"Client request properties {blocked} are security-sensitive and cannot be overridden via MCP tools"
+            )
         for key, value in client_request_properties.items():
             crp.set_option(key, value)
 

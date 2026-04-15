@@ -128,7 +128,9 @@ class TestQueryCommandValidation:
 
     @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-    def test_query_accepts_kql_with_comments(self, mock_conn: MagicMock, mock_config: MagicMock, mock_kusto_response) -> None:
+    def test_query_accepts_kql_with_comments(
+        self, mock_conn: MagicMock, mock_config: MagicMock, mock_kusto_response
+    ) -> None:
         mock_config.response_format = "kusto_response"
         mock_config.timeout_seconds = None
         mock_config.offload_enabled = False
@@ -152,7 +154,9 @@ class TestQueryCommandValidation:
 
     @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-    def test_command_accepts_dot_command(self, mock_conn: MagicMock, mock_config: MagicMock, mock_kusto_response) -> None:
+    def test_command_accepts_dot_command(
+        self, mock_conn: MagicMock, mock_config: MagicMock, mock_kusto_response
+    ) -> None:
         mock_config.response_format = "kusto_response"
         mock_config.timeout_seconds = None
         mock_config.offload_enabled = False
@@ -168,7 +172,9 @@ class TestQueryCommandValidation:
 
     @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-    def test_command_accepts_dot_command_after_set(self, mock_conn: MagicMock, mock_config: MagicMock, mock_kusto_response) -> None:
+    def test_command_accepts_dot_command_after_set(
+        self, mock_conn: MagicMock, mock_config: MagicMock, mock_kusto_response
+    ) -> None:
         mock_config.response_format = "kusto_response"
         mock_config.timeout_seconds = None
         mock_config.offload_enabled = False

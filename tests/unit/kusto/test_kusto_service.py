@@ -6,7 +6,12 @@ from azure.kusto.data import ClientRequestProperties
 from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
-from fabric_rti_mcp.services.kusto.kusto_service import kusto_command, kusto_diagnostics, kusto_query, kusto_show_queryplan
+from fabric_rti_mcp.services.kusto.kusto_service import (
+    kusto_command,
+    kusto_diagnostics,
+    kusto_query,
+    kusto_show_queryplan,
+)
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
@@ -222,6 +227,32 @@ def test_destructive_operation_with_custom_client_request_properties(
     assert result["format"] == "columnar"
     assert "data" in result
     assert result["data"]["TestColumn"] == ["TestValue"]
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_blocked_crp_keys_raise_error(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+) -> None:
+    """Test that security-sensitive CRP keys are rejected."""
+    mock_config.timeout_seconds = None
+
+    blocked_keys = [
+        "request_readonly",
+        "request_readonly_hardline",
+    ]
+
+    for key in blocked_keys:
+        with pytest.raises(ValueError, match="security-sensitive"):
+            kusto_query("T | take 1", sample_cluster_uri, database="db", client_request_properties={key: False})
+
+    # Also verify case-insensitive matching
+    with pytest.raises(ValueError, match="security-sensitive"):
+        kusto_query(
+            "T | take 1", sample_cluster_uri, database="db", client_request_properties={"Request_Readonly": False}
+        )
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
@@ -519,7 +550,15 @@ def test_diagnostics_all_sections_succeed(
 
     result = kusto_diagnostics(sample_cluster_uri, database="test_db")
 
-    expected_sections = {"capacity", "cluster", "principal_roles", "diagnostics", "workload_groups", "rowstores", "ingestion_failures"}
+    expected_sections = {
+        "capacity",
+        "cluster",
+        "principal_roles",
+        "diagnostics",
+        "workload_groups",
+        "rowstores",
+        "ingestion_failures",
+    }
     assert set(result.keys()) == expected_sections
 
     for section in expected_sections:
@@ -599,4 +638,3 @@ def test_diagnostics_commands_are_correct(
     assert ".show workload_groups" in executed_commands
     assert ".show rowstores" in executed_commands
     assert any("ingestion failures" in cmd for cmd in executed_commands)
-

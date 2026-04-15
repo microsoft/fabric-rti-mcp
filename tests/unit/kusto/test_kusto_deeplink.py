@@ -121,7 +121,9 @@ class TestBuildFabricDeeplink:
     def test_exceeds_max_length(self) -> None:
         long_query = "".join(f"{i:04X}" for i in range(10000))
         assert (
-            _build_fabric_deeplink("https://fabric.microsoft.com", "https://x.kusto.fabric.microsoft.com", "db", long_query)
+            _build_fabric_deeplink(
+                "https://fabric.microsoft.com", "https://x.kusto.fabric.microsoft.com", "db", long_query
+            )
             is None
         )
 
@@ -136,9 +138,7 @@ class TestKustoGetWebExplorerUrl:
 
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
     def test_fabric_cluster(self, mock_get_conn: MagicMock) -> None:
-        url = kusto_deeplink_from_query(
-            "https://mycluster.kusto.fabric.microsoft.com", "MyDb", "T | take 10"
-        )
+        url = kusto_deeplink_from_query("https://mycluster.kusto.fabric.microsoft.com", "MyDb", "T | take 10")
         assert url is not None
         assert url.startswith("https://fabric.microsoft.com/groups/me/queryworkbenches/querydeeplink")
         mock_get_conn.assert_not_called()
@@ -147,7 +147,7 @@ class TestKustoGetWebExplorerUrl:
     def test_unknown_domain_falls_back_to_show_version_adx(self, mock_execute: MagicMock) -> None:
         mock_execute.return_value = {
             "format": "columnar",
-            "data": {"ServiceOffering": ["{\"Type\":\"Azure Data Explorer\"}"]},
+            "data": {"ServiceOffering": ['{"Type":"Azure Data Explorer"}']},
         }
         url = kusto_deeplink_from_query("https://unknown.example.com", "db", "T | take 10")
         mock_execute.assert_called_once()
@@ -158,7 +158,7 @@ class TestKustoGetWebExplorerUrl:
     def test_unknown_domain_falls_back_to_show_version_fabric(self, mock_execute: MagicMock) -> None:
         mock_execute.return_value = {
             "format": "columnar",
-            "data": {"ServiceOffering": ["{\"Type\":\"Microsoft Fabric Eventhouse\"}"]},
+            "data": {"ServiceOffering": ['{"Type":"Microsoft Fabric Eventhouse"}']},
         }
         url = kusto_deeplink_from_query("https://unknown.example.com", "db", "T | take 10")
         assert url is not None
@@ -192,7 +192,9 @@ class TestKustoGetWebExplorerUrl:
 
     @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-    def test_config_override_forces_adx_for_fabric_cluster(self, mock_get_conn: MagicMock, mock_config: MagicMock) -> None:
+    def test_config_override_forces_adx_for_fabric_cluster(
+        self, mock_get_conn: MagicMock, mock_config: MagicMock
+    ) -> None:
         mock_config.deeplink_style = "adx"
         url = kusto_deeplink_from_query("https://mycluster.kusto.fabric.microsoft.com", "MyDb", "T | take 10")
         # URL is None because fabric domain is not in ADX cloud mappings
