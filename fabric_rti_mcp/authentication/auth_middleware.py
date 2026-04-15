@@ -92,7 +92,7 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
         # Add CORS middleware
         app.add_middleware(
             CORSMiddleware,  # ty: ignore[invalid-argument-type]
-            allow_origins=["*"],  # Allows all origins
+            allow_origins=[o.strip() for o in config.cors_allowed_origins.split(",")],
             allow_credentials=True,
             allow_methods=["*"],  # Allows all methods
             allow_headers=["*"],  # Allows all headers
