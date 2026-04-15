@@ -254,8 +254,6 @@ Table
 
 **Never skip to a complex query without running Steps 1-2 first.** Knowing the table size prevents memory errors; seeing sample rows prevents wrong assumptions about column values.
 
-**With MCP tools**: Use `kusto_sample_entity` for Step 2 and `kusto_describe_database_entity` to understand the schema before querying.
-
 ---
 
 ## 9. Diffing & Anomaly Detection

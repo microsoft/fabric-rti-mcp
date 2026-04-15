@@ -5,6 +5,9 @@ description: "KQL language expertise for writing correct, efficient Kusto querie
 
 # KQL Mastery
 
+> **Try it yourself**: All `✅` examples in this skill can be run against the public help cluster:
+> `https://help.kusto.windows.net`, database `Samples` (contains `StormEvents`, `SimpleGraph_Nodes`/`Edges`, `nyc_taxi`, and more).
+
 ## 1. Running KQL with Fabric RTI MCP
 
 Fabric RTI MCP exposes Kusto functionality as MCP tools. Authentication is handled transparently using Azure Identity.
@@ -187,7 +190,7 @@ Unlike Python's `re.findall()`, KQL's `extract_all` **requires capturing groups*
 | `extract_all(regex, source)` | All matches (needs `()`) | `extract_all(@"(\w+)", Text)` |
 | `parse` | Structured extraction | `parse Msg with * "User '" Sender "' sent" *` |
 | `matches regex` | Boolean filter | `where Url matches regex @"^https?://"` |
-| `replace_regex` | Find and replace | `replace_regex(@"\s+", " ", Text)` |
+| `replace_regex` | Find and replace | `replace_regex(Text, @"\s+", " ")` |
 
 ## 5. Serialization Requirements
 
@@ -275,7 +278,7 @@ KQL sometimes requires explicit casts when comparing computed string values — 
 | where tostring(geo_point_to_s2cell(Lon, Lat, 16)) == tostring(other_cell)
 ```
 
-This is most common with computed values from `geo_point_to_s2cell()`, `hash()`, and `strcat()` comparisons. When in doubt, cast with `tostring()`.
+This is most common with computed values from `geo_point_to_s2cell()` and `strcat()` comparisons. When in doubt, cast with `tostring()`.
 
 ## 9. Advanced Functions
 
@@ -283,22 +286,21 @@ KQL handles these natively — no need for Python:
 
 ### Vector similarity
 ```kql
-// Don't export vectors and compute cosine similarity in Python
-let target = toscalar(Vectors | where Word == "test" | project Vec);
-Data | extend sim = series_cosine_similarity(parse_json(VecColumn), target)
-| top 10 by sim desc
+// try it! — cosine similarity on Iris feature vectors
+let target = pack_array(5.1, 3.5, 1.4, 0.2);
+Iris
+| extend Vec = pack_array(SepalLength, SepalWidth, PetalLength, PetalWidth)
+| extend sim = series_cosine_similarity(Vec, target)
+| top 5 by sim desc
 ```
 
 ### Geo operations
 ```kql
-// Point-in-polygon check
-| where geo_point_in_polygon(Longitude, Latitude, dynamic({"type":"Polygon","coordinates":[...]}))
-
 // Distance between two points (meters)
-| extend dist = geo_distance_2points(Lon1, Lat1, Lon2, Lat2)
+StormEvents | extend dist = geo_distance_2points(BeginLon, BeginLat, EndLon, EndLat)
 
 // Spatial bucketing for joins
-| extend cell = geo_point_to_s2cell(Lon, Lat, 8)
+StormEvents | extend cell = geo_point_to_s2cell(BeginLon, BeginLat, 8)
 ```
 
 ### Graph queries
@@ -306,17 +308,25 @@ Data | extend sim = series_cosine_similarity(parse_json(VecColumn), target)
 Use the `kusto_graph_query` MCP tool for graph traversal. It automatically handles graph snapshots when available:
 
 ```kql
-// Build and traverse a graph
-graph(Nodes, Edges)
+// Persistent graph model — query the latest snapshot
+graph("Simple")
 | graph-match (src)-[e*1..5]->(dst)
-  where src.Name == "start" and dst.IsTarget == true
-  project src.Name, dst.Name, path_length = array_length(e)
+  where src.name == "Alice"
+  project src.name, dst.name, path_length = array_length(e)
+
+// Transient graph — build inline with make-graph
+SimpleGraph_Edges
+| make-graph source --> target with SimpleGraph_Nodes on id
+| graph-match (src)-[e*1..5]->(dst)
+  where src.name == "Alice"
+  project src.name, dst.name, path_length = array_length(e)
 ```
 
 ### Time series
 ```kql
 // Create a time series and detect anomalies
-| make-series count() default=0 on Timestamp step 1h
+StormEvents
+| make-series count() default=0 on StartTime step 1d
 | extend anomalies = series_decompose_anomalies(count_)
 ```
 
@@ -365,15 +375,15 @@ Datetime literals are a common source of errors. A wrong literal format can casc
 | where datetime_part("year", StartTime) == 2007
 
 // ✅ ALSO RIGHT — use between with datetime range
-| where StartTime between (datetime(2007-01-01) .. datetime(2007-12-31))
+| where StartTime between (datetime(2007-01-01) .. datetime(2007-12-31T23:59:59))
 ```
 
 ### Time bucketing in summarize
 ```kql
-// ❌ WRONG — complex expression directly in by-clause can fail in some engines
+// This works, but can be harder to read and reuse in complex queries
 | summarize count() by startofmonth(StartTime)
 
-// ✅ SAFER — extend first, then summarize by the computed column
+// Clearer — extend first, then summarize by the computed column
 | extend Month = startofmonth(StartTime)
 | summarize count() by Month
 | order by Month asc
@@ -382,18 +392,28 @@ Datetime literals are a common source of errors. A wrong literal format can casc
 ### Useful datetime functions
 | Function | Purpose | Example |
 |----------|---------|---------|
-| `bin(ts, 1h)` | Round to nearest bucket | `bin(Timestamp, 1d)` |
+| `bin(ts, 1h)` | Round down to bucket boundary | `bin(Timestamp, 1d)` |
 | `startofmonth(ts)` | First day of month | `startofmonth(Timestamp)` |
 | `datetime_part("hour", ts)` | Extract component | `datetime_part("year", Timestamp)` |
 | `format_datetime(ts, fmt)` | Format as string | `format_datetime(Timestamp, "yyyy-MM")` |
-| `ago(1d)` | Relative time | `where Timestamp > ago(7d)` |
-| `between(a .. b)` | Range filter | `where Timestamp between (datetime(2024-01-01) .. datetime(2024-01-31))` |
+| `ago(1d)` | Relative time | `where Timestamp > ago(1d)` |
+| `between(a .. b)` | Range filter (inclusive) | `where Timestamp between (datetime(2024-01-01) .. datetime(2024-01-31T23:59:59))` |
 | `todatetime(str)` | Parse string → datetime | `todatetime("2024-01-15T10:30:00Z")` |
 | `totimespan(str)` | Parse string → timespan | `totimespan("01:30:00")` |
 
 ## 12. Operator Naming & Equality
 
 KQL has subtle differences from SQL syntax.
+
+### Naming conventions
+
+| Entity | Convention | Example |
+|--------|-----------|---------|
+| Tables | UpperCamelCase | `StormEvents`, `NetworkLogs` |
+| Columns | UpperCamelCase | `StartTime`, `EventType` |
+| Variables (`let`) | snake_case | `let filtered_events = ...` |
+| Built-in functions | snake_case | `format_bytes()`, `geo_distance_2points()` |
+| Stored functions | UpperCamelCase | `.create function GetTopUsers` |
 
 ### Equality operators
 ```kql
