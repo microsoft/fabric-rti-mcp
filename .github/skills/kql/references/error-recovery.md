@@ -26,41 +26,41 @@ Complete mapping of common KQL error patterns. For each error: the exact message
 ### Pattern A: Unfiltered aggregation on large table
 
 ```kql
-// ❌ TRIGGERED ERROR — 24M rows, no pre-filter
-Consumption
-| summarize dcount(Consumed), count() by Timestamp, HouseholdId, MeterType
-| where dcount_Consumed > 1
+// ❌ TRIGGERED ERROR — large table, no pre-filter, too many group-by columns
+StormEvents
+| summarize dcount(EventType), count() by StartTime, State, Source
+| where dcount_EventType > 1
 
 // ✅ FIX — filter first, reduce grouping columns
-Consumption
-| where Timestamp between (datetime(2023-04-15) .. datetime(2023-04-16))
-| summarize dcount(Consumed) by HouseholdId, MeterType
-| where dcount_Consumed > 1
+StormEvents
+| where StartTime between (datetime(2007-04-15) .. datetime(2007-04-16))
+| summarize dcount(EventType) by State, Source
+| where dcount_EventType > 1
 ```
 
 ### Pattern B: Join explosion
 
 ```kql
-// ❌ TRIGGERED ERROR — 25K IPs × 195 polygons
-ip_locations
-| join kind=inner (Cities | where HackersCount >= 256) on $left.CityName == $right.CityName
+// ❌ TRIGGERED ERROR — unconstrained join between two large tables
+StormEvents
+| join kind=inner (PopulationData) on State
 
 // ✅ FIX — pre-filter both sides, check cardinality first
-let filtered_ips = ip_locations | where CountryCode == "US" | summarize by CityName;
-let target_cities = Cities | where HackersCount >= 256 | project CityName;
-filtered_ips | join kind=inner target_cities on CityName
+let filtered_storms = StormEvents | where State == "TEXAS" | summarize by State;
+let target_states = PopulationData | project State;
+filtered_storms | join kind=inner (target_states) on State
 ```
 
 ### Pattern C: High-cardinality dcount()
 
 ```kql
-// ❌ TRIGGERED ERROR — Full distinct value enumeration
-Logs | summarize dcount(SourceIP), dcount(DestIP), dcount(Port) by bin(Timestamp, 1h)
+// ❌ TRIGGERED ERROR — Full distinct value enumeration on many columns
+StormEvents | summarize dcount(EventType), dcount(Source), dcount(BeginLocation) by bin(StartTime, 1h)
 
-// ✅ FIX — use approximate counts or filter first
-Logs
-| where Timestamp > ago(1d)
-| summarize dcount(SourceIP) by bin(Timestamp, 1h)
+// ✅ FIX — filter first, reduce to one dcount
+StormEvents
+| where StartTime between (datetime(2007-06-01) .. datetime(2007-06-30T23:59:59))
+| summarize dcount(EventType) by bin(StartTime, 1h)
 ```
 
 **Recovery strategy**: When you see this error, your query is touching too much data. Options:
@@ -79,19 +79,19 @@ Logs
 
 ```kql
 // ❌ TRIGGERED ERROR — incomplete on clause
-TableA | join kind=inner TableB on $left.Id
+StormEvents | join kind=inner PopulationData on $left.State
 
 // ✅ FIX — specify both sides
-TableA | join kind=inner TableB on $left.Id == $right.Id
+StormEvents | join kind=inner (PopulationData) on $left.State == $right.State
 ```
 
 ```kql
 // ❌ TRIGGERED ERROR — expression in join condition
-TableA | join kind=inner TableB on $left.Id == $right.tolower(Name)
+StormEvents | join kind=inner (PopulationData) on $left.State == $right.tolower(State)
 
 // ✅ FIX — pre-compute the expression, join on the computed column
-TableA
-| join kind=inner (TableB | extend NameLower = tolower(Name)) on $left.Id == $right.NameLower
+StormEvents
+| join kind=inner (PopulationData | extend StateLower = tolower(State)) on $left.State == $right.StateLower
 ```
 
 ### 2b. Equality only
@@ -100,24 +100,24 @@ TableA
 
 ```kql
 // ❌ TRIGGERED ERROR — geo-distance in join predicate
-TableA | join TableB on geo_distance_2points(a.Lat, a.Lon, b.Lat, b.Lon) < 1000
+StormEvents | join (nyc_taxi) on geo_distance_2points(BeginLon, BeginLat, pickup_longitude, pickup_latitude) < 1000
 
 // ✅ FIX — pre-bucket into spatial cells
-TableA
-| extend cell = geo_point_to_s2cell(Lon, Lat, 8)
-| join kind=inner (TableB | extend cell = geo_point_to_s2cell(Lon, Lat, 8)) on cell
-| where geo_distance_2points(Lat, Lon, Lat1, Lon1) < 1000  // post-filter for precision
+StormEvents
+| extend cell = geo_point_to_s2cell(BeginLon, BeginLat, 8)
+| join kind=inner (nyc_taxi | extend cell = geo_point_to_s2cell(pickup_longitude, pickup_latitude, 8)) on cell
+| where geo_distance_2points(BeginLat, BeginLon, pickup_latitude, pickup_longitude) < 1000
 ```
 
 ```kql
 // ❌ TRIGGERED ERROR — range join
-Sales | join Thresholds on $left.Amount > $right.MinAmount
+StormEvents | join (PopulationData) on $left.DamageProperty > $right.Population
 
 // ✅ FIX — bin values and join on bins
-Sales
-| extend amount_bin = bin(Amount, 100)
-| join kind=inner (Thresholds | extend amount_bin = bin(MinAmount, 100)) on amount_bin
-| where Amount > MinAmount  // post-filter
+StormEvents
+| extend damage_bin = bin(DamageProperty, 1000000)
+| join kind=inner (PopulationData | extend damage_bin = bin(Population, 1000000)) on damage_bin
+| where DamageProperty > Population
 ```
 
 ---
@@ -130,7 +130,7 @@ Cause: Corrupted cluster URIs or genuine network timeouts.
 
 **Recovery strategy**: 
 1. Verify the cluster URI is clean ASCII (no Unicode characters)
-2. Retry with a fresh URI
+2. Retry with a fresh URI from the environment variable
 3. If persistent, wait 30 seconds and retry (cluster may be overloaded)
 
 ---
@@ -201,13 +201,14 @@ Cause: Corrupted cluster URIs or genuine network timeouts.
 
 **Error message**: `Unexpected control command`
 
-```kql
-// ❌ — .show is a management command, don't pipe query operators onto it
-.show tables | project TableName
+This error occurs when a query pipes INTO a management command (not the other way around — management commands CAN have query operators piped after them). With Fabric RTI MCP, use `kusto_command` for management commands and `kusto_query` for queries.
 
-// ✅ — use kusto_command for management commands, kusto_query for queries
-// Step 1: kusto_command(command=".show tables", ...)
-// Step 2: kusto_query(query="TableName | take 5", ...)
+```kql
+// ✅ WORKS — management output is tabular, can be filtered
+.show tables | project TableName | where TableName has "Events"
+
+// ❌ ERROR — query piped into management command
+StormEvents | take 5 | .show tables
 ```
 
 ### 6b. Reserved words as identifiers
@@ -246,14 +247,14 @@ Despite both sides being strings, KQL sometimes requires explicit casts for comp
 
 ```kql
 // ❌ — S2 cell comparison
-Runs
-| extend startCell = geo_point_to_s2cell(StartLon, StartLat, 16)
-| join kind=inner (...) on startCell
+StormEvents
+| extend startCell = geo_point_to_s2cell(BeginLon, BeginLat, 16)
+| join kind=inner (nyc_taxi | extend startCell = geo_point_to_s2cell(pickup_longitude, pickup_latitude, 16)) on startCell
 
 // ✅ — explicit tostring()
-Runs
-| extend startCell = tostring(geo_point_to_s2cell(StartLon, StartLat, 16))
-| join kind=inner (... | extend startCell = tostring(geo_point_to_s2cell(Lon, Lat, 16))) on startCell
+StormEvents
+| extend startCell = tostring(geo_point_to_s2cell(BeginLon, BeginLat, 16))
+| join kind=inner (nyc_taxi | extend startCell = tostring(geo_point_to_s2cell(pickup_longitude, pickup_latitude, 16))) on startCell
 ```
 
 This occurs most often with `geo_point_to_s2cell()`, `hash()`, and `strcat()` return values.
@@ -266,10 +267,10 @@ This occurs most often with `geo_point_to_s2cell()`, `hash()`, and `strcat()` re
 
 ```kql
 // ❌ — Missing capturing group
-| extend words = extract_all(@"[a-zA-Z]{3,}", tolower(Title))
+StormEvents | extend words = extract_all(@"[a-zA-Z]{3,}", tolower(EventNarrative))
 
 // ✅ — Add parentheses
-| extend words = extract_all(@"([a-zA-Z]{3,})", tolower(Title))
+StormEvents | extend words = extract_all(@"([a-zA-Z]{3,})", tolower(EventNarrative))
 ```
 
 Unlike Python's `re.findall()`, KQL's `extract_all` requires at least one `()` group.
@@ -282,15 +283,17 @@ Unlike Python's `re.findall()`, KQL's `extract_all` requires at least one `()` g
 
 ```kql
 // ❌
-ChatServerLogs
-| summarize Online = sum(Direction) by bin(Timestamp, 5m)
-| extend CumulativeOnline = row_cumsum(Online)
+StormEvents
+| where State == "TEXAS"
+| summarize DailyCount = count() by bin(StartTime, 1d)
+| extend CumulativeCount = row_cumsum(DailyCount)
 
 // ✅ — add order by (implicitly serializes)
-ChatServerLogs
-| summarize Online = sum(Direction) by bin(Timestamp, 5m)
-| order by Timestamp asc
-| extend CumulativeOnline = row_cumsum(Online)
+StormEvents
+| where State == "TEXAS"
+| summarize DailyCount = count() by bin(StartTime, 1d)
+| order by StartTime asc
+| extend CumulativeCount = row_cumsum(DailyCount)
 ```
 
 Affected functions: `row_number()`, `row_cumsum()`, `prev()`, `next()`, `row_window_session()`.
@@ -308,7 +311,7 @@ Some KQL functions are plugins that may not be enabled on free-tier clusters.
 | Plugin | Status on free cluster | Alternative |
 |--------|----------------------|-------------|
 | `geo_point_in_polygon` (as plugin) | ❌ Not available | Use as scalar function: `geo_point_in_polygon(lon, lat, polygon)` |
-| `python` | ❌ Not available | Use local Python instead |
+| `python` | ❌ Not available | Use powershell tool to run Python locally |
 
 ---
 
@@ -321,10 +324,17 @@ Some KQL functions are plugins that may not be enabled on free-tier clusters.
 graph-match (src)-[path*1..3]->(dst)
   where path.IsVulnerable == true
 
-// ✅ — filter edges at definition, not traversal
+// ✅ — filter edges before building the graph
 let edges = Edges | where IsVulnerable == true;
-graph(Nodes, edges)
+edges
+| make-graph SourceId --> TargetId with Nodes on NodeId
 | graph-match (src)-[path*1..3]->(dst)
+  project src.Name, dst.Name
+
+// ✅ — or use label-based filtering on persistent graphs
+graph("MyGraph")
+| graph-match (src)-[path*1..3]->(dst)
+  where all(path, labels() has "Vulnerable")
   project src.Name, dst.Name
 ```
 
@@ -337,13 +347,17 @@ The fix is to pre-filter edges before graph construction.
 **Error message**: `Runaway query (E_RUNAWAY_QUERY): Join output block exceeded memory budget`
 
 ```kql
-// ❌ — 25K × 195 unconstrained cross-join
-ip_locs | join kind=inner (Cities | where EstimatedHackersCount >= 256) on ...
+// ❌ — unconstrained cross-join on large tables
+StormEvents | join kind=inner (nyc_taxi) on $left.EventId == $right.passenger_count
 
 // ✅ — check cardinality first, pre-filter aggressively
-// Step 1: ip_locs | summarize dcount(JoinKey)  → if >10K, add filters
-// Step 2: Cities | where EstimatedHackersCount >= 256 | count  → if >100, narrow criteria
-// Step 3: Then join
+// Step 1: StormEvents | summarize dcount(State)  → 67 — OK
+// Step 2: PopulationData | count  → check if manageable
+// Step 3: Pre-filter, then join
+StormEvents
+| where State in ("NEW YORK", "TEXAS")
+| join kind=inner (PopulationData) on State
+| take 5 | project State, EventType, Population
 ```
 
 **Prevention**: Always `dcount()` both join sides before executing. If left × right > 1M, add filters.
