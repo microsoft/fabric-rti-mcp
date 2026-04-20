@@ -297,6 +297,7 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_KNOWN_SERVICES` | Kusto | JSON array of preconfigured Kusto services | None | `[{"service_uri":"https://cluster1.kusto.windows.net","default_database":"DB1","description":"Prod"}]` |
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
+| `KUSTO_SHOTS_TABLE` | Kusto | Default shots table name for `kusto_get_shots` when not provided as a parameter | None | `MyDatabase.ShotsTable` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
 | `FABRIC_RTI_KUSTO_DEEPLINK_STYLE` | Kusto | Override auto-detection of deeplink style | None | `adx` or `fabric` |
