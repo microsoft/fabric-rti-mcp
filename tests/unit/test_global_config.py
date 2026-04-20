@@ -58,6 +58,21 @@ class TestFromEnvBooleanParsing:
         config = GlobalFabricRTIConfig.from_env()
         assert config.use_ai_foundry_compat is False
 
+    @patch.dict("os.environ", {}, clear=False)
+    def test_cors_allowed_origins_defaults_to_wildcard(self) -> None:
+        import os
+
+        os.environ.pop("FABRIC_RTI_CORS_ORIGINS", None)
+        config = GlobalFabricRTIConfig.from_env()
+        assert config.cors_allowed_origins == "*"
+
+    @patch.dict("os.environ", {"FABRIC_RTI_CORS_ORIGINS": "https://example.com,https://other.com"}, clear=False)
+    def test_cors_allowed_origins_custom_value(self) -> None:
+        config = GlobalFabricRTIConfig.from_env()
+        assert config.cors_allowed_origins == "https://example.com,https://other.com"
+        origins = [o.strip() for o in config.cors_allowed_origins.split(",")]
+        assert origins == ["https://example.com", "https://other.com"]
+
 
 class TestWithArgsCLIOverride:
     @patch.dict("os.environ", {"USE_OBO_FLOW": "true"}, clear=False)

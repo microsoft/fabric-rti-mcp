@@ -21,6 +21,7 @@ class GlobalFabricRTIEnvVarNames:
     stateless_http = "FABRIC_RTI_STATELESS_HTTP"
     use_obo_flow = "USE_OBO_FLOW"
     use_ai_foundry_compat = "FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA"
+    cors_allowed_origins = "FABRIC_RTI_CORS_ORIGINS"
 
 
 DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
@@ -32,6 +33,7 @@ DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
 DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
 DEFAULT_USE_OBO_FLOW = False
 DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA = False
+DEFAULT_FABRIC_RTI_CORS_ORIGINS = "*"
 
 
 @dataclass(slots=True, frozen=True)
@@ -45,6 +47,7 @@ class GlobalFabricRTIConfig:
     stateless_http: bool
     use_obo_flow: bool
     use_ai_foundry_compat: bool
+    cors_allowed_origins: str
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -67,6 +70,9 @@ class GlobalFabricRTIConfig:
             use_obo_flow=os.getenv(GlobalFabricRTIEnvVarNames.use_obo_flow, "false").lower() in ("true", "1"),
             use_ai_foundry_compat=os.getenv(GlobalFabricRTIEnvVarNames.use_ai_foundry_compat, "false").lower()
             in ("true", "1"),
+            cors_allowed_origins=os.getenv(
+                GlobalFabricRTIEnvVarNames.cors_allowed_origins, DEFAULT_FABRIC_RTI_CORS_ORIGINS
+            ),
         )
 
     @staticmethod
@@ -83,6 +89,7 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.stateless_http,
             GlobalFabricRTIEnvVarNames.use_obo_flow,
             GlobalFabricRTIEnvVarNames.use_ai_foundry_compat,
+            GlobalFabricRTIEnvVarNames.cors_allowed_origins,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -130,6 +137,7 @@ class GlobalFabricRTIConfig:
             stateless_http=stateless_http,
             use_obo_flow=use_obo_flow,
             use_ai_foundry_compat=use_ai_foundry_compat,
+            cors_allowed_origins=base_config.cors_allowed_origins,
         )
 
 
