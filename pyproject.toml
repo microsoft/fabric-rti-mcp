@@ -31,6 +31,12 @@ dev = [
     "ruff>=0.14.10",
     "ty",
 ]
+notebook = [
+    "numpy",
+    "pandas",
+    "ipykernel",
+    "Kqlmagic",
+]
 
 [project.scripts]
 microsoft-fabric-rti-mcp = "fabric_rti_mcp.server:main"
