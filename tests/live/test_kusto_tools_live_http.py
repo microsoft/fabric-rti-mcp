@@ -480,6 +480,11 @@ def start_server(
         env["FABRIC_RTI_MCP_USER_MANAGED_IDENTITY_CLIENT_ID"] = additional_args.umi_client_id
 
     env["KUSTO_EAGER_CONNECT"] = "false"
+    env["KUSTO_ALLOW_UNKNOWN_SERVICES"] = "false"
+    env["FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA"] = "false"
+    env["FABRIC_RTI_KUSTO_DEEPLINK_STYLE"] = "adx"
+    env["FABRIC_RTI_KUSTO_RESPONSE_FORMAT"] = "kusto_response"
+    env.pop("PORT", None)
     if additional_args and hasattr(additional_args, "cluster_uri") and additional_args.cluster_uri:
         env["KUSTO_SERVICE_URI"] = additional_args.cluster_uri
     if additional_args and hasattr(additional_args, "database") and additional_args.database:
