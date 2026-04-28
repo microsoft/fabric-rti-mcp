@@ -175,8 +175,8 @@ class KustoToolsLiveTester:
 
     def __init__(self) -> None:
         self.client: McpClient | None = None
-        self.test_cluster_uri = "https://help.kusto.windows.net"
-        self.test_database = "Samples"
+        self.test_cluster_uri = os.getenv("KUSTO_LIVE_CLUSTER_URI", "https://help.kusto.windows.net")
+        self.test_database = os.getenv("KUSTO_LIVE_DATABASE", "Samples")
 
     async def setup(self) -> None:
         """Set up the MCP client connection."""
