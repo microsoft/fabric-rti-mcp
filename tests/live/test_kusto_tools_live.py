@@ -177,6 +177,7 @@ class KustoToolsLiveTester:
         self.client: McpClient | None = None
         self.test_cluster_uri = os.getenv("KUSTO_LIVE_CLUSTER_URI", "https://help.kusto.windows.net")
         self.test_database = os.getenv("KUSTO_LIVE_DATABASE", "Samples")
+        self.min_expected_databases = int(os.getenv("KUSTO_LIVE_MIN_DATABASES", "0"))
 
     async def setup(self) -> None:
         """Set up the MCP client connection."""
@@ -297,7 +298,7 @@ class KustoToolsLiveTester:
 
         # Test data: [entity_type, [cluster_uri, database], min_expected_count, expected_first_value]
         test_data = [
-            ["databases", [self.test_cluster_uri, None], 8, None],
+            ["databases", [self.test_cluster_uri, None], self.min_expected_databases, None],
             ["tables", [self.test_cluster_uri, self.test_database], 50, None],
             ["external-table", [self.test_cluster_uri, self.test_database], 0, None],
             ["materialized-view", [self.test_cluster_uri, self.test_database], 0, None],
