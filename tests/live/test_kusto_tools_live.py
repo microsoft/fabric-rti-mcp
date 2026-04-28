@@ -6,6 +6,8 @@ import asyncio
 import json
 import os
 import sys
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlparse
@@ -36,6 +38,15 @@ EXPECTED_KUSTO_TOOLS = [
     "kusto_show_queryplan",
     "kusto_diagnostics",
 ]
+
+
+@dataclass
+class LiveTestResult:
+    name: str
+    scope: str
+    required: bool
+    success: bool
+    details: str = ""
 
 
 class McpClient:
@@ -177,6 +188,8 @@ class KustoToolsLiveTester:
         self.client: McpClient | None = None
         self.test_cluster_uri = os.getenv("KUSTO_LIVE_CLUSTER_URI", "https://help.kusto.windows.net")
         self.test_database = os.getenv("KUSTO_LIVE_DATABASE", "Samples")
+        self.min_expected_databases = int(os.getenv("KUSTO_LIVE_MIN_DATABASES", "0"))
+        self.results: list[LiveTestResult] = []
 
     async def setup(self) -> None:
         """Set up the MCP client connection."""
@@ -244,6 +257,40 @@ class KustoToolsLiveTester:
         timezone_part = fractional_part[timezone_start:]
         return datetime.fromisoformat(f"{timestamp_part}.{fraction}{timezone_part}")
 
+    @staticmethod
+    def _summarize_error(error: Exception) -> str:
+        return str(error).replace("\n", " ")[:180]
+
+    async def _run_test(
+        self,
+        name: str,
+        scope: str,
+        required: bool,
+        test_func: Callable[[], Awaitable[None]],
+    ) -> None:
+        try:
+            await test_func()
+            self.results.append(LiveTestResult(name=name, scope=scope, required=required, success=True))
+        except Exception as e:
+            details = self._summarize_error(e)
+            print(f"❌ {name} failed: {details}")
+            self.results.append(
+                LiveTestResult(name=name, scope=scope, required=required, success=False, details=details)
+            )
+
+    def _print_summary(self) -> None:
+        if not self.results:
+            return
+
+        print("\nLive test summary:")
+        print("| Scope | Required | Test | Status | Details |")
+        print("| --- | --- | --- | --- | --- |")
+        for result in self.results:
+            required = "yes" if result.required else "no"
+            status = "PASS" if result.success else "FAIL"
+            details = result.details.replace("|", "\\|")
+            print(f"| {result.scope} | {required} | {result.name} | {status} | {details} |")
+
     async def test_list_tools(self) -> None:
         """Test listing available tools."""
         print("\n🔧 Testing tool listing...")
@@ -268,22 +315,19 @@ class KustoToolsLiveTester:
         if not self.client:
             raise RuntimeError("Client not initialized")
 
-        try:
-            result = await self.client.call_tool("kusto_known_services", {})
-            print(f"Known services result: {json.dumps(result, indent=2)}")
+        result = await self.client.call_tool("kusto_known_services", {})
+        print(f"Known services result: {json.dumps(result, indent=2)}")
 
-            if result.get("success"):
-                services = result.get("result", [])
-                if not isinstance(services, list):
-                    services = [services] if services else []
-                print(f"✅ Found {len(services)} known services")
-                for service in services:
-                    print(f"  - {service.get('service_uri', 'N/A')}: {service.get('description', 'N/A')}")
-            else:
-                print(f"❌ Failed to get known services: {result}")
+        if not result.get("success"):
+            raise AssertionError(f"Failed to get known services: {result}")
 
-        except Exception as e:
-            print(f"❌ Error testing known services: {e}")
+        services = result.get("result", [])
+        if not isinstance(services, list):
+            services = [services] if services else []
+        assert services, "Expected at least one known service"
+        print(f"✅ Found {len(services)} known services")
+        for service in services:
+            print(f"  - {service.get('service_uri', 'N/A')}: {service.get('description', 'N/A')}")
 
     async def test_list_entities(self) -> None:
         """Test kusto_list_entities tool for all entity types."""
@@ -297,7 +341,7 @@ class KustoToolsLiveTester:
 
         # Test data: [entity_type, [cluster_uri, database], min_expected_count, expected_first_value]
         test_data = [
-            ["databases", [self.test_cluster_uri, None], 8, None],
+            ["databases", [self.test_cluster_uri, None], self.min_expected_databases, None],
             ["tables", [self.test_cluster_uri, self.test_database], 50, None],
             ["external-table", [self.test_cluster_uri, self.test_database], 0, None],
             ["materialized-view", [self.test_cluster_uri, self.test_database], 0, None],
@@ -360,35 +404,26 @@ class KustoToolsLiveTester:
             print("⚠️  No KUSTO_CLUSTER_URI configured, skipping query test")
             return
 
-        try:
-            # Simple query to get current time
-            result = await self.client.call_tool(
-                "kusto_query",
-                {"query": "print now()", "cluster_uri": self.test_cluster_uri, "database": self.test_database},
-            )
+        result = await self.client.call_tool(
+            "kusto_query",
+            {"query": "print now()", "cluster_uri": self.test_cluster_uri, "database": self.test_database},
+        )
 
-            if result.get("success"):
-                # Use the new parser to convert to canonical format
-                query_results = result.get("result", {})
-                print(f"Query result: {json.dumps(query_results, indent=2)}")
-                parsed_data = KustoFormatter.parse(query_results)
+        if not result.get("success"):
+            raise AssertionError(f"Query failed: {result}")
 
-                if parsed_data and len(parsed_data) > 0:
-                    # Get the timestamp value from the first row
-                    scalar_value = parsed_data[0].get("print_0", "")
-                    print(f"✅ Query succeeded, current time from Kusto: {scalar_value}")
-                    if scalar_value:
-                        parsed_date = self._parse_kusto_datetime(scalar_value)
-                        assert datetime.now(tz=timezone.utc) - parsed_date < timedelta(minutes=1), (
-                            "Query result is stale"
-                        )
-                else:
-                    print("❌ No data returned from query")
-            else:
-                print(f"❌ Query failed: {result}")
+        query_results = result.get("result", {})
+        print(f"Query result: {json.dumps(query_results, indent=2)}")
+        parsed_data = KustoFormatter.parse(query_results)
 
-        except Exception as e:
-            print(f"❌ Error testing query: {e}")
+        if not parsed_data:
+            raise AssertionError("No data returned from query")
+
+        scalar_value = parsed_data[0].get("print_0", "")
+        print(f"✅ Query succeeded, current time from Kusto: {scalar_value}")
+        if scalar_value:
+            parsed_date = self._parse_kusto_datetime(scalar_value)
+            assert datetime.now(tz=timezone.utc) - parsed_date < timedelta(minutes=1), "Query result is stale"
 
     async def test_sql_query_with_crp(self) -> None:
         """Test kusto_query tool with SQL query using client request properties."""
@@ -400,36 +435,29 @@ class KustoToolsLiveTester:
             print("⚠️  No KUSTO_CLUSTER_URI configured, skipping SQL query test")
             return
 
-        try:
-            # SQL query to count StormEvents records
-            result = await self.client.call_tool(
-                "kusto_query",
-                {
-                    "query": "SELECT COUNT(*) AS cnt FROM StormEvents",
-                    "cluster_uri": self.test_cluster_uri,
-                    "database": self.test_database,
-                    "client_request_properties": {"query_language": "sql"},
-                },
-            )
+        result = await self.client.call_tool(
+            "kusto_query",
+            {
+                "query": "SELECT COUNT(*) AS cnt FROM StormEvents",
+                "cluster_uri": self.test_cluster_uri,
+                "database": self.test_database,
+                "client_request_properties": {"query_language": "sql"},
+            },
+        )
 
-            if result.get("success"):
-                # Use the new parser to convert to canonical format
-                query_results = result.get("result", {})
-                print(f"SQL Query result: {json.dumps(query_results, indent=2)}")
-                parsed_data = KustoFormatter.parse(query_results)
+        if not result.get("success"):
+            raise AssertionError(f"SQL Query failed: {result}")
 
-                if parsed_data and len(parsed_data) > 0:
-                    # Get the count value from the first row
-                    count_value = parsed_data[0].get("cnt", 0)
-                    print(f"✅ SQL Query succeeded, StormEvents count: {count_value}")
-                    assert count_value > 0, f"Expected count > 0, got {count_value}"
-                else:
-                    print("❌ No data returned from SQL query")
-            else:
-                print(f"❌ SQL Query failed: {result}")
+        query_results = result.get("result", {})
+        print(f"SQL Query result: {json.dumps(query_results, indent=2)}")
+        parsed_data = KustoFormatter.parse(query_results)
 
-        except Exception as e:
-            print(f"❌ Error testing SQL query: {e}")
+        if not parsed_data:
+            raise AssertionError("No data returned from SQL query")
+
+        count_value = parsed_data[0].get("cnt", 0)
+        print(f"✅ SQL Query succeeded, StormEvents count: {count_value}")
+        assert count_value > 0, f"Expected count > 0, got {count_value}"
 
     async def test_command(self) -> None:
         """Test kusto_command with a read-only management command."""
@@ -606,32 +634,25 @@ class KustoToolsLiveTester:
             print("⚠️  No KUSTO_CLUSTER_URI configured, skipping describe database test")
             return
 
-        try:
-            result = await self.client.call_tool(
-                "kusto_describe_database", {"cluster_uri": self.test_cluster_uri, "database": self.test_database}
-            )
+        result = await self.client.call_tool(
+            "kusto_describe_database", {"cluster_uri": self.test_cluster_uri, "database": self.test_database}
+        )
 
-            if result.get("success"):
-                # Use the new parser to convert to canonical format
-                query_result = result.get("result", {})
-                parsed_data = KustoFormatter.parse(query_result) or []
+        if not result.get("success"):
+            raise AssertionError(f"Failed to describe database: {result}")
 
-                print(f"✅ Found {len(parsed_data)} entities in database schema")
+        query_result = result.get("result", {})
+        parsed_data = KustoFormatter.parse(query_result) or []
 
-                # Group by entity type to show summary
-                entity_types = {}
-                for row in parsed_data:
-                    entity_type = row.get("EntityType", "unknown")
-                    entity_types[entity_type] = entity_types.get(entity_type, 0) + 1
+        print(f"✅ Found {len(parsed_data)} entities in database schema")
 
-                for entity_type, count in entity_types.items():
-                    print(f"  - {entity_type}: {count}")
+        entity_types = {}
+        for row in parsed_data:
+            entity_type = row.get("EntityType", "unknown")
+            entity_types[entity_type] = entity_types.get(entity_type, 0) + 1
 
-            else:
-                print(f"❌ Failed to describe database: {result}")
-
-        except Exception as e:
-            print(f"❌ Error testing describe database: {e}")
+        for entity_type, count in entity_types.items():
+            print(f"  - {entity_type}: {count}")
 
     async def test_describe_database_entity(self) -> None:
         """Test kusto_describe_database_entity tool for different entity types."""
@@ -650,36 +671,30 @@ class KustoToolsLiveTester:
         ]
 
         for entity_name, entity_type, expected_fields in test_data:
-            try:
-                print(f"  Testing {entity_type} '{entity_name}'...")
-                result = await self.client.call_tool(
-                    "kusto_describe_database_entity",
-                    {
-                        "entity_name": entity_name,
-                        "entity_type": entity_type,
-                        "cluster_uri": self.test_cluster_uri,
-                        "database": self.test_database,
-                    },
-                )
+            print(f"  Testing {entity_type} '{entity_name}'...")
+            result = await self.client.call_tool(
+                "kusto_describe_database_entity",
+                {
+                    "entity_name": entity_name,
+                    "entity_type": entity_type,
+                    "cluster_uri": self.test_cluster_uri,
+                    "database": self.test_database,
+                },
+            )
 
-                if result.get("success"):
-                    # Use the new parser to convert to canonical format
-                    query_result = result.get("result", {})
-                    parsed_data = KustoFormatter.parse(query_result) or []
+            if not result.get("success"):
+                raise AssertionError(f"Failed to describe {entity_type} '{entity_name}': {result}")
 
-                    print(f"    ✅ Retrieved schema for {entity_type} '{entity_name}' ({len(parsed_data)} rows)")
+            query_result = result.get("result", {})
+            parsed_data = KustoFormatter.parse(query_result) or []
 
-                    # Check if expected schema fields are present
-                    if parsed_data and expected_fields:
-                        first_row = parsed_data[0]
-                        for field in expected_fields:
-                            assert field in first_row, f"Missing expected field: {field}"
-                            print(f"      ✅ Found expected field: {field}")
-                else:
-                    print(f"    ❌ Failed to describe {entity_type} '{entity_name}': {result}")
+            print(f"    ✅ Retrieved schema for {entity_type} '{entity_name}' ({len(parsed_data)} rows)")
 
-            except Exception as e:
-                print(f"    ❌ Error testing {entity_type} '{entity_name}': {e}")
+            if parsed_data and expected_fields:
+                first_row = parsed_data[0]
+                for field in expected_fields:
+                    assert field in first_row, f"Missing expected field: {field}"
+                    print(f"      ✅ Found expected field: {field}")
 
     async def test_sample_entity(self) -> None:
         """Test kusto_sample_entity tool for different entity types."""
@@ -699,34 +714,28 @@ class KustoToolsLiveTester:
         ]
 
         for entity_name, entity_type, sample_size, min_expected_count in test_data:
-            try:
-                print(f"  Testing {entity_type} '{entity_name}' (sample size: {sample_size})...")
-                result = await self.client.call_tool(
-                    "kusto_sample_entity",
-                    {
-                        "entity_name": entity_name,
-                        "entity_type": entity_type,
-                        "cluster_uri": self.test_cluster_uri,
-                        "sample_size": sample_size,
-                        "database": self.test_database,
-                    },
-                )
+            print(f"  Testing {entity_type} '{entity_name}' (sample size: {sample_size})...")
+            result = await self.client.call_tool(
+                "kusto_sample_entity",
+                {
+                    "entity_name": entity_name,
+                    "entity_type": entity_type,
+                    "cluster_uri": self.test_cluster_uri,
+                    "sample_size": sample_size,
+                    "database": self.test_database,
+                },
+            )
 
-                if result.get("success"):
-                    # Use the new parser to convert to canonical format
-                    query_result = result.get("result", {})
-                    parsed_data = KustoFormatter.parse(query_result) or []
+            if not result.get("success"):
+                raise AssertionError(f"Failed to sample {entity_type} '{entity_name}': {result}")
 
-                    # Assert minimum count
-                    assert len(parsed_data) >= min_expected_count, (
-                        f"Expected at least {min_expected_count} sample records, got {len(parsed_data)}."
-                    )
-                    print(f"    ✅ Retrieved {len(parsed_data)} sample records")
-                else:
-                    print(f"    ❌ Failed to sample {entity_type} '{entity_name}': {result}")
+            query_result = result.get("result", {})
+            parsed_data = KustoFormatter.parse(query_result) or []
 
-            except Exception as e:
-                print(f"    ❌ Error testing {entity_type} '{entity_name}': {e}")
+            assert len(parsed_data) >= min_expected_count, (
+                f"Expected at least {min_expected_count} sample records, got {len(parsed_data)}."
+            )
+            print(f"    ✅ Retrieved {len(parsed_data)} sample records")
 
     async def test_graph_query(self) -> None:
         """Test kusto_graph_query tool if graphs are available."""
@@ -738,82 +747,100 @@ class KustoToolsLiveTester:
             print("⚠️  No KUSTO_CLUSTER_URI configured, skipping graph query test")
             return
 
-        try:
-            # First check if there are any graphs available
-            list_result = await self.client.call_tool(
-                "kusto_list_entities",
-                {"cluster_uri": self.test_cluster_uri, "entity_type": "graphs", "database": self.test_database},
-            )
+        list_result = await self.client.call_tool(
+            "kusto_list_entities",
+            {"cluster_uri": self.test_cluster_uri, "entity_type": "graphs", "database": self.test_database},
+        )
 
-            if not list_result.get("success"):
-                print("  ⚠️  Could not list graphs, skipping graph query test")
-                return
+        if not list_result.get("success"):
+            raise AssertionError(f"Could not list graphs: {list_result}")
 
-            query_result = list_result.get("result", {})
-            parsed_data = KustoFormatter.parse(query_result) or []
+        query_result = list_result.get("result", {})
+        parsed_data = KustoFormatter.parse(query_result) or []
 
-            if len(parsed_data) == 0:
-                print("  ⚠️  No graphs found in database, skipping graph query test")
-                return
+        if len(parsed_data) == 0:
+            raise AssertionError("No graphs found in database")
 
-            # Use the first graph found
-            graph_name = parsed_data[0].get("Name", "")
-            if not graph_name:
-                print("  ⚠️  No valid graph name found, skipping graph query test")
-                return
+        graph_name = parsed_data[0].get("Name", "")
+        if not graph_name:
+            raise AssertionError("No valid graph name found")
 
-            print(f"  Testing graph query on '{graph_name}'...")
+        print(f"  Testing graph query on '{graph_name}'...")
 
-            # Simple graph query to count nodes
-            result = await self.client.call_tool(
-                "kusto_graph_query",
-                {
-                    "graph_name": graph_name,
-                    "query": "| graph-match (node) project labels=labels(node) | take 5",
-                    "cluster_uri": self.test_cluster_uri,
-                    "database": self.test_database,
-                },
-            )
+        result = await self.client.call_tool(
+            "kusto_graph_query",
+            {
+                "graph_name": graph_name,
+                "query": "| graph-match (node) project labels=labels(node) | take 5",
+                "cluster_uri": self.test_cluster_uri,
+                "database": self.test_database,
+            },
+        )
 
-            if result.get("success"):
-                query_result = result.get("result", {})
-                parsed_data = KustoFormatter.parse(query_result) or []
-                print(f"    ✅ Graph query succeeded, returned {len(parsed_data)} rows")
-            else:
-                print(f"    ❌ Graph query failed: {result}")
+        if not result.get("success"):
+            raise AssertionError(f"Graph query failed: {result}")
 
-        except Exception as e:
-            print(f"❌ Error testing graph query: {e}")
+        query_result = result.get("result", {})
+        parsed_data = KustoFormatter.parse(query_result) or []
+        print(f"    ✅ Graph query succeeded, returned {len(parsed_data)} rows")
 
     async def run_all_tests(self) -> None:
         """Run all available tests."""
         print("🚀 Starting Kusto tools live testing...")
 
         try:
-            await self.setup()
+            try:
+                await self.setup()
+                self.results.append(
+                    LiveTestResult(name="MCP server connection", scope="required-viewer", required=True, success=True)
+                )
+            except Exception as e:
+                details = self._summarize_error(e)
+                self.results.append(
+                    LiveTestResult(
+                        name="MCP server connection",
+                        scope="required-viewer",
+                        required=True,
+                        success=False,
+                        details=details,
+                    )
+                )
+                raise
 
-            # Run tests for generic tools with all entity types
-            await self.test_list_tools()
-            await self.test_known_services()
-            await self.test_list_entities()
-            await self.test_simple_query()
-            await self.test_sql_query_with_crp()
-            await self.test_command()
-            await self.test_deeplink_from_query()
-            await self.test_show_queryplan()
-            await self.test_diagnostics()
-            await self.test_get_shots()
-            await self.test_describe_database()
-            await self.test_describe_database_entity()
-            await self.test_sample_entity()
-            await self.test_graph_query()
+            required_scope = "required-viewer"
+            optional_scope = "best-effort-metadata"
 
-            print("\n✅ All tests completed!")
+            await self._run_test("tools/list exposes Kusto tools", required_scope, True, self.test_list_tools)
+            await self._run_test("kusto_known_services", required_scope, True, self.test_known_services)
+            await self._run_test("kusto_query print now()", required_scope, True, self.test_simple_query)
+            await self._run_test(
+                "kusto_query SQL StormEvents count", required_scope, True, self.test_sql_query_with_crp
+            )
 
-        except Exception as e:
-            print(f"\n❌ Test suite failed: {e}")
-            raise
+            await self._run_test("kusto_list_entities", optional_scope, False, self.test_list_entities)
+            await self._run_test("kusto_command .show tables", optional_scope, False, self.test_command)
+            await self._run_test("kusto_deeplink_from_query", optional_scope, False, self.test_deeplink_from_query)
+            await self._run_test("kusto_show_queryplan", optional_scope, False, self.test_show_queryplan)
+            await self._run_test("kusto_diagnostics", optional_scope, False, self.test_diagnostics)
+            await self._run_test("kusto_get_shots validation", optional_scope, False, self.test_get_shots)
+            await self._run_test("kusto_describe_database", optional_scope, False, self.test_describe_database)
+            await self._run_test(
+                "kusto_describe_database_entity",
+                optional_scope,
+                False,
+                self.test_describe_database_entity,
+            )
+            await self._run_test("kusto_sample_entity", optional_scope, False, self.test_sample_entity)
+            await self._run_test("kusto_graph_query", optional_scope, False, self.test_graph_query)
+
+            required_failures = [result for result in self.results if result.required and not result.success]
+            if required_failures:
+                names = ", ".join(result.name for result in required_failures)
+                raise AssertionError(f"Required live tests failed: {names}")
+
+            print("\n✅ Required viewer live tests completed successfully")
         finally:
+            self._print_summary()
             await self.teardown()
 
 

@@ -25,6 +25,7 @@ jobs:
     env:
       KUSTO_LIVE_CLUSTER_URI: ${{ inputs.cluster_uri }}
       KUSTO_LIVE_DATABASE: ${{ inputs.database }}
+      KUSTO_LIVE_MIN_DATABASES: "0"
       KUSTO_SERVICE_URI: ${{ inputs.cluster_uri }}
       KUSTO_SERVICE_DEFAULT_DB: ${{ inputs.database }}
       KUSTO_ALLOW_UNKNOWN_SERVICES: "false"
