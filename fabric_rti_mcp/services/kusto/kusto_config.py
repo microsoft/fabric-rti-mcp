@@ -20,6 +20,7 @@ class KustoEnvVarNames:
     default_service_uri = "KUSTO_SERVICE_URI"
     default_service_default_db = "KUSTO_SERVICE_DEFAULT_DB"
     open_ai_embedding_endpoint = "AZ_OPENAI_EMBEDDING_ENDPOINT"
+    shots_table = "KUSTO_SHOTS_TABLE"
     known_services = "KUSTO_KNOWN_SERVICES"
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
@@ -34,6 +35,7 @@ class KustoEnvVarNames:
             KustoEnvVarNames.default_service_uri,
             KustoEnvVarNames.default_service_default_db,
             KustoEnvVarNames.open_ai_embedding_endpoint,
+            KustoEnvVarNames.shots_table,
             KustoEnvVarNames.known_services,
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
@@ -49,6 +51,8 @@ class KustoConfig:
     default_service: KustoServiceConfig | None = None
     # Optional OpenAI embedding endpoint to be used for embeddings where applicable.
     open_ai_embedding_endpoint: str | None = None
+    # Default shots table name for the kusto_get_shots tool.
+    shots_table: str | None = None
     # List of known Kusto services. If empty, no services are configured.
     known_services: list[KustoServiceConfig] | None = None
     # Whether to eagerly connect to the default service on startup.
@@ -78,6 +82,7 @@ class KustoConfig:
             )
 
         open_ai_embedding_endpoint = os.getenv(KustoEnvVarNames.open_ai_embedding_endpoint, None)
+        shots_table = os.getenv(KustoEnvVarNames.shots_table, None)
         known_services_string = os.getenv(KustoEnvVarNames.known_services, None)
         known_services: list[KustoServiceConfig] | None = None
         eager_connect = os.getenv(KustoEnvVarNames.eager_connect, "false").lower() in ("true", "1")
@@ -128,6 +133,7 @@ class KustoConfig:
         return KustoConfig(
             default_service,
             open_ai_embedding_endpoint,
+            shots_table,
             known_services,
             eager_connect,
             allow_unknown_services,
