@@ -8,7 +8,7 @@
 - Use docstring as tool description
 - Add annotations (readonly, destructive)
 - Add Attach to proc id + tracing pid on start so we can debug locally
-- Run Kusto live tests before publishing to PyPI
+- Gate PyPI publishing on required read-only Kusto query checks
 - Rename and test schema simplification for broader MCP client compatibility
 - Add underscore variant of console script entry point for uvx compatibility
 - Add external table support for OneLake Shortcuts

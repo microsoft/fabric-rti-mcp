@@ -261,6 +261,20 @@ class KustoToolsLiveTester:
     def _summarize_error(error: Exception) -> str:
         return str(error).replace("\n", " ")[:180]
 
+    @staticmethod
+    def _assert_positive_count(rows: list[dict[str, Any]] | None, column_name: str, label: str) -> int:
+        if not rows:
+            raise AssertionError(f"No data returned from {label}")
+
+        raw_count = rows[0].get(column_name, 0)
+        try:
+            count_value = int(raw_count)
+        except (TypeError, ValueError) as e:
+            raise AssertionError(f"Expected numeric count for {label}, got {raw_count!r}") from e
+
+        assert count_value > 0, f"Expected {label} count > 0, got {count_value}"
+        return count_value
+
     async def _run_test(
         self,
         name: str,
@@ -425,6 +439,34 @@ class KustoToolsLiveTester:
             parsed_date = self._parse_kusto_datetime(scalar_value)
             assert datetime.now(tz=timezone.utc) - parsed_date < timedelta(minutes=1), "Query result is stale"
 
+    async def test_kql_readonly_query(self) -> None:
+        """Test kusto_query with a read-only table query."""
+        print("\n🔍 Testing kusto_query with a read-only table query...")
+        if not self.client:
+            raise RuntimeError("Client not initialized")
+
+        if not self.test_cluster_uri:
+            print("⚠️  No KUSTO_CLUSTER_URI configured, skipping read-only table query test")
+            return
+
+        result = await self.client.call_tool(
+            "kusto_query",
+            {
+                "query": "StormEvents | summarize cnt=count()",
+                "cluster_uri": self.test_cluster_uri,
+                "database": self.test_database,
+            },
+        )
+
+        if not result.get("success"):
+            raise AssertionError(f"KQL read-only query failed: {result}")
+
+        query_results = result.get("result", {})
+        print(f"KQL read-only query result: {json.dumps(query_results, indent=2)}")
+        parsed_data = KustoFormatter.parse(query_results)
+        count_value = self._assert_positive_count(parsed_data, "cnt", "KQL StormEvents")
+        print(f"✅ KQL read-only query succeeded, StormEvents count: {count_value}")
+
     async def test_sql_query_with_crp(self) -> None:
         """Test kusto_query tool with SQL query using client request properties."""
         print("\n🔍 Testing kusto_query with SQL syntax...")
@@ -452,12 +494,8 @@ class KustoToolsLiveTester:
         print(f"SQL Query result: {json.dumps(query_results, indent=2)}")
         parsed_data = KustoFormatter.parse(query_results)
 
-        if not parsed_data:
-            raise AssertionError("No data returned from SQL query")
-
-        count_value = parsed_data[0].get("cnt", 0)
+        count_value = self._assert_positive_count(parsed_data, "cnt", "SQL StormEvents")
         print(f"✅ SQL Query succeeded, StormEvents count: {count_value}")
-        assert count_value > 0, f"Expected count > 0, got {count_value}"
 
     async def test_command(self) -> None:
         """Test kusto_command with a read-only management command."""
@@ -792,14 +830,16 @@ class KustoToolsLiveTester:
             try:
                 await self.setup()
                 self.results.append(
-                    LiveTestResult(name="MCP server connection", scope="required-viewer", required=True, success=True)
+                    LiveTestResult(
+                        name="MCP server connection", scope="required-read-only", required=True, success=True
+                    )
                 )
             except Exception as e:
                 details = self._summarize_error(e)
                 self.results.append(
                     LiveTestResult(
                         name="MCP server connection",
-                        scope="required-viewer",
+                        scope="required-read-only",
                         required=True,
                         success=False,
                         details=details,
@@ -807,12 +847,15 @@ class KustoToolsLiveTester:
                 )
                 raise
 
-            required_scope = "required-viewer"
+            required_scope = "required-read-only"
             optional_scope = "best-effort-metadata"
 
             await self._run_test("tools/list exposes Kusto tools", required_scope, True, self.test_list_tools)
             await self._run_test("kusto_known_services", required_scope, True, self.test_known_services)
             await self._run_test("kusto_query print now()", required_scope, True, self.test_simple_query)
+            await self._run_test(
+                "kusto_query KQL StormEvents count", required_scope, True, self.test_kql_readonly_query
+            )
             await self._run_test(
                 "kusto_query SQL StormEvents count", required_scope, True, self.test_sql_query_with_crp
             )
@@ -838,7 +881,7 @@ class KustoToolsLiveTester:
                 names = ", ".join(result.name for result in required_failures)
                 raise AssertionError(f"Required live tests failed: {names}")
 
-            print("\n✅ Required viewer live tests completed successfully")
+            print("\n✅ Required read-only live tests completed successfully")
         finally:
             self._print_summary()
             await self.teardown()

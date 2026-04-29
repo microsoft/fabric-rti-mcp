@@ -96,7 +96,7 @@ scripts\build_deploy_local.bat 0.1.0
 
 2. **GitHub Release**
    Creating a release from the tag triggers the workflow that builds and uploads the package (with the version derived from the tag).
-   The publish workflow first runs the Kusto live tests through the `live-tests` environment, then publishes through the `release` environment.
+   The publish workflow first runs the required read-only Kusto query checks through the `live-tests` environment, then publishes through the `release` environment.
 
 ### Versioning
 

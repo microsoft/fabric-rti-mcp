@@ -16,7 +16,7 @@ on:
 
 jobs:
   kusto-live-tests:
-    name: Kusto live tests
+    name: Kusto read-only live tests
     runs-on: ubuntu-latest
     environment: live-tests
     permissions:
@@ -65,7 +65,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
-      - name: Run Kusto live tests
+      - name: Run required read-only Kusto live tests
         run: python -m tests.live.test_kusto_tools_live
 
   build-and-upload:
