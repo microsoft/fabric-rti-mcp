@@ -16,6 +16,16 @@ class KustoServiceConfig:
     description: str | None = None
 
 
+def normalize_service_uri_key(service_uri: str) -> str:
+    """Canonical key for matching/caching Kusto service URIs.
+
+    Hostnames and trailing slashes are not semantically significant for cluster
+    identity, so we strip whitespace, drop a trailing slash, and lowercase to
+    avoid duplicate cache entries and missed known-service lookups.
+    """
+    return service_uri.strip().rstrip("/").lower()
+
+
 class KustoEnvVarNames:
     default_service_uri = "KUSTO_SERVICE_URI"
     default_service_default_db = "KUSTO_SERVICE_DEFAULT_DB"
@@ -155,9 +165,20 @@ class KustoConfig:
     def get_known_services() -> dict[str, KustoServiceConfig]:
         config = KustoConfig.from_env()
         result: dict[str, KustoServiceConfig] = {}
+
+        def _add(service: KustoServiceConfig) -> None:
+            key = normalize_service_uri_key(service.service_uri)
+            existing = result.get(key)
+            if existing is not None:
+                logger.warning(
+                    f"Duplicate Kusto known service entry for normalized key '{key}': "
+                    f"'{existing.service_uri}' is overridden by '{service.service_uri}'."
+                )
+            result[key] = service
+
         if config.default_service:
-            result[config.default_service.service_uri] = config.default_service
+            _add(config.default_service)
         if config.known_services is not None:
             for known_service in config.known_services:
-                result[known_service.service_uri] = known_service
+                _add(known_service)
         return result

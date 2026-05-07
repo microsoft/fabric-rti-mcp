@@ -15,7 +15,7 @@ from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuild
 
 from fabric_rti_mcp import __version__  # type: ignore
 from fabric_rti_mcp.config import global_config, logger
-from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
+from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig, normalize_service_uri_key
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter, KustoResponseFormat
 
@@ -256,16 +256,17 @@ class KustoConnectionManager:
         This method is the single entry point for accessing connections.
         """
         sanitized_uri = sanitize_uri(cluster_uri)
+        cache_key = normalize_service_uri_key(sanitized_uri)
 
-        if sanitized_uri in self._cache:
-            return self._cache[sanitized_uri]
+        if cache_key in self._cache:
+            return self._cache[cache_key]
 
         # Connection not found, create a new one.
         known_services = KustoConfig.get_known_services()
         default_database = _DEFAULT_DB_NAME
 
-        if sanitized_uri in known_services:
-            default_database = known_services[sanitized_uri].default_database or _DEFAULT_DB_NAME
+        if cache_key in known_services:
+            default_database = known_services[cache_key].default_database or _DEFAULT_DB_NAME
         elif not CONFIG.allow_unknown_services:
             raise ValueError(
                 f"Service URI '{sanitized_uri}' is not in the list of approved services, "
@@ -273,7 +274,7 @@ class KustoConnectionManager:
             )
 
         connection = KustoConnection(sanitized_uri, default_database=default_database)
-        self._cache[sanitized_uri] = connection
+        self._cache[cache_key] = connection
         return connection
 
 
