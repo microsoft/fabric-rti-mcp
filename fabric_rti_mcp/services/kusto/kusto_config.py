@@ -16,6 +16,10 @@ class KustoServiceConfig:
     description: str | None = None
 
 
+def normalize_service_uri_key(service_uri: str) -> str:
+    return service_uri.strip().rstrip("/").lower()
+
+
 class KustoEnvVarNames:
     default_service_uri = "KUSTO_SERVICE_URI"
     default_service_default_db = "KUSTO_SERVICE_DEFAULT_DB"
@@ -156,8 +160,8 @@ class KustoConfig:
         config = KustoConfig.from_env()
         result: dict[str, KustoServiceConfig] = {}
         if config.default_service:
-            result[config.default_service.service_uri] = config.default_service
+            result[normalize_service_uri_key(config.default_service.service_uri)] = config.default_service
         if config.known_services is not None:
             for known_service in config.known_services:
-                result[known_service.service_uri] = known_service
+                result[normalize_service_uri_key(known_service.service_uri)] = known_service
         return result

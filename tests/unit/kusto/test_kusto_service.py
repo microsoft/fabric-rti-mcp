@@ -7,11 +7,40 @@ from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
 from fabric_rti_mcp.services.kusto.kusto_service import (
+    KustoConnectionManager,
     kusto_command,
     kusto_diagnostics,
     kusto_query,
     kusto_show_queryplan,
 )
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "KUSTO_SERVICE_URI": "https://demo11.westus.kusto.windows.net/",
+        "KUSTO_SERVICE_DEFAULT_DB": "ML",
+        "KUSTO_KNOWN_SERVICES": json.dumps(
+            [
+                {"service_uri": "https://demo11.westus.kusto.windows.net/", "default_database": "ML"},
+                {"service_uri": "https://demo12.westus.kusto.windows.net/", "default_database": "Datasets"},
+                {"service_uri": "https://kuskus.kusto.windows.net/", "default_database": "Kuskus"},
+            ]
+        ),
+        "KUSTO_ALLOW_UNKNOWN_SERVICES": "true",
+    },
+    clear=False,
+)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.KustoConnection")
+def test_connection_manager_uses_known_service_default_database(mock_kusto_connection: MagicMock) -> None:
+    manager = KustoConnectionManager()
+
+    manager.get("HTTPS://DEMO12.WESTUS.KUSTO.WINDOWS.NET/")
+
+    mock_kusto_connection.assert_called_once_with(
+        "HTTPS://DEMO12.WESTUS.KUSTO.WINDOWS.NET",
+        default_database="Datasets",
+    )
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
