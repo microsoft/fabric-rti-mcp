@@ -6,12 +6,84 @@ from azure.kusto.data import ClientRequestProperties
 from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
+from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_service import (
+    KustoConnectionManager,
     kusto_command,
     kusto_diagnostics,
     kusto_query,
     kusto_show_queryplan,
 )
+
+_KNOWN_SERVICES_ENV = {
+    "KUSTO_SERVICE_URI": "https://demo11.westus.kusto.windows.net/",
+    "KUSTO_SERVICE_DEFAULT_DB": "ML",
+    "KUSTO_KNOWN_SERVICES": json.dumps(
+        [
+            {"service_uri": "https://demo11.westus.kusto.windows.net/", "default_database": "ML"},
+            {"service_uri": "https://demo12.westus.kusto.windows.net/", "default_database": "Datasets"},
+            {"service_uri": "https://kuskus.kusto.windows.net/", "default_database": "Kuskus"},
+        ]
+    ),
+    "KUSTO_ALLOW_UNKNOWN_SERVICES": "true",
+}
+
+
+@patch.dict("os.environ", _KNOWN_SERVICES_ENV, clear=True)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.KustoConnection")
+def test_connection_manager_uses_known_service_default_database(mock_kusto_connection: MagicMock) -> None:
+    """Known-service lookup matches even when the caller's URI differs in case/trailing slash."""
+    manager = KustoConnectionManager()
+
+    manager.get("HTTPS://DEMO12.WESTUS.KUSTO.WINDOWS.NET/")
+
+    mock_kusto_connection.assert_called_once_with(
+        "HTTPS://DEMO12.WESTUS.KUSTO.WINDOWS.NET",
+        default_database="Datasets",
+    )
+
+
+@patch.dict("os.environ", _KNOWN_SERVICES_ENV, clear=True)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.KustoConnection")
+def test_connection_manager_caches_by_normalized_uri(mock_kusto_connection: MagicMock) -> None:
+    """Calls that differ only in case/trailing slash share the same cached connection."""
+    mock_kusto_connection.return_value = MagicMock()
+    manager = KustoConnectionManager()
+
+    first = manager.get("https://demo12.westus.kusto.windows.net")
+    second = manager.get("HTTPS://DEMO12.WESTUS.KUSTO.WINDOWS.NET/")
+    third = manager.get("https://demo12.westus.kusto.windows.net/")
+
+    assert first is second is third
+    mock_kusto_connection.assert_called_once()
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "KUSTO_KNOWN_SERVICES": json.dumps(
+            [
+                {"service_uri": "https://demo.kusto.windows.net/", "default_database": "First"},
+                {"service_uri": "HTTPS://DEMO.KUSTO.WINDOWS.NET", "default_database": "Second"},
+            ]
+        ),
+        "KUSTO_ALLOW_UNKNOWN_SERVICES": "true",
+    },
+    clear=True,
+)
+def test_get_known_services_warns_on_duplicate_normalized_keys(caplog: pytest.LogCaptureFixture) -> None:
+    """Duplicate normalized keys log a warning naming both URIs and the winner."""
+    with caplog.at_level("WARNING", logger="fabric_rti_mcp"):
+        services = KustoConfig.get_known_services()
+
+    assert len(services) == 1
+    winner = next(iter(services.values()))
+    assert winner.default_database == "Second"
+    expected_message = (
+        "Duplicate Kusto known service entry for normalized key 'https://demo.kusto.windows.net': "
+        "'https://demo.kusto.windows.net/' is overridden by 'HTTPS://DEMO.KUSTO.WINDOWS.NET'."
+    )
+    assert any(record.message == expected_message for record in caplog.records)
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
