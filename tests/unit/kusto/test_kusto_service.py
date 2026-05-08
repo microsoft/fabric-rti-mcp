@@ -79,12 +79,11 @@ def test_get_known_services_warns_on_duplicate_normalized_keys(caplog: pytest.Lo
     assert len(services) == 1
     winner = next(iter(services.values()))
     assert winner.default_database == "Second"
-    assert any(
-        "Duplicate Kusto known service" in record.message
-        and "https://demo.kusto.windows.net/" in record.message
-        and "HTTPS://DEMO.KUSTO.WINDOWS.NET" in record.message
-        for record in caplog.records
+    expected_message = (
+        "Duplicate Kusto known service entry for normalized key 'https://demo.kusto.windows.net': "
+        "'https://demo.kusto.windows.net/' is overridden by 'HTTPS://DEMO.KUSTO.WINDOWS.NET'."
     )
+    assert any(record.message == expected_message for record in caplog.records)
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
