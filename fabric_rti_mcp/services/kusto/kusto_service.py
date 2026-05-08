@@ -5,9 +5,11 @@ import functools
 import gzip
 import inspect
 import json
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict
+from datetime import timedelta
 from typing import Any, TypeVar
 from urllib.parse import quote, urlparse
 
@@ -316,6 +318,25 @@ _BLOCKED_CRP_KEYS = frozenset(
     }
 )
 
+_TIMESPAN_RE = re.compile(r"^(\d+):(\d{1,2}):(\d{1,2})$")
+
+
+def _parse_servertimeout(value: str) -> timedelta:
+    """Parse an ``HH:MM:SS`` string into a ``timedelta``.
+
+    The Azure Kusto SDK requires ``servertimeout`` to be a ``timedelta`` because
+    it performs ``timeout + client_server_delta`` arithmetic internally. We
+    intentionally accept only the ``HH:MM:SS`` form so agents have a single,
+    unambiguous format to produce.
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"servertimeout must be a string in 'HH:MM:SS' format, got {type(value).__name__}: {value!r}")
+    match = _TIMESPAN_RE.match(value.strip())
+    if not match:
+        raise ValueError(f"servertimeout must be in 'HH:MM:SS' format, got {value!r}")
+    hours, minutes, seconds = (int(g) for g in match.groups())
+    return timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
 
 def _crp(
     action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: dict[str, Any] | None = None
@@ -326,13 +347,13 @@ def _crp(
     if not is_destructive and not ignore_readonly:
         crp.set_option("request_readonly", True)
 
-    # Set global timeout if configured
+    # The Azure Kusto SDK expects servertimeout as a timedelta — it adds
+    # client_server_delta (also a timedelta) to it in client_base.py.
     if CONFIG.timeout_seconds is not None:
-        # Convert seconds to timespan format (HH:MM:SS)
-        hours, remainder = divmod(CONFIG.timeout_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        crp.set_option("servertimeout", timeout_str)
+        crp.set_option(
+            ClientRequestProperties.request_timeout_option_name,
+            timedelta(seconds=CONFIG.timeout_seconds),
+        )
 
     if client_request_properties:
         blocked = [k for k in client_request_properties if k.lower() in _BLOCKED_CRP_KEYS]
@@ -341,6 +362,8 @@ def _crp(
                 f"Client request properties {blocked} are security-sensitive and cannot be overridden via MCP tools"
             )
         for key, value in client_request_properties.items():
+            if key == ClientRequestProperties.request_timeout_option_name:
+                value = _parse_servertimeout(value)
             crp.set_option(key, value)
 
     return crp
