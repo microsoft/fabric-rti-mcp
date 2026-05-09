@@ -2,32 +2,21 @@
   "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/refs/heads/main/schemas/mcpb-manifest-v0.4.schema.json",
   "manifest_version": "0.4",
   "name": "fabric-rti-mcp",
+  "display_name": "Fabric Real-Time Intelligence",
   "version": "",
   "description": "Enables AI agents to query Eventhouse with KQL, manage Eventstreams, create Activator alerts, and visualize data on Maps.",
   "author": {
     "name": "Microsoft",
-    "url": "https://github.com/microsoft"
+    "url": "https://www.microsoft.com"
   },
-  "homepage": "https://github.com/microsoft/fabric-rti-mcp",
   "repository": {
     "type": "git",
-    "url": "https://github.com/microsoft/fabric-rti-mcp"
+    "url": "https://github.com/microsoft/fabric-rti-mcp.git"
   },
-  "keywords": [
-    "fabric",
-    "kusto",
-    "kql",
-    "eventhouse",
-    "eventstream",
-    "real-time-intelligence",
-    "microsoft",
-    "azure",
-    "mcp"
-  ],
-  "display_name": "Fabric Real-Time Intelligence",
-  "icon": "icon.png",
+  "homepage": "https://learn.microsoft.com/fabric/real-time-intelligence/mcp-local-server",
   "documentation": "https://github.com/microsoft/fabric-rti-mcp",
   "support": "https://github.com/microsoft/fabric-rti-mcp/issues",
+  "icon": "icon.png",
   "server": {
     "type": "uv",
     "entry_point": "fabric_rti_mcp/server.py",
@@ -53,6 +42,22 @@
       }
     }
   },
+  "keywords": [
+    "azure",
+    "mcp",
+    "model context protocol",
+    "server",
+    "microsoft",
+    "fabric",
+    "kusto",
+    "kql",
+    "eventhouse",
+    "eventstream",
+    "real-time-intelligence",
+    "rti",
+    "azure-data-explorer",
+    "adx"
+  ],
   "user_config": {
     "kusto_service_uri": {
       "type": "string",
