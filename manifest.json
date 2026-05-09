@@ -1,0 +1,119 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/refs/heads/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "fabric-rti-mcp",
+  "version": "",
+  "description": "Enables AI agents to query Eventhouse with KQL, manage Eventstreams, create Activator alerts, and visualize data on Maps.",
+  "author": {
+    "name": "Microsoft",
+    "url": "https://github.com/microsoft"
+  },
+  "homepage": "https://github.com/microsoft/fabric-rti-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/fabric-rti-mcp"
+  },
+  "keywords": [
+    "fabric",
+    "kusto",
+    "kql",
+    "eventhouse",
+    "eventstream",
+    "real-time-intelligence",
+    "microsoft",
+    "azure",
+    "mcp"
+  ],
+  "display_name": "Fabric Real-Time Intelligence",
+  "icon": "icon.png",
+  "documentation": "https://github.com/microsoft/fabric-rti-mcp",
+  "support": "https://github.com/microsoft/fabric-rti-mcp/issues",
+  "server": {
+    "type": "uv",
+    "entry_point": "fabric_rti_mcp/server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "fabric_rti_mcp/server.py"
+      ],
+      "env": {
+        "FABRIC_API_BASE": "${user_config.fabric_api_base}",
+        "FABRIC_BASE_URL": "${user_config.fabric_base_url}",
+        "KUSTO_SERVICE_URI": "${user_config.kusto_service_uri}",
+        "KUSTO_SERVICE_DEFAULT_DB": "${user_config.kusto_service_default_db}",
+        "KUSTO_KNOWN_SERVICES": "${user_config.kusto_known_services}",
+        "KUSTO_EAGER_CONNECT": "${user_config.kusto_eager_connect}",
+        "KUSTO_ALLOW_UNKNOWN_SERVICES": "${user_config.kusto_allow_unknown_services}",
+        "KUSTO_SHOTS_TABLE": "${user_config.kusto_shots_table}",
+        "AZ_OPENAI_EMBEDDING_ENDPOINT": "${user_config.az_openai_embedding_endpoint}",
+        "FABRIC_RTI_KUSTO_DEEPLINK_STYLE": "${user_config.fabric_rti_kusto_deeplink_style}"
+      }
+    }
+  },
+  "user_config": {
+    "kusto_service_uri": {
+      "type": "string",
+      "title": "Kusto Service URI",
+      "description": "Default Kusto cluster URI. Example: https://mycluster.westus.kusto.windows.net",
+      "required": true
+    },
+    "kusto_service_default_db": {
+      "type": "string",
+      "title": "Kusto Default Database",
+      "description": "Default database name for Kusto queries",
+      "required": true
+    },
+    "kusto_known_services": {
+      "type": "string",
+      "title": "Kusto Known Services",
+      "description": "JSON array of preconfigured Kusto services. Example: [{\"service_uri\":\"https://cluster1.kusto.windows.net\",\"default_database\":\"DB1\",\"description\":\"Prod\"}]",
+      "default": ""
+    },
+    "kusto_eager_connect": {
+      "type": "boolean",
+      "title": "Kusto Eager Connect",
+      "description": "Whether to eagerly connect to the default service on startup (not recommended)",
+      "default": ""
+    },
+    "kusto_allow_unknown_services": {
+      "type": "boolean",
+      "title": "Kusto Allow Unknown Services",
+      "description": "Security setting to allow connections to Kusto services not listed in KUSTO_KNOWN_SERVICES",
+      "default": ""
+    },
+    "kusto_shots_table": {
+      "type": "string",
+      "title": "Kusto Shots Table",
+      "description": "Default shots table for kusto_get_shots when not provided as a parameter. Example: MyDatabase.ShotsTable",
+      "default": ""
+    },
+    "az_openai_embedding_endpoint": {
+      "type": "string",
+      "title": "Azure OpenAI Embedding Endpoint",
+      "description": "Azure OpenAI embedding endpoint for semantic search in kusto_get_shots",
+      "default": ""
+    },
+    "fabric_api_base": {
+      "type": "string",
+      "title": "Fabric API Base URL",
+      "description": "Base URL for Microsoft Fabric API",
+      "default": ""
+    },
+    "fabric_base_url": {
+      "type": "string",
+      "title": "Fabric Base URL",
+      "description": "Base URL for Microsoft Fabric web interface",
+      "default": ""
+    },
+    "fabric_rti_kusto_deeplink_style": {
+      "type": "string",
+      "title": "Kusto Deeplink Style",
+      "description": "Override auto-detection of Kusto deeplink style",
+      "default": ""
+    }
+  },
+  "license": "MIT"
+}
