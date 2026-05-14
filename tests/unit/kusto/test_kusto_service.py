@@ -118,11 +118,10 @@ def test_execute_basic_query(
     mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
     mock_client.execute.assert_called_once()
 
-    # Verify database and stripped query (watermark is prepended)
+    # Verify database and stripped query (no watermark by default — opt-in via FABRIC_RTI_KUSTO_CUSTOM_WATERMARK)
     args = mock_client.execute.call_args[0]
     assert args[0] == database
-    assert args[1].endswith("TestTable | take 10")
-    assert args[1].startswith("// ")
+    assert args[1] == "TestTable | take 10"
 
     # Verify ClientRequestProperties settings
     crp = mock_client.execute.call_args[0][2]
@@ -172,7 +171,7 @@ def test_execute_with_custom_client_request_properties(
     mock_get_kusto_connection.assert_called_once_with(sample_cluster_uri)
     mock_client.execute.assert_called_once()
 
-    # Verify database and query (watermark is prepended)
+    # Verify database and query (no watermark by default — opt-in via FABRIC_RTI_KUSTO_CUSTOM_WATERMARK)
     args = mock_client.execute.call_args[0]
     assert args[0] == database
     assert args[1] == query

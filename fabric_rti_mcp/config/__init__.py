@@ -114,8 +114,9 @@ class GlobalFabricRTIConfig:
         parser.add_argument(
             "--custom-watermark",
             type=str,
-            help='JSON object for custom query watermark, e.g. \'{"team": "my-team", "app_id": "env:MY_APP_ID"}\''
-            " (FABRIC_RTI_KUSTO_CUSTOM_WATERMARK)",
+            help="Enable query watermarking with optional custom JSON entries, "
+            'e.g. \'{}\' for defaults only or \'{"team": "my-team", "app_id": "env:MY_APP_ID"}\''
+            " (FABRIC_RTI_KUSTO_CUSTOM_WATERMARK). Watermarking is opt-in: unset = disabled.",
         )
         args, _ = parser.parse_known_args()
 

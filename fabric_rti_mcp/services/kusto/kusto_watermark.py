@@ -81,9 +81,14 @@ def build_watermark() -> str:
 def add_watermark(query: str) -> str:
     """Prepend a watermark comment to a KQL query.
 
-    Control commands (starting with '.') cannot have comments prepended,
-    so they are returned unchanged.
+    Watermarking is opt-in: the query is returned unchanged unless the
+    ``FABRIC_RTI_KUSTO_CUSTOM_WATERMARK`` environment variable is set (set it
+    to ``{}`` to enable watermarking without any custom entries). Control
+    commands (starting with '.') cannot have comments prepended, so they are
+    also returned unchanged.
     """
     if query.lstrip().startswith("."):
+        return query
+    if os.getenv(CUSTOM_WATERMARK_ENV_VAR) is None:
         return query
     return build_watermark() + query

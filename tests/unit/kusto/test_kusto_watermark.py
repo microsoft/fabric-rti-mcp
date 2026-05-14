@@ -141,30 +141,51 @@ class TestBuildWatermark:
 class TestAddWatermark:
     def test_prepends_watermark_to_query(self) -> None:
         query = "TestTable | take 10"
-        result = add_watermark(query)
+        with patch.dict(os.environ, {CUSTOM_WATERMARK_ENV_VAR: "{}"}):
+            result = add_watermark(query)
         lines = result.split("\n", 1)
         assert lines[0].startswith("// ")
         assert lines[1] == query
 
     def test_watermark_is_valid_json_comment(self) -> None:
         query = "TestTable | take 10"
-        result = add_watermark(query)
+        with patch.dict(os.environ, {CUSTOM_WATERMARK_ENV_VAR: "{}"}):
+            result = add_watermark(query)
         first_line = result.split("\n", 1)[0]
-        json_str = first_line[3:]  # Strip "// " prefix
+        json_str = first_line[3:]
         data = json.loads(json_str)
         assert isinstance(data, dict)
         assert "fabric_rti_mcp_version" in data
 
+    def test_opt_out_when_env_var_unset(self) -> None:
+        query = "TestTable | take 10"
+        with patch.dict(os.environ, {}, clear=True):
+            result = add_watermark(query)
+        assert result == query
+
+    def test_opt_in_with_empty_json(self) -> None:
+        query = "TestTable | take 10"
+        with patch.dict(os.environ, {CUSTOM_WATERMARK_ENV_VAR: "{}"}, clear=True):
+            result = add_watermark(query)
+        assert result.startswith("// ")
+        assert result.endswith(query)
+
+    def test_control_command_unchanged_even_when_enabled(self) -> None:
+        command = ".show tables"
+        with patch.dict(os.environ, {CUSTOM_WATERMARK_ENV_VAR: "{}"}):
+            result = add_watermark(command)
+        assert result == command
+
 
 class TestWatermarkIntegration:
     @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
-    def test_query_includes_watermark(
+    def test_query_includes_watermark_when_enabled(
         self,
         mock_get_kusto_connection: Mock,
         sample_cluster_uri: str,
         mock_kusto_response: KustoResponseDataSet,
     ) -> None:
-        """Test that executed queries include the watermark comment."""
+        """Test that executed queries include the watermark comment when opt-in env var is set."""
         mock_client = MagicMock()
         mock_client.execute.return_value = mock_kusto_response
 
@@ -175,13 +196,37 @@ class TestWatermarkIntegration:
 
         query = "TestTable | take 10"
 
-        kusto_query(query, sample_cluster_uri, database="test_db")
+        with patch.dict(os.environ, {CUSTOM_WATERMARK_ENV_VAR: "{}"}):
+            kusto_query(query, sample_cluster_uri, database="test_db")
 
-        # Verify the query passed to execute starts with a watermark comment
         executed_query = mock_client.execute.call_args[0][1]
         assert executed_query.startswith("// ")
         watermark_line = executed_query.split("\n", 1)[0]
         watermark_data = json.loads(watermark_line[3:])
         assert "fabric_rti_mcp_version" in watermark_data
-        # The actual query follows the watermark
         assert executed_query.endswith(query)
+
+    @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+    def test_query_unwatermarked_by_default(
+        self,
+        mock_get_kusto_connection: Mock,
+        sample_cluster_uri: str,
+        mock_kusto_response: KustoResponseDataSet,
+    ) -> None:
+        """Test that executed queries are not watermarked when the opt-in env var is unset."""
+        mock_client = MagicMock()
+        mock_client.execute.return_value = mock_kusto_response
+
+        mock_connection = MagicMock()
+        mock_connection.query_client = mock_client
+        mock_connection.default_database = "default_db"
+        mock_get_kusto_connection.return_value = mock_connection
+
+        query = "TestTable | take 10"
+
+        env = {k: v for k, v in os.environ.items() if k != CUSTOM_WATERMARK_ENV_VAR}
+        with patch.dict(os.environ, env, clear=True):
+            kusto_query(query, sample_cluster_uri, database="test_db")
+
+        executed_query = mock_client.execute.call_args[0][1]
+        assert executed_query == query
