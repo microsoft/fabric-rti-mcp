@@ -1,20 +1,152 @@
 from __future__ import annotations
 
+import base64
 import functools
+import gzip
 import inspect
+import json
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict
+from datetime import timedelta
 from typing import Any, TypeVar
+from urllib.parse import quote, urlparse
 
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
-from fabric_rti_mcp.config import logger
-from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
+from fabric_rti_mcp.config import global_config, logger
+from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig, normalize_service_uri_key
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
-from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter
+from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter, KustoResponseFormat
 from fabric_rti_mcp.services.kusto.kusto_watermark import add_watermark
+
+# ── Deeplink constants ──────────────────────────────────────────────────────────
+
+_MAX_URL_LENGTH = 8000
+
+OFFERING_ADX = "Azure Data Explorer"
+OFFERING_FABRIC = "Microsoft Fabric Eventhouse"
+
+_DEEPLINK_STYLE_MAP: dict[str, str] = {
+    "adx": OFFERING_ADX,
+    "fabric": OFFERING_FABRIC,
+}
+
+_PUBLIC_EXPLORER_BASE = "https://dataexplorer.azure.com"
+
+# Cloud domain suffix → Web Explorer base URL mapping.
+# .kusto.fabric.microsoft.com is intentionally excluded — Fabric uses a different deeplink format.
+_ADX_CLOUD_MAPPINGS: list[tuple[str, str]] = [
+    (".kusto.windows.net", _PUBLIC_EXPLORER_BASE),
+    (".kustodev.windows.net", _PUBLIC_EXPLORER_BASE),
+    (".kustomfa.windows.net", _PUBLIC_EXPLORER_BASE),
+    (".kusto.data.microsoft.com", _PUBLIC_EXPLORER_BASE),
+    (".kusto.azuresynapse.net", _PUBLIC_EXPLORER_BASE),
+]
+
+
+# ── Deeplink helpers ────────────────────────────────────────────────────────────
+
+
+def _encode_query(query: str) -> str:
+    """Encode a KQL query via UTF-8 → gzip → base64 → URL-encode for deeplink URLs."""
+    compressed = gzip.compress(query.encode("utf-8"))
+    b64 = base64.b64encode(compressed).decode("ascii")
+    return quote(b64, safe="")
+
+
+def _detect_offering_from_uri(cluster_uri: str) -> str | None:
+    """
+    Detect the cluster offering type from its URI.
+
+    Returns OFFERING_FABRIC if the host contains '.fabric.',
+    OFFERING_ADX if it matches a known ADX domain suffix, or None.
+    """
+    try:
+        parsed = urlparse(cluster_uri)
+        host = parsed.hostname
+        if not host:
+            return None
+    except Exception:
+        return None
+
+    host_lower = host.lower()
+
+    if ".fabric." in host_lower:
+        return OFFERING_FABRIC
+
+    for suffix, _ in _ADX_CLOUD_MAPPINGS:
+        if host_lower.endswith(suffix):
+            return OFFERING_ADX
+
+    return None
+
+
+def _get_adx_explorer_base(host: str) -> str | None:
+    host_lower = host.lower()
+    for suffix, explorer_base in _ADX_CLOUD_MAPPINGS:
+        if host_lower.endswith(suffix):
+            return explorer_base
+    return None
+
+
+def _build_adx_deeplink(cluster_uri: str, database: str, query: str) -> str | None:
+    """
+    Build an Azure Data Explorer Web Explorer deeplink URL.
+
+    Returns None if the cluster URI is invalid, the domain is unrecognized,
+    or the resulting URL exceeds the browser limit.
+    """
+    try:
+        parsed = urlparse(cluster_uri)
+        if not parsed.scheme or not parsed.hostname:
+            return None
+    except Exception:
+        return None
+
+    host = parsed.hostname
+    explorer_base = _get_adx_explorer_base(host)
+    if explorer_base is None:
+        return None
+
+    encoded_query = _encode_query(query)
+    encoded_db = quote(database, safe="")
+
+    url = f"{explorer_base}/clusters/{host}/databases/{encoded_db}?query={encoded_query}"
+
+    if len(url) > _MAX_URL_LENGTH:
+        return None
+
+    return url
+
+
+def _build_fabric_deeplink(fabric_base_url: str, cluster_uri: str, database: str, query: str) -> str | None:
+    """
+    Build a Microsoft Fabric Eventhouse query workbench deeplink URL.
+
+    Returns None if the resulting URL exceeds the browser limit.
+    """
+    encoded_query = _encode_query(query)
+    encoded_cluster = quote(cluster_uri, safe="")
+    encoded_db = quote(database, safe="")
+
+    url = (
+        f"{fabric_base_url}/groups/me/queryworkbenches/querydeeplink"
+        f"?experience=fabric-developer"
+        f"&cluster={encoded_cluster}"
+        f"&databaseItemId={encoded_db}"
+        f"&query={encoded_query}"
+    )
+
+    if len(url) > _MAX_URL_LENGTH:
+        return None
+
+    return url
+
+
+# ── Kusto service ───────────────────────────────────────────────────────────────
 
 
 def canonical_entity_type(entity_type: str) -> str:
@@ -40,6 +172,64 @@ def canonical_entity_type(entity_type: str) -> str:
             f"Unknown entity type '{entity_type}'. "
             "Supported types: table, materialized-view, external-table, function, graph, database."
         )
+
+
+def kql_escape_entity_name(name: str) -> str:
+    """
+    Sanitize an entity name for safe use in KQL commands and queries.
+
+    Accepts either:
+    - Already escaped: ['entity'] or ["entity"] — validated and passed through
+    - Unescaped: entity — auto-wrapped in ['...']
+
+    Raises ValueError if escape characters (['"]]) appear inside the name
+    in an inconsistent way (partial escaping).
+    """
+    name = name.strip()
+
+    if (name.startswith("['") and name.endswith("']")) or (name.startswith('["') and name.endswith('"]')):
+        inner = name[2:-2]
+        _validate_no_escape_chars(inner)
+        return name
+
+    _validate_no_escape_chars(name)
+    return f"['{name}']"
+
+
+def _validate_no_escape_chars(name: str) -> None:
+    escape_sequences = ["['", "']", '["', '"]']
+    found = [seq for seq in escape_sequences if seq in name]
+    if found:
+        raise ValueError(
+            f"Entity name '{name}' contains KQL escape sequences ({', '.join(repr(s) for s in found)}). "
+            "Entities must be either properly escaped (['entity'], [\"entity\"]) or unescaped. "
+            "Mixing escape sequences inside the entity name is not allowed."
+        )
+
+
+def _find_first_statement(text: str) -> str:
+    """
+    Find the first meaningful KQL statement, skipping comments (//), directives (#), and set hints.
+
+    Returns the first non-skippable line stripped, or empty string if none found.
+    """
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("//"):
+            continue
+        if stripped.startswith("#"):
+            continue
+        if stripped.startswith("set "):
+            continue
+        return stripped
+    return ""
+
+
+def kql_escape_string(value: str) -> str:
+    """Escape a value for use inside KQL single-quoted string literals."""
+    return value.replace("'", "''")
 
 
 CONFIG = KustoConfig.from_env()
@@ -69,16 +259,17 @@ class KustoConnectionManager:
         This method is the single entry point for accessing connections.
         """
         sanitized_uri = sanitize_uri(cluster_uri)
+        cache_key = normalize_service_uri_key(sanitized_uri)
 
-        if sanitized_uri in self._cache:
-            return self._cache[sanitized_uri]
+        if cache_key in self._cache:
+            return self._cache[cache_key]
 
         # Connection not found, create a new one.
         known_services = KustoConfig.get_known_services()
         default_database = _DEFAULT_DB_NAME
 
-        if sanitized_uri in known_services:
-            default_database = known_services[sanitized_uri].default_database or _DEFAULT_DB_NAME
+        if cache_key in known_services:
+            default_database = known_services[cache_key].default_database or _DEFAULT_DB_NAME
         elif not CONFIG.allow_unknown_services:
             raise ValueError(
                 f"Service URI '{sanitized_uri}' is not in the list of approved services, "
@@ -86,7 +277,7 @@ class KustoConnectionManager:
             )
 
         connection = KustoConnection(sanitized_uri, default_database=default_database)
-        self._cache[sanitized_uri] = connection
+        self._cache[cache_key] = connection
         return connection
 
 
@@ -121,6 +312,33 @@ def destructive_operation(func: F) -> F:
     return wrapper  # type: ignore
 
 
+_BLOCKED_CRP_KEYS = frozenset(
+    {
+        "request_readonly",
+        "request_readonly_hardline",
+    }
+)
+
+_TIMESPAN_RE = re.compile(r"^(\d+):(\d{1,2}):(\d{1,2})$")
+
+
+def _parse_servertimeout(value: str) -> timedelta:
+    """Parse an ``HH:MM:SS`` string into a ``timedelta``.
+
+    The Azure Kusto SDK requires ``servertimeout`` to be a ``timedelta`` because
+    it performs ``timeout + client_server_delta`` arithmetic internally. We
+    intentionally accept only the ``HH:MM:SS`` form so agents have a single,
+    unambiguous format to produce.
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"servertimeout must be a string in 'HH:MM:SS' format, got {type(value).__name__}: {value!r}")
+    match = _TIMESPAN_RE.match(value.strip())
+    if not match:
+        raise ValueError(f"servertimeout must be in 'HH:MM:SS' format, got {value!r}")
+    hours, minutes, seconds = (int(g) for g in match.groups())
+    return timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
+
 def _crp(
     action: str, is_destructive: bool, ignore_readonly: bool, client_request_properties: dict[str, Any] | None = None
 ) -> ClientRequestProperties:
@@ -130,21 +348,41 @@ def _crp(
     if not is_destructive and not ignore_readonly:
         crp.set_option("request_readonly", True)
 
-    # Set global timeout if configured
+    # The Azure Kusto SDK expects servertimeout as a timedelta — it adds
+    # client_server_delta (also a timedelta) to it in client_base.py.
     if CONFIG.timeout_seconds is not None:
-        # Convert seconds to timespan format (HH:MM:SS)
-        hours, remainder = divmod(CONFIG.timeout_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        timeout_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        crp.set_option("servertimeout", timeout_str)
+        crp.set_option(
+            ClientRequestProperties.request_timeout_option_name,
+            timedelta(seconds=CONFIG.timeout_seconds),
+        )
 
-    # Apply any additional client request properties provided by the user
-    # User properties can override global settings
     if client_request_properties:
+        blocked = [k for k in client_request_properties if k.lower() in _BLOCKED_CRP_KEYS]
+        if blocked:
+            raise ValueError(
+                f"Client request properties {blocked} are security-sensitive and cannot be overridden via MCP tools"
+            )
         for key, value in client_request_properties.items():
+            if key == ClientRequestProperties.request_timeout_option_name:
+                value = _parse_servertimeout(value)
             crp.set_option(key, value)
 
     return crp
+
+
+_FORMAT_DISPATCH: dict[str, Any] = {
+    "columnar": KustoFormatter.to_columnar,
+    "json": KustoFormatter.to_json,
+    "csv": KustoFormatter.to_csv,
+    "tsv": KustoFormatter.to_tsv,
+    "header_arrays": KustoFormatter.to_header_arrays,
+    "kusto_response": KustoFormatter.to_kusto_response,
+}
+
+
+def _format_result(result_set: Any) -> KustoResponseFormat:
+    formatter = _FORMAT_DISPATCH.get(CONFIG.response_format, KustoFormatter.to_kusto_response)
+    return formatter(result_set)
 
 
 def _execute(
@@ -175,7 +413,7 @@ def _execute(
         database = database.strip()
 
         result_set = client.execute(database, query, crp)
-        return asdict(KustoFormatter.to_columnar(result_set))
+        return asdict(_format_result(result_set))
 
     except Exception as e:
         error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"
@@ -211,7 +449,91 @@ def kusto_query(
     :param client_request_properties: Optional dictionary of additional client request properties.
     :return: The result of the query execution as a list of dictionaries (json).
     """
+    first_stmt = _find_first_statement(query)
+    if first_stmt.startswith("."):
+        raise ValueError(
+            "kusto_query is for KQL queries, not management commands. "
+            "Management commands (starting with '.') should use kusto_command instead."
+        )
     return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+
+def kusto_deeplink_from_query(
+    cluster_uri: str,
+    database: str,
+    query: str,
+) -> str | None:
+    """
+    Build a deeplink URL that opens the given KQL query in the appropriate web explorer UI.
+
+    For Azure Data Explorer clusters, opens in Kusto Web Explorer (dataexplorer.azure.com).
+    For Microsoft Fabric Eventhouse clusters, opens in the Fabric query workbench.
+
+    The cluster type is auto-detected from the URI. If detection fails,
+    falls back to querying the cluster with `.show version`.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: The database name.
+    :param query: The KQL query text.
+    :return: A deeplink URL string, or None if the cluster type could not be determined.
+    """
+    _validate_deeplink_inputs(cluster_uri, database, query)
+
+    deeplink_style = CONFIG.deeplink_style
+    if deeplink_style:
+        offering = _DEEPLINK_STYLE_MAP.get(deeplink_style)
+    else:
+        offering = _detect_offering_from_uri(cluster_uri)
+        if offering is None:
+            offering = _detect_offering_via_show_version(cluster_uri)
+
+    query = query.strip()
+    if offering == OFFERING_ADX:
+        return _build_adx_deeplink(cluster_uri, database, query)
+    elif offering == OFFERING_FABRIC:
+        return _build_fabric_deeplink(global_config.fabric_base_url, cluster_uri, database, query)
+
+    return None
+
+
+def _validate_deeplink_inputs(cluster_uri: str, database: str, query: str) -> None:
+    if not cluster_uri or not cluster_uri.strip():
+        raise ValueError("cluster_uri is required and cannot be empty.")
+
+    if not database or not database.strip():
+        raise ValueError("database is required and cannot be empty.")
+
+    if not query or not query.strip():
+        raise ValueError("query is required and cannot be empty.")
+
+    try:
+        parsed = urlparse(cluster_uri.strip())
+    except Exception:
+        raise ValueError(f"cluster_uri is not a valid URL: '{cluster_uri}'")
+
+    if not parsed.scheme or parsed.scheme not in ("http", "https"):
+        raise ValueError(f"cluster_uri must use http or https scheme, got: '{cluster_uri}'")
+
+    if not parsed.hostname:
+        raise ValueError(f"cluster_uri is missing a hostname: '{cluster_uri}'")
+
+
+def _detect_offering_via_show_version(cluster_uri: str) -> str | None:
+    """Detect cluster offering by executing `.show version` and examining the ServiceOffering column."""
+    try:
+        result = _execute(".show version", cluster_uri, readonly_override=True)
+        data = result.get("data", {})
+        service_offering = data.get("ServiceOffering", [])
+        if not service_offering:
+            return None
+        value = service_offering[0]
+        if OFFERING_FABRIC in value:
+            return OFFERING_FABRIC
+        if OFFERING_ADX in value:
+            return OFFERING_ADX
+        return None
+    except Exception:
+        return None
 
 
 def kusto_graph_query(
@@ -283,9 +605,7 @@ def kusto_graph_query(
         cluster_uri
     )
     """
-    query = (
-        f"graph('{graph_name}') {query}"  # todo: this should properly choose between graph() and make-graph operator
-    )
+    query = f"graph('{kql_escape_string(graph_name)}') {query}"
     return _execute(query, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
@@ -306,6 +626,11 @@ def kusto_command(
     :param client_request_properties: Optional dictionary of additional client request properties.
     :return: The result of the command execution as a list of dictionaries (json).
     """
+    first_stmt = _find_first_statement(command)
+    if not first_stmt.startswith("."):
+        raise ValueError(
+            "kusto_command is for management commands (starting with '.'). KQL queries should use kusto_query instead."
+        )
     return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
@@ -389,7 +714,7 @@ def kusto_describe_database(
     """
     return _execute(
         ".show databases entities with (showObfuscatedStrings=true) "
-        f"| where DatabaseName == '{database or _DEFAULT_DB_NAME}' "
+        f"| where DatabaseName == '{kql_escape_string(database or _DEFAULT_DB_NAME or '')}' "
         "| project EntityName, EntityType, Folder, DocString, CslInputSchema, Content, CslOutputSchema",
         cluster_uri,
         database=database,
@@ -418,30 +743,31 @@ def kusto_describe_database_entity(
     """
 
     entity_type = canonical_entity_type(entity_type)
+    escaped = kql_escape_entity_name(entity_name)
     if entity_type.lower() == "table":
         return _execute(
-            f".show table {entity_name} cslschema",
+            f".show table {escaped} cslschema",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
         )
     elif entity_type.lower() == "external-table":
         return _execute(
-            f".show external table {entity_name} cslschema",
+            f".show external table {escaped} cslschema",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
         )
     elif entity_type.lower() == "function":
         return _execute(
-            f".show function {entity_name}",
+            f".show function {escaped}",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
         )
     elif entity_type.lower() == "materialized-view":
         return _execute(
-            f".show materialized-view {entity_name} "
+            f".show materialized-view {escaped} "
             "| project Name, SourceTable, Query, LastRun, LastRunResult, IsHealthy, IsEnabled, DocString",
             cluster_uri,
             database=database,
@@ -449,7 +775,7 @@ def kusto_describe_database_entity(
         )
     elif entity_type.lower() == "graph":
         return _execute(
-            f".show graph_model {entity_name} details | project Name, Model",
+            f".show graph_model {escaped} details | project Name, Model",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
@@ -479,23 +805,24 @@ def kusto_sample_entity(
     :return: List of dictionaries containing sampled records.
     """
     entity_type = canonical_entity_type(entity_type)
+    escaped = kql_escape_entity_name(entity_name)
     if entity_type.lower() in ["table", "materialized-view", "external-table", "function"]:
         return _execute(
-            f"{entity_name} | sample {sample_size}",
+            f"{escaped} | sample {sample_size}",
             cluster_uri,
             database=database,
             client_request_properties=client_request_properties,
         )
     if entity_type.lower() == "graph":
-        # TODO: handle transient graphs properly
-        sample_size_node = max(1, sample_size // 2)  # at least 5 of each
-        sample_size_edge = max(1, sample_size - sample_size_node)  # at least 5 of each
+        escaped_str = kql_escape_string(entity_name)
+        sample_size_node = max(1, sample_size // 2)
+        sample_size_edge = max(1, sample_size - sample_size_node)
         return _execute(
-            f"""let NodeSample = graph('{entity_name}')
+            f"""let NodeSample = graph('{escaped_str}')
 | graph-to-table nodes
 | take {sample_size_node}
 | project PackedEntity=pack_all(), EntityType='Node';
-let EdgeSample = graph('{entity_name}')
+let EdgeSample = graph('{escaped_str}')
 | graph-to-table edges
 | take {sample_size_edge}
 | project PackedEntity=pack_all(), EntityType='Edge';
@@ -530,7 +857,7 @@ def kusto_ingest_inline_into_table(
     :return: List of dictionaries containing the ingestion result.
     """
     return _execute(
-        f".ingest inline into table {table_name} <| {data_comma_separator}",
+        f".ingest inline into table {kql_escape_entity_name(table_name)} <| {data_comma_separator}",
         cluster_uri,
         database=database,
         client_request_properties=client_request_properties,
@@ -539,21 +866,35 @@ def kusto_ingest_inline_into_table(
 
 def kusto_get_shots(
     prompt: str,
-    shots_table_name: str,
     cluster_uri: str,
+    shots_table_name: str | None = None,
     sample_size: int = 3,
     database: str | None = None,
     embedding_endpoint: str | None = None,
     client_request_properties: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Retrieves shots that are most semantic similar to the supplied prompt from the specified shots table.
+    Retrieves KQL query examples that semantically resemble the user's prompt.
+
+    IMPORTANT: Call this tool BEFORE writing any KQL query. The returned shots contain
+    expert-written KQL examples that reveal the correct databases, tables, column names,
+    and query patterns for this cluster. Without this context, you are likely to query
+    the wrong table or database.
+
+    Use this to:
+    - Discover which databases and tables contain the data you need
+    - Learn the correct column names and schema for a given domain
+    - Find proven query patterns as starting points
+
+    The returned shots come from a curated collection of expert-written examples
+    paired with natural language descriptions.
 
     :param prompt: The user prompt to find similar shots for.
     :param shots_table_name: Name of the table containing the shots. The table should have "EmbeddingText" (string)
                              column containing the natural language prompt, "AugmentedText" (string) column containing
                              the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector
                              for the NL.
+                             If not provided, uses the KUSTO_SHOTS_TABLE environment variable.
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of most similar shots to retrieve. Defaults to 3.
     :param database: Optional database name. If not provided, uses the "AI" database or the default database.
@@ -563,16 +904,203 @@ def kusto_get_shots(
     :param client_request_properties: Optional dictionary of additional client request properties.
     :return: List of dictionaries containing the shots records.
     """
+    resolved_table = shots_table_name or CONFIG.shots_table
+    if not resolved_table:
+        raise ValueError(
+            "shots_table_name must be provided either as a parameter or via the KUSTO_SHOTS_TABLE environment variable."
+        )
+
     # Use provided endpoint, or fall back to environment variable, or use default
     endpoint = embedding_endpoint or CONFIG.open_ai_embedding_endpoint
 
     kql_query = f"""
-        let model_endpoint = '{endpoint}';
-        let embedded_term = toscalar(evaluate ai_embeddings('{prompt}', model_endpoint));
-        {shots_table_name}
+        let model_endpoint = '{kql_escape_string(endpoint or "")}';
+        let embedded_term = toscalar(evaluate ai_embeddings('{kql_escape_string(prompt)}', model_endpoint));
+        {kql_escape_entity_name(resolved_table)}
         | extend similarity = series_cosine_similarity(embedded_term, EmbeddingVector)
         | top {sample_size} by similarity
         | project similarity, EmbeddingText, AugmentedText
     """
 
     return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+
+def _rows_to_dicts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert a kusto_response result into a compact list of row-dicts."""
+    data = result.get("data", {})
+    fmt = result.get("format", "")
+    if fmt == "kusto_response":
+        columns = [c["ColumnName"] for c in data.get("columns", [])]
+        return [dict(zip(columns, row)) for row in data.get("rows", [])]
+    if isinstance(data, dict):
+        columns = list(data.keys())
+        if not columns:
+            return []
+        row_count = len(data[columns[0]]) if data[columns[0]] else 0
+        return [{col: data[col][i] for col in columns} for i in range(row_count)]
+    return []
+
+
+def _extract_physical_plan_hints(plan_json: dict[str, Any]) -> dict[str, Any]:
+    """Extract execution hints from the physical QueryPlan: row counts, selection flags, concurrency."""
+    hints: dict[str, Any] = {}
+    if "TotalRowCount" in plan_json:
+        hints["estimated_rows"] = plan_json["TotalRowCount"]
+
+    # Walk the operator tree to collect shard-level hints
+    shards: list[dict[str, Any]] = []
+
+    def _walk(obj: Any) -> None:
+        if not isinstance(obj, dict):
+            if isinstance(obj, list):
+                for item in obj:
+                    _walk(item)
+            return
+        if "TotalRowCount" in obj and "HasSelection" in obj:
+            shard: dict[str, Any] = {
+                "total_rows": obj["TotalRowCount"],
+                "has_selection": obj["HasSelection"],
+            }
+            shards.append(shard)
+        if "StrategyHint" in obj:
+            sh = obj["StrategyHint"]
+            hints.setdefault("concurrency", sh.get("Concurrency"))
+            hints.setdefault("spread", sh.get("Spread"))
+        for v in obj.values():
+            _walk(v)
+
+    _walk(plan_json.get("RootOperator", {}))
+    if shards:
+        hints["shard_scans"] = shards
+    return hints
+
+
+def _parse_queryplan_content(rows: list[list[Any]]) -> dict[str, Any]:
+    """Parse .show queryplan rows into a compact, agent-friendly dict."""
+    plan: dict[str, Any] = {}
+    for row in rows:
+        result_type, _, content = row[0], row[1], row[2]
+        if result_type == "QueryText":
+            plan["query_text"] = content.strip()
+        elif result_type == "Error":
+            first_line = content.strip().split("\n")[0].split("\r")[0]
+            plan["error"] = first_line
+        elif result_type == "Stats":
+            try:
+                plan["stats"] = json.loads(content)
+            except Exception:
+                plan["stats"] = content
+        elif result_type == "RelopTree":
+            try:
+                plan["relop_tree"] = json.loads(content)
+            except Exception:
+                plan["relop_tree"] = content
+        elif result_type == "QueryPlan":
+            try:
+                physical = json.loads(content)
+                hints = _extract_physical_plan_hints(physical)
+                if hints:
+                    plan["execution_hints"] = hints
+            except Exception:
+                plan["query_plan"] = content
+    return plan
+
+
+def kusto_show_queryplan(
+    query: str,
+    cluster_uri: str,
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Retrieves the query execution plan without actually running the query.
+    This is significantly lighter than execution and useful for understanding
+    performance characteristics and estimating query impact.
+
+    :param query: The KQL query to get the execution plan for.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
+    :return: A compact dictionary with the following keys:
+        * query_text — the query as received by the engine
+        * stats — planning statistics: Duration, PlanSize (bytes), RelopSize (bytes)
+        * relop_tree — the logical operator tree (compact JSON)
+        * execution_hints — extracted from the physical plan:
+            * estimated_rows — total row count the engine expects to process
+            * concurrency — parallelism hint (-1 = auto, 1 = parallel partitions)
+            * spread — node spread hint (-1 = auto, 1 = distributed)
+            * shard_scans — per-shard info: total_rows and has_selection (filter applied)
+        * error — if the query has semantic errors (e.g., bad column name), this contains
+            the error message. The query is NOT executed.
+
+    Critical:
+    * This does NOT execute the query — it only generates the plan.
+    * The plan shows the logical operators the engine would use.
+    * Use this to estimate cost and understand performance before running expensive queries.
+    * PlanSize indicates the overall plan complexity; RelopSize indicates the logical tree size.
+    * execution_hints.estimated_rows and shard_scans reveal the data volume the engine expects to scan.
+    * has_selection=true in shard_scans means a filter narrows the scan (extent pruning applies).
+    """
+    raw = _execute(
+        f".show queryplan <| {query.strip()}",
+        cluster_uri,
+        database=database,
+        client_request_properties=client_request_properties,
+    )
+    data = raw.get("data", {})
+    rows = data.get("rows", []) if raw.get("format") == "kusto_response" else []
+    if not rows:
+        return raw
+    return _parse_queryplan_content(rows)
+
+
+_DIAGNOSTICS_COMMANDS: dict[str, str] = {
+    "capacity": ".show capacity | project Resource, Total, Consumed, Remaining",
+    "cluster": ".show cluster",
+    "principal_roles": ".show principal roles | project Scope, Role",
+    "diagnostics": ".show diagnostics",
+    "workload_groups": ".show workload_groups",
+    "rowstores": ".show rowstores",
+    "ingestion_failures": ".show ingestion failures | where FailedOn > ago(1d)",
+}
+
+
+def kusto_diagnostics(
+    cluster_uri: str,
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Runs a suite of diagnostic commands and returns a JSON summary of the cluster's
+    current state. Each section runs independently — if a command fails (e.g., due to
+    permissions or unsupported features), that section returns an error while others
+    continue normally.
+
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
+    :return: A dictionary with keys for each diagnostic area. Each value is either a list
+             of row-dicts or {"error": "<message>"} if that command failed.
+
+    Sections returned:
+    * capacity — resource utilization limits (total, consumed, remaining per resource)
+    * cluster — cluster node info and state
+    * principal_roles — caller's permission scope and role
+    * diagnostics — internal cluster diagnostics (health, latency, utilization)
+    * workload_groups — configured workload groups and their policies
+    * rowstores — rowstore state and memory usage
+    * ingestion_failures — ingestion failures from the last 24 hours
+    """
+    results: dict[str, Any] = {}
+    for section, command in _DIAGNOSTICS_COMMANDS.items():
+        try:
+            raw = _execute(
+                command,
+                cluster_uri,
+                database=database,
+                client_request_properties=client_request_properties,
+            )
+            results[section] = _rows_to_dicts(raw)
+        except Exception as e:
+            results[section] = {"error": str(e)}
+    return results

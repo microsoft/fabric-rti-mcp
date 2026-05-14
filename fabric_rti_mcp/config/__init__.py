@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import sys
 from dataclasses import dataclass
 
 logger = logging.getLogger("fabric-rti-mcp")
@@ -20,6 +21,7 @@ class GlobalFabricRTIEnvVarNames:
     stateless_http = "FABRIC_RTI_STATELESS_HTTP"
     use_obo_flow = "USE_OBO_FLOW"
     use_ai_foundry_compat = "FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA"
+    cors_allowed_origins = "FABRIC_RTI_CORS_ORIGINS"
 
 
 DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
@@ -31,6 +33,7 @@ DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
 DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
 DEFAULT_USE_OBO_FLOW = False
 DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA = False
+DEFAULT_FABRIC_RTI_CORS_ORIGINS = "*"
 
 
 @dataclass(slots=True, frozen=True)
@@ -44,6 +47,7 @@ class GlobalFabricRTIConfig:
     stateless_http: bool
     use_obo_flow: bool
     use_ai_foundry_compat: bool
+    cors_allowed_origins: str
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -62,14 +66,12 @@ class GlobalFabricRTIConfig:
                 )
             ),
             http_path=os.getenv(GlobalFabricRTIEnvVarNames.http_path, DEFAULT_FABRIC_RTI_HTTP_PATH),
-            stateless_http=bool(
-                os.getenv(GlobalFabricRTIEnvVarNames.stateless_http, DEFAULT_FABRIC_RTI_STATELESS_HTTP)
-            ),
-            use_obo_flow=bool(os.getenv(GlobalFabricRTIEnvVarNames.use_obo_flow, DEFAULT_USE_OBO_FLOW)),
-            use_ai_foundry_compat=bool(
-                os.getenv(
-                    GlobalFabricRTIEnvVarNames.use_ai_foundry_compat, DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA
-                )
+            stateless_http=os.getenv(GlobalFabricRTIEnvVarNames.stateless_http, "false").lower() in ("true", "1"),
+            use_obo_flow=os.getenv(GlobalFabricRTIEnvVarNames.use_obo_flow, "false").lower() in ("true", "1"),
+            use_ai_foundry_compat=os.getenv(GlobalFabricRTIEnvVarNames.use_ai_foundry_compat, "false").lower()
+            in ("true", "1"),
+            cors_allowed_origins=os.getenv(
+                GlobalFabricRTIEnvVarNames.cors_allowed_origins, DEFAULT_FABRIC_RTI_CORS_ORIGINS
             ),
         )
 
@@ -87,6 +89,7 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.stateless_http,
             GlobalFabricRTIEnvVarNames.use_obo_flow,
             GlobalFabricRTIEnvVarNames.use_ai_foundry_compat,
+            GlobalFabricRTIEnvVarNames.cors_allowed_origins,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -122,12 +125,12 @@ class GlobalFabricRTIConfig:
         elif args.http or os.getenv("PORT"):  # if it is running in Azure (Port is set), use HTTP transport
             transport = "http"
 
-        stateless_http = args.stateless_http if args.stateless_http is not None else base_config.stateless_http
+        stateless_http = args.stateless_http if "--stateless-http" in sys.argv else base_config.stateless_http
         http_host = args.host if args.host is not None else base_config.http_host
         http_port = args.port if args.port is not None else base_config.http_port
-        use_obo_flow = args.use_obo_flow if args.use_obo_flow is not None else base_config.use_obo_flow
+        use_obo_flow = args.use_obo_flow if "--use-obo-flow" in sys.argv else base_config.use_obo_flow
         use_ai_foundry_compat = (
-            args.use_ai_foundry_compat if args.use_ai_foundry_compat is not None else base_config.use_ai_foundry_compat
+            args.use_ai_foundry_compat if "--use-ai-foundry-compat" in sys.argv else base_config.use_ai_foundry_compat
         )
 
         # CLI --custom-watermark takes priority over env var
@@ -144,6 +147,7 @@ class GlobalFabricRTIConfig:
             stateless_http=stateless_http,
             use_obo_flow=use_obo_flow,
             use_ai_foundry_compat=use_ai_foundry_compat,
+            cors_allowed_origins=base_config.cors_allowed_origins,
         )
 
 

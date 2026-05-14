@@ -18,11 +18,11 @@ classifiers = [
 ]
 dependencies = [
     "httpx~=0.28.1",
-    "fastmcp>=2.5,<2.15",
-    "azure-kusto-data~=5.0.0",
-    "azure-identity~=1.23.0",
-    "azure-kusto-ingest~=5.0.0",
-    "msal~=1.32.0"
+    "fastmcp>=3.0,<4",
+    "azure-kusto-data>=6.0.3,<7",
+    "azure-identity>=1.24.0,<2",
+    "azure-kusto-ingest>=6.0.3,<7",
+    "msal>=1.32.0,<2"
 ]
 
 [project.optional-dependencies]
@@ -30,6 +30,12 @@ dev = [
     "pytest>=8.3.5",
     "ruff>=0.14.10",
     "ty",
+]
+notebook = [
+    "numpy",
+    "pandas",
+    "ipykernel",
+    "Kqlmagic",
 ]
 
 [project.scripts]

@@ -1,6 +1,7 @@
 """Test global timeout configuration for Kusto tools."""
 
 import os
+from datetime import timedelta
 from unittest.mock import Mock, patch
 
 from azure.kusto.data import ClientRequestProperties
@@ -54,10 +55,9 @@ def test_global_timeout_applied_to_query(mock_get_connection: Mock) -> None:
     crp = call_args[0][2]  # Third argument should be ClientRequestProperties
 
     assert isinstance(crp, ClientRequestProperties)
-    # The timeout should be set as server timeout option in HH:MM:SS format
-    # 600 seconds = 10 minutes = 00:10:00
-    expected_timeout = "00:10:00"
-    assert crp._options.get("servertimeout") == expected_timeout
+    # The SDK expects servertimeout as a timedelta — it adds client_server_delta to it internally.
+    # 600 seconds = 10 minutes
+    assert crp._options.get("servertimeout") == timedelta(seconds=600)
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")

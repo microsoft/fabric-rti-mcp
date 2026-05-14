@@ -40,6 +40,19 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - List Map items in workspaces
 - Delete Map items
 
+### 🧠 Copilot Skills
+
+This repository includes a **KQL Copilot Skill** (`.github/skills/kql/`) that gives AI agents deep KQL expertise when writing, debugging, or reviewing Kusto queries. The skill covers:
+
+- Syntax gotchas and self-correction patterns for common KQL errors
+- Dynamic type discipline, join patterns, datetime pitfalls
+- Memory-safe query patterns and result-size discipline
+- Advanced functions: graph queries, vector similarity, geospatial operations, time series
+- Query templates for deduplication, top-N, sessionization, pivoting, and more
+- Full error-to-fix mapping for rapid recovery
+
+The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `kusto_sample_entity`, etc.) so agents know how to execute queries through this MCP server.
+
 ## 🚧 Coming soon
 - **Other RTI items**
 
@@ -51,6 +64,9 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - "What can you tell me about StormEvents data?"
 - "Analyze the StormEvents to come up with trend analysis across past 10 years of data"
 - "Analyze the commands in 'CommandExecution' table and categorize them as low/medium/high risks"
+- "Before running this query, check the execution plan and tell me if it's expensive"
+- "Compare these two query approaches and tell me which is more efficient"
+- "Check the cluster health — do we have enough capacity for a heavy analytics job?"
 
 **Eventstream Management:**
 - "List all Eventstreams in my workspace"
@@ -63,26 +79,27 @@ The Fabric RTI MCP Server acts as a bridge between AI agents and Microsoft Fabri
 - "Create a teams alert to notify me when my success rate drops below 95%"
 - "List all Activator artifacts in my workspace"
 
-**Map Visualization::**
+**Map Visualization:**
 - "List all Map items in my workspace"
 - "Create a new Map and add LakeHouse with name 'MyLakeHouse' as a data source to Map item 'MyMap'"
 - "Delete a Map item with name 'MyMap' from my workspace"
 
 ### Available tools
 
-#### Eventhouse (Kusto) - 12 Tools:
+#### Eventhouse (Kusto) - 13 Tools:
 - **`kusto_known_services`** - List all available Kusto services configured in the MCP
 - **`kusto_query`** - Execute KQL queries on the specified database
-- **`kusto_command`** - Execute Kusto management commands (destructive operations)
-- **`kusto_list_databases`** - List all databases in the Kusto cluster
-- **`kusto_list_tables`** - List all tables in a specified database
-- **`kusto_get_entities_schema`** - Get schema information for all entities (tables, external tables, materialized views, functions) in a database
-- **`kusto_get_table_schema`** - Get detailed schema information for a specific table
-- **`kusto_get_function_schema`** - Get schema information for a specific function, including parameters and output schema
-- **`kusto_sample_table_data`** - Retrieve random sample records from a specified table
-- **`kusto_sample_function_data`** - Retrieve random sample records from the result of a function call
+- **`kusto_command`** - Execute Kusto management commands (`.show`, `.create`, `.alter`, `.drop`)
+- **`kusto_list_entities`** - List entities (databases, tables, external tables, materialized views, functions, graphs) in a cluster or database
+- **`kusto_describe_database`** - Get schema information for all entities in a database
+- **`kusto_describe_database_entity`** - Get detailed schema for a specific entity (table, external table, materialized view, function, graph)
+- **`kusto_graph_query`** - Execute graph queries using snapshots or transient graphs
+- **`kusto_sample_entity`** - Retrieve sample records from a table, external table, materialized view, or function
 - **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
 - **`kusto_get_shots`** - Retrieve semantically similar query examples from a shots table using AI embeddings
+- **`kusto_deeplink_from_query`** - Generate a deeplink URL to open a KQL query in Azure Data Explorer Web Explorer or Microsoft Fabric query workbench
+- **`kusto_show_queryplan`** - Retrieve the execution plan for a KQL query without running it. Returns planning stats (PlanSize, RelopSize), the logical operator tree, and execution hints (estimated row counts, concurrency/spread hints, per-shard scan info with filter detection). Useful for comparing query approaches, catching expensive joins, and validating query syntax before execution.
+- **`kusto_diagnostics`** - Run a best-effort suite of cluster diagnostic commands and return a unified summary. Sections: capacity (resource slots), cluster (nodes/hardware), principal roles (caller permissions), internal diagnostics (health/utilization), workload groups, rowstores, and ingestion failures (last 24h). Each section runs independently — permission failures on one section don't block others.
 
 #### Eventstreams - 17 Tools:
 
@@ -147,7 +164,7 @@ The process should end with the below settings in your `settings.json` or your `
 ```json
 {
     "mcp": {
-        "server": {
+        "servers": {
             "fabric-rti-mcp": {
                 "command": "uvx",
                 "args": [
@@ -156,7 +173,7 @@ The process should end with the below settings in your `settings.json` or your `
                 "env": {
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
                     "KUSTO_SERVICE_DEFAULT_DB": "Samples",
-                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
+                    "FABRIC_API_BASE": "https://api.fabric.microsoft.com/v1"
                 }
             }
         }
@@ -187,7 +204,7 @@ Or manually add to your `~/.copilot/mcp-config.json`:
             "env": {
                 "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
                 "KUSTO_SERVICE_DEFAULT_DB": "Samples",
-                "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
+                "FABRIC_API_BASE": "https://api.fabric.microsoft.com/v1"
             }
         }
     }
@@ -223,7 +240,7 @@ For more information, see the [GitHub Copilot CLI documentation](https://docs.gi
                 "env": {
                     "KUSTO_SERVICE_URI": "https://help.kusto.windows.net/",
                     "KUSTO_SERVICE_DEFAULT_DB": "Samples",
-                    "FABRIC_API_BASE_URL": "https://api.fabric.microsoft.com/v1"
+                    "FABRIC_API_BASE": "https://api.fabric.microsoft.com/v1"
                 }
             }
         }
@@ -261,27 +278,7 @@ Once VS Code picks up the server and starts it, navigate to its output:
 3. Try prompts that tell the agent to use the RTI tools, such as:
    - **Eventhouse**: "List my Kusto tables" or "Show me a sample from the StormEvents table"
    - **Eventstreams**: "List all Eventstreams in my workspace" or "Show me details of my data processing Eventstream"
-4. The agent should be able use the Fabric RTI MCP Server tools to complete your query
-
-### Via VS Code Client Tool
-For direct testing and development, use the included VS Code client:
-
-```bash
-# Interactive mode with menu
-python eventstream_test/vscode_mcp_client.py
-
-# Natural language commands
-python eventstream_test/vscode_mcp_client.py "list eventstreams in workspace abc-123 with interactive auth"
-python eventstream_test/vscode_mcp_client.py "query cluster https://example.kusto.windows.net: MyTable | take 10"
-python eventstream_test/vscode_mcp_client.py "get fabric api base url"
-```
-
-The VS Code client includes:
-- 🔐 **Interactive authentication** - Browser-based Microsoft sign-in
-- 🗣️ **Natural language prompts** - English commands for MCP operations  
-- ⚙️ **API configuration** - Runtime control of Fabric API endpoints
-- 📊 **JSON output** - Formatted results for analysis
-
+4. The agent should be able to use the Fabric RTI MCP Server tools to complete your query
 
 ## ⚙️ Configuration
 
@@ -301,8 +298,10 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
 | `FABRIC_RTI_KUSTO_CUSTOM_WATERMARK` | Kusto | JSON object for custom query watermark key-value pairs | None | `{"team": "my-team", "app_id": "env:MY_APP_ID"}` |
+| `KUSTO_SHOTS_TABLE` | Kusto | Default shots table name for `kusto_get_shots` when not provided as a parameter | None | `MyDatabase.ShotsTable` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
+| `FABRIC_RTI_KUSTO_DEEPLINK_STYLE` | Kusto | Override auto-detection of deeplink style | None | `adx` or `fabric` |
 
 ### Embedding Endpoint Configuration
 
@@ -321,7 +320,7 @@ https://{your-openai-resource}.openai.azure.com/openai/deployments/{deployment-n
 
 **Authentication Requirements:**
 - Your Azure identity must have access to the OpenAI resource
-- In case using managed identity, the OpenAI resource must should be configured to accept managed identity authentication
+- In case of using managed identity, the OpenAI resource must be configured to accept managed identity authentication
 - The deployment must exist and be accessible
 
 ### Configuration of Shots Table
@@ -397,7 +396,7 @@ If your scenario involves a user token with a non-Kusto audience and you need to
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
 | `USE_OBO_FLOW` | Enable OBO flow for token exchange | `false` | `true` |
-| `FABRIC_RTI_MCP_AZURE_TENANT_ID` | `72f988bf-86f1-41af-91ab-2d7cd011db47` (Microsoft) | `72f988bf-86f1-41af-91ab-2d7cd011db47` |
+| `FABRIC_RTI_MCP_AZURE_TENANT_ID` | Azure AD tenant ID | `72f988bf-86f1-41af-91ab-2d7cd011db47` (Microsoft) | `72f988bf-86f1-41af-91ab-2d7cd011db47` |
 | `FABRIC_RTI_MCP_ENTRA_APP_CLIENT_ID` | Entra App (AAD) Client ID | Your client ID |
 | `FABRIC_RTI_MCP_USER_MANAGED_IDENTITY_CLIENT_ID` | User Managed Identity Client ID | Your UMI client ID |
 
@@ -433,11 +432,8 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ## 📚 Documentation
 
-- **[Usage Guide](./USAGE_GUIDE.md)** - Comprehensive examples and scenarios
-- **[Architecture Guide](./ARCHITECTURE.md)** - Technical architecture and design patterns  
-- **[Async Pattern Explanation](./ASYNC_PATTERN_EXPLANATION.md)** - Details on async/sync integration
 - **[Changelog](./CHANGELOG.md)** - Release history and breaking changes
-- **[Project Assessment](./POST_CLEANUP_ASSESSMENT.md)** - Current project health status
+- **[Contributing](./CONTRIB.md)** - Contribution guidelines
 
 ## Data Collection
 

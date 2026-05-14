@@ -16,15 +16,28 @@ class KustoServiceConfig:
     description: str | None = None
 
 
+def normalize_service_uri_key(service_uri: str) -> str:
+    """Canonical key for matching/caching Kusto service URIs.
+
+    Hostnames and trailing slashes are not semantically significant for cluster
+    identity, so we strip whitespace, drop a trailing slash, and lowercase to
+    avoid duplicate cache entries and missed known-service lookups.
+    """
+    return service_uri.strip().rstrip("/").lower()
+
+
 class KustoEnvVarNames:
     default_service_uri = "KUSTO_SERVICE_URI"
     default_service_default_db = "KUSTO_SERVICE_DEFAULT_DB"
     open_ai_embedding_endpoint = "AZ_OPENAI_EMBEDDING_ENDPOINT"
+    shots_table = "KUSTO_SHOTS_TABLE"
     known_services = "KUSTO_KNOWN_SERVICES"
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
     custom_watermark = "FABRIC_RTI_KUSTO_CUSTOM_WATERMARK"
+    deeplink_style = "FABRIC_RTI_KUSTO_DEEPLINK_STYLE"
+    response_format = "FABRIC_RTI_KUSTO_RESPONSE_FORMAT"
 
     @staticmethod
     def all() -> list[str]:
@@ -33,11 +46,14 @@ class KustoEnvVarNames:
             KustoEnvVarNames.default_service_uri,
             KustoEnvVarNames.default_service_default_db,
             KustoEnvVarNames.open_ai_embedding_endpoint,
+            KustoEnvVarNames.shots_table,
             KustoEnvVarNames.known_services,
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
             KustoEnvVarNames.custom_watermark,
+            KustoEnvVarNames.deeplink_style,
+            KustoEnvVarNames.response_format,
         ]
 
 
@@ -47,6 +63,8 @@ class KustoConfig:
     default_service: KustoServiceConfig | None = None
     # Optional OpenAI embedding endpoint to be used for embeddings where applicable.
     open_ai_embedding_endpoint: str | None = None
+    # Default shots table name for the kusto_get_shots tool.
+    shots_table: str | None = None
     # List of known Kusto services. If empty, no services are configured.
     known_services: list[KustoServiceConfig] | None = None
     # Whether to eagerly connect to the default service on startup.
@@ -57,6 +75,10 @@ class KustoConfig:
     allow_unknown_services: bool = True
     # Global timeout for all Kusto operations in seconds
     timeout_seconds: int | None = None
+    # Override deeplink style detection. Valid values: "adx", "fabric".
+    deeplink_style: str | None = None
+    # Response format for Kusto query results. Default: "kusto_response".
+    response_format: str = "kusto_response"
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -72,6 +94,7 @@ class KustoConfig:
             )
 
         open_ai_embedding_endpoint = os.getenv(KustoEnvVarNames.open_ai_embedding_endpoint, None)
+        shots_table = os.getenv(KustoEnvVarNames.shots_table, None)
         known_services_string = os.getenv(KustoEnvVarNames.known_services, None)
         known_services: list[KustoServiceConfig] | None = None
         eager_connect = os.getenv(KustoEnvVarNames.eager_connect, "false").lower() in ("true", "1")
@@ -94,13 +117,41 @@ class KustoConfig:
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse {KustoEnvVarNames.known_services}: {e}. Skipping known services.")
 
+        deeplink_style = None
+        deeplink_style_env = os.getenv(KustoEnvVarNames.deeplink_style)
+        if deeplink_style_env:
+            normalized = deeplink_style_env.strip().lower()
+            if normalized in ("adx", "fabric"):
+                deeplink_style = normalized
+            else:
+                logger.warning(
+                    f"Invalid {KustoEnvVarNames.deeplink_style}='{deeplink_style_env}'. "
+                    "Expected 'adx' or 'fabric'. Ignoring override."
+                )
+
+        valid_formats = ("columnar", "json", "csv", "tsv", "header_arrays", "kusto_response")
+        response_format = "kusto_response"
+        response_format_env = os.getenv(KustoEnvVarNames.response_format)
+        if response_format_env:
+            normalized_fmt = response_format_env.strip().lower()
+            if normalized_fmt in valid_formats:
+                response_format = normalized_fmt
+            else:
+                logger.warning(
+                    f"Invalid {KustoEnvVarNames.response_format}='{response_format_env}'. "
+                    f"Expected one of: {', '.join(valid_formats)}. Using default 'kusto_response'."
+                )
+
         return KustoConfig(
             default_service,
             open_ai_embedding_endpoint,
+            shots_table,
             known_services,
             eager_connect,
             allow_unknown_services,
             timeout_seconds,
+            deeplink_style,
+            response_format,
         )
 
     @staticmethod
@@ -116,9 +167,20 @@ class KustoConfig:
     def get_known_services() -> dict[str, KustoServiceConfig]:
         config = KustoConfig.from_env()
         result: dict[str, KustoServiceConfig] = {}
+
+        def _add(service: KustoServiceConfig) -> None:
+            key = normalize_service_uri_key(service.service_uri)
+            existing = result.get(key)
+            if existing is not None:
+                logger.warning(
+                    f"Duplicate Kusto known service entry for normalized key '{key}': "
+                    f"'{existing.service_uri}' is overridden by '{service.service_uri}'."
+                )
+            result[key] = service
+
         if config.default_service:
-            result[config.default_service.service_uri] = config.default_service
+            _add(config.default_service)
         if config.known_services is not None:
             for known_service in config.known_services:
-                result[known_service.service_uri] = known_service
+                _add(known_service)
         return result
