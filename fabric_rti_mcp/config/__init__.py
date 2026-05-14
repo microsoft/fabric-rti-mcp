@@ -111,6 +111,13 @@ class GlobalFabricRTIConfig:
         parser.add_argument(
             "--use-ai-foundry-compat", action="store_true", help="Enable or disable AI Foundry compatibility mode"
         )
+        parser.add_argument(
+            "--custom-watermark",
+            type=str,
+            help="Enable query watermarking with optional custom JSON entries, "
+            'e.g. \'{}\' for defaults only or \'{"team": "my-team", "app_id": "env:MY_APP_ID"}\''
+            " (FABRIC_RTI_KUSTO_CUSTOM_WATERMARK). Watermarking is opt-in: unset = disabled.",
+        )
         args, _ = parser.parse_known_args()
 
         transport = base_config.transport
@@ -126,6 +133,10 @@ class GlobalFabricRTIConfig:
         use_ai_foundry_compat = (
             args.use_ai_foundry_compat if "--use-ai-foundry-compat" in sys.argv else base_config.use_ai_foundry_compat
         )
+
+        # CLI --custom-watermark takes priority over env var
+        if args.custom_watermark is not None:
+            os.environ["FABRIC_RTI_KUSTO_CUSTOM_WATERMARK"] = args.custom_watermark
 
         return GlobalFabricRTIConfig(
             fabric_api_base=base_config.fabric_api_base,
