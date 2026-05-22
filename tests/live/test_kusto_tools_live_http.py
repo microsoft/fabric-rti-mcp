@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import base64
 import json
 import os
 import subprocess
@@ -428,17 +429,131 @@ class KustoHttpClientTester:
         except Exception as e:
             print(f"❌ Error testing query: {e}")
 
+    def _make_jwt(self, header: dict[str, Any], payload: dict[str, Any], signature: str = "fakesig") -> str:
+        """Build a JWT from parts (no real signature)."""
+        h = base64.urlsafe_b64encode(json.dumps(header).encode()).rstrip(b"=").decode()
+        p = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+        return f"{h}.{p}.{signature}"
+
+    def _raw_init_request(self, auth_header: str | None) -> requests.Response:
+        """Send an initialize request with the given auth header (bypasses client auth)."""
+        headers: dict[str, str] = {"Content-Type": "application/json", "Accept": "application/json"}
+        if auth_header is not None:
+            headers["Authorization"] = auth_header
+
+        payload = {
+            "jsonrpc": "2.0",
+            "id": str(uuid.uuid4()),
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "1.0",
+                "capabilities": {},
+                "clientInfo": {"name": "validation_tester", "version": "1.0"},
+            },
+        }
+        mcp_url = f"http://{self.host}:{self.port}/mcp"
+        return requests.post(mcp_url, headers=headers, json=payload, timeout=10)
+
+    async def test_no_auth_header(self) -> None:
+        """Server should return 401 when no Authorization header is provided."""
+        print("\n🔒 Testing missing Authorization header...")
+        resp = self._raw_init_request(auth_header=None)
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        body = resp.json()
+        assert "Authorization header required" in body.get("message", "")
+        print("  ✅ Correctly rejected with 401")
+
+    async def test_malformed_token_not_three_parts(self) -> None:
+        """Server should reject tokens that don't have 3 dot-separated parts."""
+        print("\n🔒 Testing malformed token (not 3 parts)...")
+        resp = self._raw_init_request(auth_header="Bearer only.two")
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        body = resp.json()
+        assert "Invalid JWT format" in body.get("message", "")
+        print("  ✅ Correctly rejected malformed token")
+
+    async def test_empty_token_part(self) -> None:
+        """Server should reject tokens with an empty part."""
+        print("\n🔒 Testing token with empty part...")
+        resp = self._raw_init_request(auth_header="Bearer header..signature")
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        body = resp.json()
+        assert "empty" in body.get("message", "").lower() or "Invalid JWT" in body.get("message", "")
+        print("  ✅ Correctly rejected token with empty part")
+
+    async def test_unsupported_algorithm(self) -> None:
+        """Server should reject tokens using 'none' or other insecure algorithms."""
+        print("\n🔒 Testing token with 'none' algorithm...")
+        token = self._make_jwt(
+            header={"alg": "none", "typ": "JWT"},
+            payload={"sub": "test", "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp())},
+        )
+        resp = self._raw_init_request(auth_header=f"Bearer {token}")
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        body = resp.json()
+        assert "unsupported algorithm" in body.get("message", "").lower()
+        print("  ✅ Correctly rejected 'none' algorithm")
+
+    async def test_expired_token(self) -> None:
+        """Server should reject expired tokens."""
+        print("\n🔒 Testing expired token...")
+        token = self._make_jwt(
+            header={"alg": "RS256", "typ": "JWT"},
+            payload={"sub": "test", "exp": int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp())},
+        )
+        resp = self._raw_init_request(auth_header=f"Bearer {token}")
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        body = resp.json()
+        assert "expired" in body.get("message", "").lower()
+        print("  ✅ Correctly rejected expired token")
+
+    async def test_missing_algorithm(self) -> None:
+        """Server should reject tokens with no 'alg' in header."""
+        print("\n🔒 Testing token with missing algorithm...")
+        token = self._make_jwt(
+            header={"typ": "JWT"},
+            payload={"sub": "test", "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp())},
+        )
+        resp = self._raw_init_request(auth_header=f"Bearer {token}")
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        body = resp.json()
+        assert "alg" in body.get("message", "").lower()
+        print("  ✅ Correctly rejected token without algorithm")
+
+    async def test_health_endpoint_no_auth(self) -> None:
+        """Health endpoint should be accessible without auth."""
+        print("\n🔒 Testing /health endpoint without auth...")
+        resp = requests.get(f"http://{self.host}:{self.port}/health", timeout=10)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        print("  ✅ Health endpoint accessible without auth")
+
     async def run_all_tests(self) -> None:
         """Run all tests."""
         try:
             await self.setup()
 
+            # Functional tests with real credentials
             try:
                 await self.test_list_tools()
                 await self.test_list_entities()
                 await self.test_simple_query()
             except Exception as test_error:
                 print(f"\n❌ Specific test failed: {test_error}")
+
+            # Token validation tests (no real credential needed, uses raw requests)
+            print("\n" + "=" * 60)
+            print("Token Validation Tests")
+            print("=" * 60)
+
+            await self.test_no_auth_header()
+            await self.test_malformed_token_not_three_parts()
+            await self.test_empty_token_part()
+            await self.test_unsupported_algorithm()
+            await self.test_expired_token()
+            await self.test_missing_algorithm()
+            await self.test_health_endpoint_no_auth()
+
+            print("\n✅ All token validation tests passed!")
 
             print("\n✅ Tests execution completed!")
 
