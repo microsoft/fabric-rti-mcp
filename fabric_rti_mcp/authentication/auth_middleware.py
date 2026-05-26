@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+from datetime import datetime, timezone
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -18,12 +19,24 @@ from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
 from fabric_rti_mcp.services.kusto.kusto_connection import set_auth_token
 
+# Secure asymmetric algorithms allowed for JWT validation.
+# Microsoft Entra ID uses RS256 (per https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration).
+# Additional RSA/ECDSA variants included for non-Entra identity providers.
+# Blocks insecure algorithms: "none", HMAC-based (HS256/HS384/HS512).
+ALLOWED_JWT_ALGORITHMS = ["RS256"]
+
 
 def extract_token_from_header(auth_header: str) -> str:
     """Extract clean token from authorization header."""
     if auth_header.lower().startswith("bearer "):
         return auth_header[7:]  # Remove "Bearer " (7 characters)
     return auth_header
+
+
+def _decode_base64url(data: str) -> bytes:
+    """Decode a base64url-encoded string (with padding fixup)."""
+    padding = "=" * (4 - len(data) % 4) if len(data) % 4 else ""
+    return base64.b64decode(data.replace("-", "+").replace("_", "/") + padding)
 
 
 def decode_jwt_token(token: str) -> dict[str, Any]:
@@ -73,6 +86,88 @@ def decode_jwt_token(token: str) -> dict[str, Any]:
         return {}  # TBD : Handle token validation errors errors when validation is added
 
 
+def validate_jwt_token_format(token: str) -> tuple[bool, str]:
+    """Validate JWT has 3 non-empty dot-separated parts."""
+    parts = token.split(".")
+    if len(parts) != 3:
+        return False, f"Invalid JWT format: expected 3 parts, got {len(parts)}"
+    for i, part in enumerate(parts):
+        if not part:
+            return False, f"Invalid JWT format: part {i} is empty"
+    return True, ""
+
+
+def validate_jwt_token_expiration(token_payload: dict[str, Any]) -> tuple[bool, str]:
+    """Validate the token is not expired. Passes if 'exp' claim is absent."""
+    exp = token_payload.get("exp")
+    if exp is None:
+        return True, ""
+
+    current_time = datetime.now(timezone.utc).timestamp()
+    if current_time > exp:
+        return False, "Token has expired"
+
+    logger.info(f"Token valid for {int(exp - current_time)} seconds")
+    return True, ""
+
+
+def validate_jwt_token_structure(token: str) -> tuple[bool, str]:
+    """Validate the JWT header is decodable and uses a secure algorithm."""
+    parts = token.split(".")
+
+    try:
+        header = json.loads(_decode_base64url(parts[0]))
+    except Exception as e:
+        return False, f"Failed to decode token header: {e}"
+
+    alg = header.get("alg")
+    if not alg:
+        return False, "Token missing 'alg' (algorithm) in header"
+
+    if alg not in ALLOWED_JWT_ALGORITHMS:
+        return False, f"Token uses unsupported algorithm: {alg}"
+
+    return True, ""
+
+
+def _log_token_claims(token_payload: dict[str, Any]) -> None:
+    """Log token claims for debugging (informational only, never rejects)."""
+    aud = token_payload.get("aud", "N/A")
+    tid = token_payload.get("tid", "N/A")
+    oid = token_payload.get("oid", "N/A")
+    iss = token_payload.get("iss", "N/A")
+    scp = token_payload.get("scp", token_payload.get("roles", "N/A"))
+    logger.info(f"Token claims - Audience: {aud}, Tenant: {tid}, Object ID: {oid}")
+    logger.info(f"Token claims - Issuer: {iss}, Scopes/Roles: {scp}")
+
+
+def validate_token(token: str) -> tuple[bool, str]:
+    """
+    Perform deployment-agnostic token validation:
+    - Format (3 parts, non-empty)
+    - Header decodable with secure algorithm
+    - Not expired
+    """
+    is_valid, error_msg = validate_jwt_token_format(token)
+    if not is_valid:
+        return False, error_msg
+
+    is_valid, error_msg = validate_jwt_token_structure(token)
+    if not is_valid:
+        return False, error_msg
+
+    payload = decode_jwt_token(token)
+    if not payload:
+        return False, "Failed to decode token payload"
+
+    is_valid, error_msg = validate_jwt_token_expiration(payload)
+    if not is_valid:
+        return False, error_msg
+
+    _log_token_claims(payload)
+    return True, ""
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """HTTP middleware that validates authorization tokens for MCP endpoints."""
 
@@ -102,6 +197,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
             logger.info(f"Request URI: {request_uri}, Method: {request_method}")
 
             token = extract_token_from_header(auth_header)
+
+            # Validate token before using it
+            is_valid, error_msg = validate_token(token)
+            if not is_valid:
+                logger.error(f"Token validation failed: {error_msg}")
+                return JSONResponse(
+                    {"error": "unauthorized", "message": f"Invalid token: {error_msg}"}, status_code=401
+                )
 
             try:
                 if config.use_obo_flow:
