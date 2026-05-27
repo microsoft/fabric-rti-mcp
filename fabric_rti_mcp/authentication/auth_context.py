@@ -1,10 +1,10 @@
 import time
-from collections.abc import Callable
 from contextvars import ContextVar
 from contextvars import Token as ContextToken
 from typing import Any
 
 from azure.core.credentials import AccessToken, TokenCredential
+from azure.identity import DefaultAzureCredential
 
 _request_token: ContextVar[str | None] = ContextVar("_request_token", default=None)
 
@@ -34,10 +34,16 @@ class BearerTokenCredential(TokenCredential):
         return AccessToken(token=token, expires_on=int(time.time()) + 3600)
 
 
-def get_azure_credential_or_http_header_token(
-    azure_credential_factory: Callable[[], TokenCredential],
-) -> TokenCredential:
-    """Use the HTTP request bearer token when present, otherwise create an Azure credential."""
+def get_azure_credential_or_http_header_token(authority: str | None = None) -> TokenCredential:
+    """Use the HTTP request bearer token when present, otherwise create a DefaultAzureCredential."""
     if get_auth_token():
         return BearerTokenCredential()
-    return azure_credential_factory()
+
+    credential_args: dict[str, Any] = {
+        "exclude_shared_token_cache_credential": True,
+        "exclude_interactive_browser_credential": False,
+    }
+    if authority:
+        credential_args["authority"] = authority
+
+    return DefaultAzureCredential(**credential_args)

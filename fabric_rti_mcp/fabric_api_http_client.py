@@ -4,8 +4,6 @@ from contextvars import copy_context
 from typing import Any, cast
 
 import httpx
-from azure.core.credentials import TokenCredential
-from azure.identity import DefaultAzureCredential
 
 from fabric_rti_mcp.authentication.auth_context import get_azure_credential_or_http_header_token
 from fabric_rti_mcp.config import GlobalFabricRTIConfig, logger
@@ -31,28 +29,14 @@ class FabricAPIHttpClient:
             api_base_url = config.fabric_api_base
 
         self.api_base_url = api_base_url.rstrip("/")
-        self.credential = self._get_credential()
         self.token_scope = "https://api.fabric.microsoft.com/.default"
         self._cached_token = None
         self._token_expiry = None
 
-    def _get_credential(self) -> TokenCredential:
-        """
-        Get Azure credential for authentication.
-        This ensures consistent authentication behavior across all Fabric services.
-
-        Uses the user's default tenant, allowing the client to work
-        for users in any tenant (not hard-coded to Microsoft's tenant).
-        """
-        return DefaultAzureCredential(
-            exclude_shared_token_cache_credential=True,
-            exclude_interactive_browser_credential=False,
-        )
-
     def _get_access_token(self) -> str:
         try:
             # Get token from Azure credential
-            credential = get_azure_credential_or_http_header_token(lambda: self.credential)
+            credential = get_azure_credential_or_http_header_token()
             token = credential.get_token(self.token_scope)
 
             if not token:

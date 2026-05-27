@@ -53,22 +53,44 @@ class TestAuthTokenContextVar:
 
 
 class TestAzureCredentialOrHttpHeaderToken:
-    def test_uses_http_header_token_when_present(self) -> None:
+    def test_uses_http_header_token_when_present(self, monkeypatch: pytest.MonkeyPatch) -> None:
         set_auth_token("caller-token")
-        azure_credential_factory = MagicMock()
+        default_credential = MagicMock()
+        monkeypatch.setattr("fabric_rti_mcp.authentication.auth_context.DefaultAzureCredential", default_credential)
 
-        credential = get_azure_credential_or_http_header_token(azure_credential_factory)
+        credential = get_azure_credential_or_http_header_token()
 
         assert isinstance(credential, BearerTokenCredential)
         assert credential.get_token("scope").token == "caller-token"
-        azure_credential_factory.assert_not_called()
+        default_credential.assert_not_called()
 
-    def test_calls_azure_credential_factory_without_http_header_token(self) -> None:
+    def test_falls_back_to_default_azure_credential_without_http_header_token(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         set_auth_token(None)
         azure_credential = MagicMock()
-        azure_credential_factory = MagicMock(return_value=azure_credential)
+        default_credential = MagicMock(return_value=azure_credential)
+        monkeypatch.setattr("fabric_rti_mcp.authentication.auth_context.DefaultAzureCredential", default_credential)
 
-        credential = get_azure_credential_or_http_header_token(azure_credential_factory)
+        credential = get_azure_credential_or_http_header_token()
 
         assert credential is azure_credential
-        azure_credential_factory.assert_called_once_with()
+        default_credential.assert_called_once_with(
+            exclude_shared_token_cache_credential=True,
+            exclude_interactive_browser_credential=False,
+        )
+
+    def test_passes_authority_to_default_azure_credential(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        set_auth_token(None)
+        azure_credential = MagicMock()
+        default_credential = MagicMock(return_value=azure_credential)
+        monkeypatch.setattr("fabric_rti_mcp.authentication.auth_context.DefaultAzureCredential", default_credential)
+
+        credential = get_azure_credential_or_http_header_token(authority="https://login.example")
+
+        assert credential is azure_credential
+        default_credential.assert_called_once_with(
+            exclude_shared_token_cache_credential=True,
+            exclude_interactive_browser_credential=False,
+            authority="https://login.example",
+        )

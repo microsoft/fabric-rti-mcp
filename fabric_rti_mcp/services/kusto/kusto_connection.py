@@ -1,5 +1,4 @@
 from azure.core.credentials import TokenCredential
-from azure.identity import DefaultAzureCredential
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
 
@@ -28,13 +27,7 @@ class KustoConnection:
         self.default_database = default_database
 
     def _get_credential(self, login_endpoint: str) -> TokenCredential:
-        return get_azure_credential_or_http_header_token(
-            lambda: DefaultAzureCredential(
-                exclude_shared_token_cache_credential=True,
-                exclude_interactive_browser_credential=False,
-                authority=login_endpoint,
-            )
-        )
+        return get_azure_credential_or_http_header_token(authority=login_endpoint)
 
 
 def sanitize_uri(cluster_uri: str) -> str:

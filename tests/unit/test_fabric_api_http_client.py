@@ -56,32 +56,43 @@ def clear_auth_token() -> Generator[None, None, None]:
     set_auth_token(None)
 
 
+def mock_default_credential(monkeypatch: pytest.MonkeyPatch, credential: FakeCredential) -> MagicMock:
+    default_credential = MagicMock(return_value=credential)
+    monkeypatch.setattr("fabric_rti_mcp.authentication.auth_context.DefaultAzureCredential", default_credential)
+    return default_credential
+
+
 def test_get_headers_uses_request_token_without_default_credential(monkeypatch: pytest.MonkeyPatch) -> None:
     credential = FakeCredential()
-    monkeypatch.setattr(FabricAPIHttpClient, "_get_credential", lambda self: credential)
+    default_credential = mock_default_credential(monkeypatch, credential)
     client = FabricAPIHttpClient("https://fabric.example")
 
     set_auth_token("caller-token")
     headers = client._get_headers()
 
     assert headers["Authorization"] == "Bearer caller-token"
+    default_credential.assert_not_called()
     credential.get_token_mock.assert_not_called()
 
 
 def test_get_headers_falls_back_to_default_credential_without_request_token(monkeypatch: pytest.MonkeyPatch) -> None:
     credential = FakeCredential()
-    monkeypatch.setattr(FabricAPIHttpClient, "_get_credential", lambda self: credential)
+    default_credential = mock_default_credential(monkeypatch, credential)
     client = FabricAPIHttpClient("https://fabric.example")
 
     headers = client._get_headers()
 
     assert headers["Authorization"] == "Bearer managed-identity-token"
+    default_credential.assert_called_once_with(
+        exclude_shared_token_cache_credential=True,
+        exclude_interactive_browser_credential=False,
+    )
     credential.get_token_mock.assert_called_once_with("https://api.fabric.microsoft.com/.default")
 
 
 def test_extra_headers_cannot_override_request_authorization(monkeypatch: pytest.MonkeyPatch) -> None:
     credential = FakeCredential()
-    monkeypatch.setattr(FabricAPIHttpClient, "_get_credential", lambda self: credential)
+    default_credential = mock_default_credential(monkeypatch, credential)
     client = FabricAPIHttpClient("https://fabric.example")
 
     set_auth_token("caller-token")
@@ -89,12 +100,13 @@ def test_extra_headers_cannot_override_request_authorization(monkeypatch: pytest
 
     assert headers["Authorization"] == "Bearer caller-token"
     assert headers["x-ms-custom"] == "value"
+    default_credential.assert_not_called()
     credential.get_token_mock.assert_not_called()
 
 
 def test_make_request_preserves_request_token_when_running_inside_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     credential = FakeCredential()
-    monkeypatch.setattr(FabricAPIHttpClient, "_get_credential", lambda self: credential)
+    default_credential = mock_default_credential(monkeypatch, credential)
     monkeypatch.setattr("fabric_rti_mcp.fabric_api_http_client.httpx.AsyncClient", FakeAsyncClient)
     client = FabricAPIHttpClient("https://fabric.example")
 
@@ -106,4 +118,5 @@ def test_make_request_preserves_request_token_when_running_inside_event_loop(mon
 
     assert result == {"ok": True}
     assert FakeAsyncClient.last_headers["Authorization"] == "Bearer caller-token"
+    default_credential.assert_not_called()
     credential.get_token_mock.assert_not_called()
