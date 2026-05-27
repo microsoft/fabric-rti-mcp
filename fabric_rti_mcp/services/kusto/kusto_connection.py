@@ -1,5 +1,4 @@
 import time
-from contextvars import ContextVar
 from typing import Any
 
 from azure.core.credentials import AccessToken, TokenCredential
@@ -7,18 +6,8 @@ from azure.identity import DefaultAzureCredential
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
 
-# Thread-safe context variable to store the current request's auth token
-_request_token: ContextVar[str | None] = ContextVar("_request_token", default=None)
-
-
-def set_auth_token(token: str | None) -> None:
-    """Set the auth token for the current request context"""
-    _request_token.set(token)
-
-
-def get_auth_token() -> str | None:
-    """Get the auth token from the current request context"""
-    return _request_token.get()
+from fabric_rti_mcp.authentication.auth_context import get_auth_token
+from fabric_rti_mcp.authentication.auth_context import set_auth_token as set_auth_token
 
 
 class BearerTokenCredential(TokenCredential):

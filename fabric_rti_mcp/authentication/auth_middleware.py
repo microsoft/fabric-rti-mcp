@@ -13,11 +13,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
+from fabric_rti_mcp.authentication.auth_context import reset_auth_token, set_auth_token
 from fabric_rti_mcp.authentication.token_obo_exchanger import TokenOboExchanger
 from fabric_rti_mcp.config import global_config as config
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
-from fabric_rti_mcp.services.kusto.kusto_connection import set_auth_token
 
 # Secure asymmetric algorithms allowed for JWT validation.
 # Microsoft Entra ID uses RS256 (per https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration).
@@ -232,24 +232,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 )
 
             # Store the token for use by services
-            set_auth_token(token)
+            auth_context_token = set_auth_token(token)
+            try:
+                token_payload = decode_jwt_token(token)
 
-            token_payload = decode_jwt_token(token)
+                audience = token_payload.get("aud", "N/A")
+                tenant_id = token_payload.get("tid", "N/A")
+                scopes = token_payload.get("scp", token_payload.get("roles", "N/A"))
 
-            audience = token_payload.get("aud", "N/A")
-            tenant_id = token_payload.get("tid", "N/A")
-            scopes = token_payload.get("scp", token_payload.get("roles", "N/A"))
+                logger.info(f"Token audience: {audience}")
+                logger.info(f"Token tenant ID: {tenant_id}")
+                logger.info(f"Token scopes/roles: {scopes}")
 
-            logger.info(f"Token audience: {audience}")
-            logger.info(f"Token tenant ID: {tenant_id}")
-            logger.info(f"Token scopes/roles: {scopes}")
+                # Continue with request
+                response = await call_next(request)
 
-            # Continue with request
-            response = await call_next(request)
+                logger.info(f"Response status code: {response.status_code}")
 
-            logger.info(f"Response status code: {response.status_code}")
-
-            return response
+                return response
+            finally:
+                reset_auth_token(auth_context_token)
 
         except Exception as e:
             logger.error(f"Error in auth middleware: {e}")

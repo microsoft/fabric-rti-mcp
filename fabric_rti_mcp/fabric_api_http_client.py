@@ -1,10 +1,12 @@
 import asyncio
 from collections.abc import Coroutine
+from contextvars import copy_context
 from typing import Any, cast
 
 import httpx
 from azure.identity import ChainedTokenCredential, DefaultAzureCredential
 
+from fabric_rti_mcp.authentication.auth_context import get_auth_token
 from fabric_rti_mcp.config import GlobalFabricRTIConfig, logger
 
 
@@ -47,6 +49,11 @@ class FabricAPIHttpClient:
         )
 
     def _get_access_token(self) -> str:
+        request_token = get_auth_token()
+        if request_token:
+            logger.debug("Using request auth token for Fabric API call")
+            return request_token
+
         try:
             # Get token from Azure credential
             token = self.credential.get_token(self.token_scope)
@@ -64,7 +71,6 @@ class FabricAPIHttpClient:
     def _get_headers(self, extra_headers: dict[str, str] | None = None) -> dict[str, str]:
         access_token = self._get_access_token()
         headers = {
-            "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -73,6 +79,7 @@ class FabricAPIHttpClient:
         if extra_headers:
             headers.update(extra_headers)
 
+        headers["Authorization"] = f"Bearer {access_token}"
         return headers
 
     def _run_async_operation(self, coro: Coroutine[Any, Any, Any]) -> Any:
@@ -82,12 +89,14 @@ class FabricAPIHttpClient:
             # If we're already in an event loop, we need to run in a thread
             import concurrent.futures
 
+            context = copy_context()
+
             def run_in_thread() -> Any:
                 # Create a new event loop for this thread
                 new_loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(new_loop)
                 try:
-                    return new_loop.run_until_complete(coro)
+                    return context.run(new_loop.run_until_complete, coro)
                 finally:
                     new_loop.close()
 
