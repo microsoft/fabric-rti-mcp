@@ -1,9 +1,15 @@
-from contextvars import ContextVar, Token
+import time
+from collections.abc import Callable
+from contextvars import ContextVar
+from contextvars import Token as ContextToken
+from typing import Any
+
+from azure.core.credentials import AccessToken, TokenCredential
 
 _request_token: ContextVar[str | None] = ContextVar("_request_token", default=None)
 
 
-def set_auth_token(token: str | None) -> Token[str | None]:
+def set_auth_token(token: str | None) -> ContextToken[str | None]:
     """Set the auth token for the current request context."""
     return _request_token.set(token)
 
@@ -13,6 +19,27 @@ def get_auth_token() -> str | None:
     return _request_token.get()
 
 
-def reset_auth_token(context_token: Token[str | None]) -> None:
+def reset_auth_token(context_token: ContextToken[str | None]) -> None:
     """Reset the auth token context to its previous value."""
     _request_token.reset(context_token)
+
+
+class BearerTokenCredential(TokenCredential):
+    """A credential that reads the bearer token from the current request's ContextVar on each call."""
+
+    def get_token(self, *scopes: str, **kwargs: Any) -> AccessToken:
+        token = get_auth_token()
+        if not token:
+            raise ValueError("No auth token available in request context")
+        return AccessToken(token=token, expires_on=int(time.time()) + 3600)
+
+
+def get_azure_credential_or_http_header_token(
+    azure_credential: TokenCredential | Callable[[], TokenCredential],
+) -> TokenCredential:
+    """Use the HTTP request bearer token when present, otherwise use the supplied Azure credential."""
+    if get_auth_token():
+        return BearerTokenCredential()
+    if callable(azure_credential):
+        return azure_credential()
+    return azure_credential

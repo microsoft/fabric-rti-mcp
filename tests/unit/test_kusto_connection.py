@@ -1,3 +1,8 @@
+from unittest.mock import MagicMock
+
+import pytest
+
+from fabric_rti_mcp.authentication.auth_context import get_azure_credential_or_http_header_token
 from fabric_rti_mcp.services.kusto.kusto_connection import BearerTokenCredential, get_auth_token, set_auth_token
 
 
@@ -19,11 +24,8 @@ class TestBearerTokenCredential:
     def test_raises_when_no_token_in_context(self) -> None:
         set_auth_token(None)
         cred = BearerTokenCredential()
-        try:
+        with pytest.raises(ValueError, match="No auth token"):
             cred.get_token("scope")
-            assert False, "Expected ValueError"
-        except ValueError as e:
-            assert "No auth token" in str(e)
 
     def test_token_not_stale_after_context_change(self) -> None:
         """Simulates the exact bug from issue #128."""
@@ -48,3 +50,23 @@ class TestAuthTokenContextVar:
     def test_default_is_none(self) -> None:
         set_auth_token(None)
         assert get_auth_token() is None
+
+
+class TestAzureCredentialOrHttpHeaderToken:
+    def test_uses_http_header_token_when_present(self) -> None:
+        set_auth_token("caller-token")
+        azure_credential_factory = MagicMock()
+
+        credential = get_azure_credential_or_http_header_token(azure_credential_factory)
+
+        assert isinstance(credential, BearerTokenCredential)
+        assert credential.get_token("scope").token == "caller-token"
+        azure_credential_factory.assert_not_called()
+
+    def test_falls_back_to_azure_credential_without_http_header_token(self) -> None:
+        set_auth_token(None)
+        azure_credential = MagicMock()
+
+        credential = get_azure_credential_or_http_header_token(lambda: azure_credential)
+
+        assert credential is azure_credential

@@ -4,9 +4,10 @@ from contextvars import copy_context
 from typing import Any, cast
 
 import httpx
-from azure.identity import ChainedTokenCredential, DefaultAzureCredential
+from azure.core.credentials import TokenCredential
+from azure.identity import DefaultAzureCredential
 
-from fabric_rti_mcp.authentication.auth_context import get_auth_token
+from fabric_rti_mcp.authentication.auth_context import get_azure_credential_or_http_header_token
 from fabric_rti_mcp.config import GlobalFabricRTIConfig, logger
 
 
@@ -35,7 +36,7 @@ class FabricAPIHttpClient:
         self._cached_token = None
         self._token_expiry = None
 
-    def _get_credential(self) -> ChainedTokenCredential:
+    def _get_credential(self) -> TokenCredential:
         """
         Get Azure credential for authentication.
         This ensures consistent authentication behavior across all Fabric services.
@@ -49,14 +50,10 @@ class FabricAPIHttpClient:
         )
 
     def _get_access_token(self) -> str:
-        request_token = get_auth_token()
-        if request_token:
-            logger.debug("Using request auth token for Fabric API call")
-            return request_token
-
         try:
             # Get token from Azure credential
-            token = self.credential.get_token(self.token_scope)
+            credential = get_azure_credential_or_http_header_token(self.credential)
+            token = credential.get_token(self.token_scope)
 
             if not token:
                 raise Exception("Failed to acquire token from Azure credential")
