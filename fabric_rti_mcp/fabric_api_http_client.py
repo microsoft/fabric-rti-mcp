@@ -52,7 +52,7 @@ class FabricAPIHttpClient:
     def _get_access_token(self) -> str:
         try:
             # Get token from Azure credential
-            credential = get_azure_credential_or_http_header_token(self.credential)
+            credential = get_azure_credential_or_http_header_token(lambda: self.credential)
             token = credential.get_token(self.token_scope)
 
             if not token:

@@ -35,11 +35,9 @@ class BearerTokenCredential(TokenCredential):
 
 
 def get_azure_credential_or_http_header_token(
-    azure_credential: TokenCredential | Callable[[], TokenCredential],
+    azure_credential_factory: Callable[[], TokenCredential],
 ) -> TokenCredential:
-    """Use the HTTP request bearer token when present, otherwise use the supplied Azure credential."""
+    """Use the HTTP request bearer token when present, otherwise create an Azure credential."""
     if get_auth_token():
         return BearerTokenCredential()
-    if callable(azure_credential):
-        return azure_credential()
-    return azure_credential
+    return azure_credential_factory()

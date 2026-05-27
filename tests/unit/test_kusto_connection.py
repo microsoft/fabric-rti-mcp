@@ -63,10 +63,12 @@ class TestAzureCredentialOrHttpHeaderToken:
         assert credential.get_token("scope").token == "caller-token"
         azure_credential_factory.assert_not_called()
 
-    def test_falls_back_to_azure_credential_without_http_header_token(self) -> None:
+    def test_calls_azure_credential_factory_without_http_header_token(self) -> None:
         set_auth_token(None)
         azure_credential = MagicMock()
+        azure_credential_factory = MagicMock(return_value=azure_credential)
 
-        credential = get_azure_credential_or_http_header_token(lambda: azure_credential)
+        credential = get_azure_credential_or_http_header_token(azure_credential_factory)
 
         assert credential is azure_credential
+        azure_credential_factory.assert_called_once_with()
