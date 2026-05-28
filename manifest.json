@@ -62,14 +62,12 @@
     "kusto_service_uri": {
       "type": "string",
       "title": "Kusto Service URI",
-      "description": "Default Kusto cluster URI. Example: https://mycluster.westus.kusto.windows.net",
-      "required": true
+      "description": "Default Kusto cluster URI. Example: https://mycluster.westus.kusto.windows.net"
     },
     "kusto_service_default_db": {
       "type": "string",
       "title": "Kusto Default Database",
-      "description": "Default database name for Kusto queries",
-      "required": true
+      "description": "Default database name for Kusto queries"
     },
     "kusto_known_services": {
       "type": "string",
