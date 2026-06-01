@@ -346,6 +346,7 @@ def _crp(
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
     if not is_destructive and not ignore_readonly:
         crp.set_option("request_readonly", True)
+        crp.set_option("request_readonly_hardline", True)
 
     # The Azure Kusto SDK expects servertimeout as a timedelta — it adds
     # client_server_delta (also a timedelta) to it in client_base.py.
