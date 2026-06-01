@@ -17,6 +17,7 @@ from fabric_rti_mcp.authentication.token_obo_exchanger import TokenOboExchanger
 from fabric_rti_mcp.config import global_config as config
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
+from fabric_rti_mcp.fabric_api_http_client import set_fabric_auth_token
 from fabric_rti_mcp.services.kusto.kusto_connection import set_auth_token
 
 # Secure asymmetric algorithms allowed for JWT validation.
@@ -209,6 +210,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             try:
                 if config.use_obo_flow:
                     logger.info("Started performing OBO token exchange")
+                    # Capture the original user assertion before any exchange overwrites
+                    # the `token` variable below; the Fabric exchange needs the original.
+                    user_assertion = token
                     # Create token exchanger and perform OBO token exchange
                     token_exchanger = TokenOboExchanger()
                     exchanged_token = await token_exchanger.perform_obo_token_exchange(
@@ -216,6 +220,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     )
                     # Update token to use the exchanged token
                     token = exchanged_token
+                    # Second exchange for the Fabric REST audience; stashed in a
+                    # separate ContextVar so FabricAPIHttpClient can pick it up
+                    # without disturbing the Kusto path.
+                    fabric_token = await token_exchanger.perform_obo_token_exchange(
+                        user_token=user_assertion, resource_uri=obo_config.fabric_audience
+                    )
+                    set_fabric_auth_token(fabric_token)
                     logger.info("Successfully performed OBO token exchange")
                 else:
                     logger.info("OBO flow not enabled; using original token")

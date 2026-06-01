@@ -12,6 +12,7 @@ class FabricRtiMcpOBOFlowEnvVarNames:
     # user assigned managed identity client id used as Federated credentials on the Entra App (entra_app_client_id)
     umi_client_id = "FABRIC_RTI_MCP_USER_MANAGED_IDENTITY_CLIENT_ID"
     kusto_audience = "FABRIC_RTI_MCP_KUSTO_AUDIENCE"  # Kusto audience, ex: https://<clustername>.kusto.windows.net
+    fabric_audience = "FABRIC_RTI_MCP_FABRIC_AUDIENCE"  # Fabric REST audience, ex: https://api.fabric.microsoft.com
 
 
 # Default values for OBO Flow configuration
@@ -19,6 +20,7 @@ DEFAULT_FABRIC_RTI_MCP_AZURE_TENANT_ID = "72f988bf-86f1-41af-91ab-2d7cd011db47" 
 DEFAULT_FABRIC_RTI_MCP_ENTRA_APP_CLIENT_ID = ""
 DEFAULT_FABRIC_RTI_MCP_USER_MANAGED_IDENTITY_CLIENT_ID = ""
 DEFAULT_FABRIC_RTI_MCP_KUSTO_AUDIENCE = "https://kusto.kusto.windows.net"
+DEFAULT_FABRIC_RTI_MCP_FABRIC_AUDIENCE = "https://api.fabric.microsoft.com"
 
 
 @dataclass(slots=True, frozen=True)
@@ -29,6 +31,7 @@ class FabricRtiMcpOBOFlowAuthConfig:
     entra_app_client_id: str
     umi_client_id: str
     kusto_audience: str
+    fabric_audience: str
 
     @staticmethod
     def from_env() -> "FabricRtiMcpOBOFlowAuthConfig":
@@ -46,6 +49,9 @@ class FabricRtiMcpOBOFlowAuthConfig:
             kusto_audience=os.getenv(
                 FabricRtiMcpOBOFlowEnvVarNames.kusto_audience, DEFAULT_FABRIC_RTI_MCP_KUSTO_AUDIENCE
             ),
+            fabric_audience=os.getenv(
+                FabricRtiMcpOBOFlowEnvVarNames.fabric_audience, DEFAULT_FABRIC_RTI_MCP_FABRIC_AUDIENCE
+            ),
         )
 
     @staticmethod
@@ -57,6 +63,7 @@ class FabricRtiMcpOBOFlowAuthConfig:
             FabricRtiMcpOBOFlowEnvVarNames.entra_app_client_id,
             FabricRtiMcpOBOFlowEnvVarNames.umi_client_id,
             FabricRtiMcpOBOFlowEnvVarNames.kusto_audience,
+            FabricRtiMcpOBOFlowEnvVarNames.fabric_audience,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -83,6 +90,7 @@ class FabricRtiMcpOBOFlowAuthConfig:
             entra_app_client_id=entra_app_client_id,
             umi_client_id=umi_client_id,
             kusto_audience=obo_config.kusto_audience,
+            fabric_audience=obo_config.fabric_audience,
         )
 
 
