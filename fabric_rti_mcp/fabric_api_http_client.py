@@ -1,11 +1,37 @@
 import asyncio
 from collections.abc import Coroutine
+from contextvars import ContextVar
 from typing import Any, cast
 
 import httpx
 from azure.identity import ChainedTokenCredential, DefaultAzureCredential
 
 from fabric_rti_mcp.config import GlobalFabricRTIConfig, logger
+
+# Per-request Fabric token, set by AuthMiddleware after OBO exchange.
+# Mirrors the ContextVar pattern in
+# ``fabric_rti_mcp.services.kusto.kusto_connection`` so the Fabric REST path
+# can honor per-user delegation in gateway scenarios where many users share
+# a single ``FabricAPIHttpClient`` instance (cf. ``FabricHttpClientCache``).
+_fabric_user_token: ContextVar[str | None] = ContextVar("_fabric_user_token", default=None)
+
+
+def set_fabric_auth_token(token: str | None) -> None:
+    """Set a pre-exchanged Fabric token for the current request context.
+
+    The value is the Fabric-scoped access token already obtained via OBO by
+    the ``AuthMiddleware`` — NOT the inbound user assertion. The HTTP
+    client treats it as opaque and forwards it as the ``Authorization``
+    bearer for any request issued within this async context.
+
+    Async-safe via ``ContextVar``; clear by passing ``None``.
+    """
+    _fabric_user_token.set(token)
+
+
+def get_fabric_auth_token() -> str | None:
+    """Return the Fabric token set for the current request context, if any."""
+    return _fabric_user_token.get()
 
 
 class FabricAPIHttpClient:
@@ -47,6 +73,15 @@ class FabricAPIHttpClient:
         )
 
     def _get_access_token(self) -> str:
+        # Prefer a per-request OBO-exchanged Fabric token if AuthMiddleware
+        # has stashed one for the current request context. Falls back to the
+        # host's DefaultAzureCredential chain otherwise — same behavior as
+        # before this seam existed.
+        fabric_token = get_fabric_auth_token()
+        if fabric_token is not None:
+            logger.debug("Using OBO-exchanged Fabric token from request context")
+            return fabric_token
+
         try:
             # Get token from Azure credential
             token = self.credential.get_token(self.token_scope)
