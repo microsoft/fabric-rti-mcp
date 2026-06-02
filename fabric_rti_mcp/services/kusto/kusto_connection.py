@@ -2,10 +2,7 @@ from azure.core.credentials import TokenCredential
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
 
-from fabric_rti_mcp.authentication.auth_context import BearerTokenCredential as BearerTokenCredential
-from fabric_rti_mcp.authentication.auth_context import get_auth_token as get_auth_token
-from fabric_rti_mcp.authentication.auth_context import get_azure_credential_or_http_header_token
-from fabric_rti_mcp.authentication.auth_context import set_auth_token as set_auth_token
+from fabric_rti_mcp.authentication.auth_context import get_credential
 
 
 class KustoConnection:
@@ -27,7 +24,7 @@ class KustoConnection:
         self.default_database = default_database
 
     def _get_credential(self, login_endpoint: str) -> TokenCredential:
-        return get_azure_credential_or_http_header_token(authority=login_endpoint)
+        return get_credential(authority=login_endpoint)
 
 
 def sanitize_uri(cluster_uri: str) -> str:

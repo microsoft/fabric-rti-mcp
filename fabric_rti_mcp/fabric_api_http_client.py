@@ -5,7 +5,7 @@ from typing import Any, cast
 
 import httpx
 
-from fabric_rti_mcp.authentication.auth_context import get_azure_credential_or_http_header_token
+from fabric_rti_mcp.authentication.auth_context import get_credential
 from fabric_rti_mcp.config import GlobalFabricRTIConfig, logger
 
 
@@ -36,7 +36,7 @@ class FabricAPIHttpClient:
     def _get_access_token(self) -> str:
         try:
             # Get token from Azure credential
-            credential = get_azure_credential_or_http_header_token()
+            credential = get_credential()
             token = credential.get_token(self.token_scope)
 
             if not token:

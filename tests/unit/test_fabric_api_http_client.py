@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from azure.core.credentials import AccessToken, TokenCredential
 
-from fabric_rti_mcp.authentication.auth_context import set_auth_token
+from fabric_rti_mcp.authentication.auth_context import set_request_token
 from fabric_rti_mcp.fabric_api_http_client import FabricAPIHttpClient
 
 
@@ -51,9 +51,9 @@ class FakeAsyncClient:
 
 @pytest.fixture(autouse=True)
 def clear_auth_token() -> Generator[None, None, None]:
-    set_auth_token(None)
+    set_request_token(None)
     yield
-    set_auth_token(None)
+    set_request_token(None)
 
 
 def mock_default_credential(monkeypatch: pytest.MonkeyPatch, credential: FakeCredential) -> MagicMock:
@@ -67,7 +67,7 @@ def test_get_headers_uses_request_token_without_default_credential(monkeypatch: 
     default_credential = mock_default_credential(monkeypatch, credential)
     client = FabricAPIHttpClient("https://fabric.example")
 
-    set_auth_token("caller-token")
+    set_request_token("caller-token")
     headers = client._get_headers()
 
     assert headers["Authorization"] == "Bearer caller-token"
@@ -95,7 +95,7 @@ def test_extra_headers_cannot_override_request_authorization(monkeypatch: pytest
     default_credential = mock_default_credential(monkeypatch, credential)
     client = FabricAPIHttpClient("https://fabric.example")
 
-    set_auth_token("caller-token")
+    set_request_token("caller-token")
     headers = client._get_headers({"Authorization": "Bearer attacker-token", "x-ms-custom": "value"})
 
     assert headers["Authorization"] == "Bearer caller-token"
@@ -111,7 +111,7 @@ def test_make_request_preserves_request_token_when_running_inside_event_loop(mon
     client = FabricAPIHttpClient("https://fabric.example")
 
     async def run_request() -> dict[str, Any]:
-        set_auth_token("caller-token")
+        set_request_token("caller-token")
         return client.make_request("GET", "/items")
 
     result = asyncio.run(run_request())
