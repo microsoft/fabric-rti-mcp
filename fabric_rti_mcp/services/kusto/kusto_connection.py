@@ -2,7 +2,7 @@ from azure.core.credentials import TokenCredential
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
 
-from fabric_rti_mcp.authentication.auth_context import get_credential
+from fabric_rti_mcp.auth.auth_context import get_credential
 
 
 class KustoConnection:

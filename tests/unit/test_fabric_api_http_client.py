@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from azure.core.credentials import AccessToken, TokenCredential
 
-from fabric_rti_mcp.authentication.auth_context import set_request_token
+from fabric_rti_mcp.auth.auth_context import set_request_token
 from fabric_rti_mcp.fabric_api_http_client import FabricAPIHttpClient
 
 
@@ -58,7 +58,7 @@ def clear_auth_token() -> Generator[None, None, None]:
 
 def mock_default_credential(monkeypatch: pytest.MonkeyPatch, credential: FakeCredential) -> MagicMock:
     default_credential = MagicMock(return_value=credential)
-    monkeypatch.setattr("fabric_rti_mcp.authentication.auth_context.DefaultAzureCredential", default_credential)
+    monkeypatch.setattr("fabric_rti_mcp.auth.auth_context.DefaultAzureCredential", default_credential)
     return default_credential
 
 

@@ -13,8 +13,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
-from fabric_rti_mcp.authentication.auth_context import reset_request_token, set_request_token
-from fabric_rti_mcp.authentication.token_obo_exchanger import TokenOboExchanger
+from fabric_rti_mcp.auth.auth_context import reset_request_token, set_request_token
+from fabric_rti_mcp.auth.token_obo_exchanger import TokenOboExchanger
 from fabric_rti_mcp.config import global_config as config
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config

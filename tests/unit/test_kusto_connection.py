@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fabric_rti_mcp.authentication.auth_context import BearerTokenCredential, get_credential, set_request_token
+from fabric_rti_mcp.auth.auth_context import BearerTokenCredential, get_credential, set_request_token
 
 
 class TestBearerTokenCredential:
@@ -45,7 +45,7 @@ class TestGetCredential:
     def test_uses_http_header_token_when_present(self, monkeypatch: pytest.MonkeyPatch) -> None:
         set_request_token("caller-token")
         default_credential = MagicMock()
-        monkeypatch.setattr("fabric_rti_mcp.authentication.auth_context.DefaultAzureCredential", default_credential)
+        monkeypatch.setattr("fabric_rti_mcp.auth.auth_context.DefaultAzureCredential", default_credential)
 
         credential = get_credential()
 
@@ -59,7 +59,7 @@ class TestGetCredential:
         set_request_token(None)
         azure_credential = MagicMock()
         default_credential = MagicMock(return_value=azure_credential)
-        monkeypatch.setattr("fabric_rti_mcp.authentication.auth_context.DefaultAzureCredential", default_credential)
+        monkeypatch.setattr("fabric_rti_mcp.auth.auth_context.DefaultAzureCredential", default_credential)
 
         credential = get_credential()
 
@@ -73,7 +73,7 @@ class TestGetCredential:
         set_request_token(None)
         azure_credential = MagicMock()
         default_credential = MagicMock(return_value=azure_credential)
-        monkeypatch.setattr("fabric_rti_mcp.authentication.auth_context.DefaultAzureCredential", default_credential)
+        monkeypatch.setattr("fabric_rti_mcp.auth.auth_context.DefaultAzureCredential", default_credential)
 
         credential = get_credential(authority="https://login.example")
 
