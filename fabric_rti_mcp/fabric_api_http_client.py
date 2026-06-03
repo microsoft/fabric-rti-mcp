@@ -1,10 +1,11 @@
 import asyncio
 from collections.abc import Coroutine
+from contextvars import copy_context
 from typing import Any, cast
 
 import httpx
-from azure.identity import ChainedTokenCredential, DefaultAzureCredential
 
+from fabric_rti_mcp.auth.auth_context import TokenTarget, get_credential
 from fabric_rti_mcp.config import GlobalFabricRTIConfig, logger
 
 
@@ -28,28 +29,15 @@ class FabricAPIHttpClient:
             api_base_url = config.fabric_api_base
 
         self.api_base_url = api_base_url.rstrip("/")
-        self.credential = self._get_credential()
         self.token_scope = "https://api.fabric.microsoft.com/.default"
         self._cached_token = None
         self._token_expiry = None
 
-    def _get_credential(self) -> ChainedTokenCredential:
-        """
-        Get Azure credential for authentication.
-        This ensures consistent authentication behavior across all Fabric services.
-
-        Uses the user's default tenant, allowing the client to work
-        for users in any tenant (not hard-coded to Microsoft's tenant).
-        """
-        return DefaultAzureCredential(
-            exclude_shared_token_cache_credential=True,
-            exclude_interactive_browser_credential=False,
-        )
-
     def _get_access_token(self) -> str:
         try:
             # Get token from Azure credential
-            token = self.credential.get_token(self.token_scope)
+            credential = get_credential(TokenTarget.FABRIC)
+            token = credential.get_token(self.token_scope)
 
             if not token:
                 raise Exception("Failed to acquire token from Azure credential")
@@ -64,7 +52,6 @@ class FabricAPIHttpClient:
     def _get_headers(self, extra_headers: dict[str, str] | None = None) -> dict[str, str]:
         access_token = self._get_access_token()
         headers = {
-            "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -73,6 +60,7 @@ class FabricAPIHttpClient:
         if extra_headers:
             headers.update(extra_headers)
 
+        headers["Authorization"] = f"Bearer {access_token}"
         return headers
 
     def _run_async_operation(self, coro: Coroutine[Any, Any, Any]) -> Any:
@@ -82,12 +70,14 @@ class FabricAPIHttpClient:
             # If we're already in an event loop, we need to run in a thread
             import concurrent.futures
 
+            context = copy_context()
+
             def run_in_thread() -> Any:
                 # Create a new event loop for this thread
                 new_loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(new_loop)
                 try:
-                    return new_loop.run_until_complete(coro)
+                    return context.run(new_loop.run_until_complete, coro)
                 finally:
                     new_loop.close()
 

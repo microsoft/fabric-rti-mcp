@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
@@ -13,11 +13,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
-from fabric_rti_mcp.authentication.token_obo_exchanger import TokenOboExchanger
+from fabric_rti_mcp.auth.auth_context import RequestTokenContext, TokenTarget, reset_request_token, set_request_token
+from fabric_rti_mcp.auth.token_obo_exchanger import TokenOboExchanger
 from fabric_rti_mcp.config import global_config as config
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
-from fabric_rti_mcp.services.kusto.kusto_connection import set_auth_token
 
 # Secure asymmetric algorithms allowed for JWT validation.
 # Microsoft Entra ID uses RS256 (per https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration).
@@ -168,6 +168,64 @@ def validate_token(token: str) -> tuple[bool, str]:
     return True, ""
 
 
+def token_target_for_tool_name(tool_name: str) -> TokenTarget:
+    """Return the auth token target used by a registered MCP tool."""
+    if tool_name.startswith("kusto_"):
+        return TokenTarget.KUSTO
+    return TokenTarget.FABRIC
+
+
+def _as_json_object(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    return cast(dict[str, object], value)
+
+
+def _tool_name_from_jsonrpc_payload(payload: object) -> str | None:
+    payload_object = _as_json_object(payload)
+    if payload_object is None or payload_object.get("method") != "tools/call":
+        return None
+
+    params = _as_json_object(payload_object.get("params"))
+    if params is None:
+        raise ValueError("MCP tools/call request is missing object params")
+
+    tool_name = params.get("name")
+    if not isinstance(tool_name, str) or not tool_name:
+        raise ValueError("MCP tools/call request is missing a tool name")
+
+    return tool_name
+
+
+def token_target_for_jsonrpc_payload(payload: object) -> TokenTarget | None:
+    """Return the auth token target required by a JSON-RPC request payload."""
+    tool_name = _tool_name_from_jsonrpc_payload(payload)
+    if tool_name is None:
+        return None
+    return token_target_for_tool_name(tool_name)
+
+
+async def _token_target_for_request(request: Request) -> TokenTarget | None:
+    body = await request.body()
+    if not body:
+        return None
+
+    try:
+        payload: object = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+
+    return token_target_for_jsonrpc_payload(payload)
+
+
+def _audience_for_token_target(token_target: TokenTarget) -> str:
+    if token_target is TokenTarget.KUSTO:
+        return obo_config.kusto_audience
+    if token_target is TokenTarget.FABRIC:
+        return obo_config.fabric_audience
+    raise ValueError(f"Unsupported auth token target: {token_target}")
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """HTTP middleware that validates authorization tokens for MCP endpoints."""
 
@@ -198,6 +256,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
             token = extract_token_from_header(auth_header)
 
+            try:
+                token_target = await _token_target_for_request(request)
+            except ValueError as e:
+                logger.error(f"Auth token routing failed: {e}")
+                return JSONResponse({"error": "bad_request", "message": str(e)}, status_code=400)
+
             # Validate token before using it
             is_valid, error_msg = validate_token(token)
             if not is_valid:
@@ -206,22 +270,24 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     {"error": "unauthorized", "message": f"Invalid token: {error_msg}"}, status_code=401
                 )
 
+            request_token_context: RequestTokenContext | None = None
             try:
-                if config.use_obo_flow:
-                    logger.info("Started performing OBO token exchange")
-                    # Create token exchanger and perform OBO token exchange
-                    token_exchanger = TokenOboExchanger()
-                    exchanged_token = await token_exchanger.perform_obo_token_exchange(
-                        user_token=token, resource_uri=obo_config.kusto_audience
-                    )
-                    # Update token to use the exchanged token
-                    token = exchanged_token
-                    logger.info("Successfully performed OBO token exchange")
+                if token_target:
+                    token_exchanger = TokenOboExchanger() if config.use_obo_flow else None
+                    if token_exchanger:
+                        logger.info(f"Started performing OBO token exchange for {token_target.value}")
+                        token_for_target = await token_exchanger.perform_obo_token_exchange(
+                            user_token=token,
+                            resource_uri=_audience_for_token_target(token_target),
+                        )
+                        logger.info(f"Successfully performed OBO token exchange for {token_target.value}")
+                    else:
+                        logger.info(f"OBO flow not enabled; using original token for {token_target.value}")
+                        token_for_target = token
+                    request_token_context = set_request_token(token_target, token_for_target)
                 else:
-                    logger.info("OBO flow not enabled; using original token")
-
+                    logger.info("No auth token target required for request")
             except Exception as e:
-                # Log the error and raise it to fail the request
                 logger.error(f"Error during OBO token exchange: {e}")
                 return JSONResponse(
                     {
@@ -231,25 +297,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     status_code=401,
                 )
 
-            # Store the token for use by services
-            set_auth_token(token)
+            try:
+                # Continue with request
+                response = await call_next(request)
 
-            token_payload = decode_jwt_token(token)
+                logger.info(f"Response status code: {response.status_code}")
 
-            audience = token_payload.get("aud", "N/A")
-            tenant_id = token_payload.get("tid", "N/A")
-            scopes = token_payload.get("scp", token_payload.get("roles", "N/A"))
-
-            logger.info(f"Token audience: {audience}")
-            logger.info(f"Token tenant ID: {tenant_id}")
-            logger.info(f"Token scopes/roles: {scopes}")
-
-            # Continue with request
-            response = await call_next(request)
-
-            logger.info(f"Response status code: {response.status_code}")
-
-            return response
+                return response
+            finally:
+                if request_token_context:
+                    reset_request_token(request_token_context)
 
         except Exception as e:
             logger.error(f"Error in auth middleware: {e}")

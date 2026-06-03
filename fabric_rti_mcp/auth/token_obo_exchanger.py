@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import msal  # type: ignore
 from azure.identity import ManagedIdentityCredential
@@ -38,6 +38,7 @@ class TokenOboExchanger:
         Returns:
             New access token for the specified resource
         """
+        resource_uri = obo_config.require_allowed_audience(resource_uri)
         self.logger.info(f"TokenOboExchanger: Performing OBO token exchange for target resource: {resource_uri}")
 
         client_id = self.entra_app_client_id
@@ -76,13 +77,16 @@ class TokenOboExchanger:
             )  # get the MI token to be used as client assesrtion for OBO
             assertion_token = access_token_result.token
 
-            app = msal.ConfidentialClientApplication(
-                client_id=client_id,
-                authority=authority,
-                client_credential={
-                    "client_assertion": assertion_token,
-                    "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-                },
+            app = cast(
+                Any,
+                msal.ConfidentialClientApplication(
+                    client_id=client_id,
+                    authority=authority,
+                    client_credential={
+                        "client_assertion": assertion_token,
+                        "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                    },
+                ),
             )
 
             # Set the scopes for the target resource we want to access
@@ -90,16 +94,20 @@ class TokenOboExchanger:
             self.logger.info(f"TokenOboExchanger: Requesting access to scopes: {target_scopes}")
 
             # Use the user token to acquire a new token for the target resource
-            result = app.acquire_token_on_behalf_of(user_assertion=user_token, scopes=target_scopes)
+            result = cast(
+                dict[str, object], app.acquire_token_on_behalf_of(user_assertion=user_token, scopes=target_scopes)
+            )
 
             if "access_token" not in result:
-                error_msg = result.get("error_description") or result.get("error") or "Unknown error"
+                error_msg = str(result.get("error_description") or result.get("error") or "Unknown error")
                 error_message = f"TokenOboExchanger: Failed to acquire token: {error_msg}"
                 self.logger.error(error_message)
                 raise Exception(error_message)
 
             self.logger.info("TokenOboExchanger: Successfully acquired OBO token")
-            access_token: str = result["access_token"]
+            access_token = result["access_token"]
+            if not isinstance(access_token, str):
+                raise Exception("TokenOboExchanger: access_token is not a string")
             return access_token
         except Exception as e:
             self.logger.error(f"TokenOboExchanger: Error performing OBO token exchange: {e}")
