@@ -633,20 +633,19 @@ def kusto_command(
     return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)
 
 
-def kusto_command_readonly(
+def kusto_show_command(
     command: str,
     cluster_uri: str,
     database: str | None = None,
     client_request_properties: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Executes a read-only Kusto management command (.show) on the specified database.
+    Executes a Kusto .show management command on the specified database.
     If no database is provided, it will use the default database.
 
-    This tool is restricted to .show commands only. For mutating commands
-    (.create, .alter, .drop, .set, .delete, etc.), use kusto_command instead.
+    Only .show commands are accepted.
 
-    :param command: The read-only kusto management command to execute (must be a .show command).
+    :param command: The .show command to execute.
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
     :param client_request_properties: Optional dictionary of additional client request properties.
@@ -655,7 +654,7 @@ def kusto_command_readonly(
     first_stmt = _find_first_statement(command)
     if not first_stmt.startswith(".show "):
         raise ValueError(
-            "kusto_command_readonly only supports read-only .show commands. "
+            "kusto_show_command only supports read-only .show commands. "
             "For mutating commands (.create, .alter, .drop, etc.), use kusto_command instead."
         )
     return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)

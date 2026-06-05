@@ -18,7 +18,7 @@ def register_tools(mcp: FastMCP) -> None:
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
     )
     mcp.add_tool(
-        kusto_service.kusto_command_readonly,
+        kusto_service.kusto_show_command,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
     )
     mcp.add_tool(

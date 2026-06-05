@@ -5,7 +5,7 @@ from fabric_rti_mcp.services.kusto.kusto_service import (
     kql_escape_entity_name,
     kql_escape_string,
     kusto_command,
-    kusto_command_readonly,
+    kusto_show_command,
     kusto_query,
 )
 
@@ -190,7 +190,7 @@ class TestQueryCommandValidation:
         assert result["format"] == "kusto_response"
 
 
-class TestCommandReadonlyValidation:
+class TestShowCommandValidation:
     @pytest.mark.parametrize(
         "command",
         [
@@ -206,7 +206,7 @@ class TestCommandReadonlyValidation:
     )
     def test_rejects_non_show_commands(self, command: str) -> None:
         with pytest.raises(ValueError, match="read-only .show commands"):
-            kusto_command_readonly(command, "https://help.kusto.windows.net")
+            kusto_show_command(command, "https://help.kusto.windows.net")
 
     @pytest.mark.parametrize(
         "command",
@@ -235,5 +235,5 @@ class TestCommandReadonlyValidation:
         connection.default_database = "db"
         mock_conn.return_value = connection
 
-        result = kusto_command_readonly(command, "https://help.kusto.windows.net")
+        result = kusto_show_command(command, "https://help.kusto.windows.net")
         assert result["format"] == "kusto_response"
