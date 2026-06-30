@@ -127,14 +127,16 @@ def test_kusto_known_services_filters_by_sentry_check_in_http(
 ) -> None:
     mock_resolve_credential_source.return_value = CredentialSource.BEARER_TOKEN
     mock_config.should_probe_known_services.return_value = True
-    mock_known_service_authenticates.side_effect = lambda service: "demo12" not in service.service_uri
+    denied_service_uri = "https://demo12.westus.kusto.windows.net/"
+    mock_known_service_authenticates.side_effect = lambda service: service.service_uri != denied_service_uri
 
     services = kusto_known_services()
 
-    service_uris = [service["service_uri"] for service in services]
-    assert "https://demo11.westus.kusto.windows.net/" in service_uris
-    assert "https://kuskus.kusto.windows.net/" in service_uris
-    assert "https://demo12.westus.kusto.windows.net/" not in service_uris
+    service_uris = {service["service_uri"] for service in services}
+    assert service_uris == {
+        "https://demo11.westus.kusto.windows.net/",
+        "https://kuskus.kusto.windows.net/",
+    }
     assert mock_known_service_authenticates.call_count == 3
     mock_config.should_probe_known_services.assert_called_once_with(CredentialSource.BEARER_TOKEN)
 
