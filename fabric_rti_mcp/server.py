@@ -5,6 +5,7 @@ import types
 from datetime import datetime, timezone
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -64,6 +65,42 @@ def add_health_endpoint(mcp: FastMCP) -> None:
     mcp.custom_route("/health", methods=["GET"])(health_check)
 
 
+def _split_comma_separated(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _is_loopback_host(host: str) -> bool:
+    return host in ("127.0.0.1", "localhost", "::1")
+
+
+def build_transport_security_settings() -> TransportSecuritySettings | None:
+    """Build explicit DNS-rebinding protection when configured, otherwise let FastMCP handle loopback defaults."""
+    allowed_hosts = _split_comma_separated(config.http_allowed_hosts)
+    allowed_origins = _split_comma_separated(config.http_allowed_origins)
+
+    if allowed_hosts or allowed_origins:
+        if not allowed_hosts:
+            raise ValueError("FABRIC_RTI_HTTP_ALLOWED_HOSTS must be set when configuring HTTP transport security")
+        return TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
+        )
+
+    if not _is_loopback_host(config.http_host):
+        if not config.http_debug_mode:
+            raise ValueError(
+                "HTTP host is non-loopback. Configure FABRIC_RTI_HTTP_ALLOWED_HOSTS "
+                "or set FABRIC_RTI_HTTP_DEBUG_MODE=true for local testing only."
+            )
+        logger.warning(
+            "HTTP host is non-loopback and no explicit Host/Origin allow-list is configured. "
+            "This is allowed only because FABRIC_RTI_HTTP_DEBUG_MODE=true. Do not use this configuration in production."
+        )
+
+    return None
+
+
 def main() -> None:
     """Main entry point for the server."""
     try:
@@ -106,6 +143,7 @@ def main() -> None:
                 port=config.http_port,
                 streamable_http_path=config.http_path,
                 stateless_http=config.stateless_http,
+                transport_security=build_transport_security_settings(),
             )
         else:
             fastmcp_server = fastmcp_class(name)

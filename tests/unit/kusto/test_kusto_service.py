@@ -6,11 +6,13 @@ from azure.kusto.data import ClientRequestProperties
 from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
+from fabric_rti_mcp.auth.auth_context import CredentialSource
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_service import (
     KustoConnectionManager,
     kusto_command,
     kusto_diagnostics,
+    kusto_known_services,
     kusto_query,
     kusto_show_queryplan,
 )
@@ -58,6 +60,36 @@ def test_connection_manager_caches_by_normalized_uri(mock_kusto_connection: Magi
     mock_kusto_connection.assert_called_once()
 
 
+@patch.dict("os.environ", _KNOWN_SERVICES_ENV, clear=True)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.credential_source_cache_key")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.resolve_credential_source")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.KustoConnection")
+def test_connection_manager_partitions_cache_by_credential_mode(
+    mock_kusto_connection: MagicMock,
+    mock_resolve_credential_source: MagicMock,
+    mock_credential_source_cache_key: MagicMock,
+) -> None:
+    request_connection = MagicMock()
+    mi_connection = MagicMock()
+    mock_kusto_connection.side_effect = [request_connection, mi_connection]
+    mock_resolve_credential_source.side_effect = [
+        CredentialSource.BEARER_TOKEN,
+        CredentialSource.MANAGED_IDENTITY,
+        CredentialSource.BEARER_TOKEN,
+    ]
+    mock_credential_source_cache_key.side_effect = ["bearer-token", "managed-identity:system", "bearer-token"]
+    manager = KustoConnectionManager()
+
+    first = manager.get("https://demo12.westus.kusto.windows.net")
+    second = manager.get("HTTPS://DEMO12.WESTUS.KUSTO.WINDOWS.NET/")
+    third = manager.get("https://demo12.westus.kusto.windows.net/")
+
+    assert first is third
+    assert second is mi_connection
+    assert first is not second
+    assert mock_kusto_connection.call_count == 2
+
+
 @patch.dict(
     "os.environ",
     {
@@ -84,6 +116,75 @@ def test_get_known_services_warns_on_duplicate_normalized_keys(caplog: pytest.Lo
         "'https://demo.kusto.windows.net/' is overridden by 'HTTPS://DEMO.KUSTO.WINDOWS.NET'."
     )
     assert any(record.message == expected_message for record in caplog.records)
+
+
+@patch.dict("os.environ", _KNOWN_SERVICES_ENV, clear=True)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.resolve_credential_source")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service._known_service_authenticates")
+def test_kusto_known_services_filters_by_sentry_check_in_http(
+    mock_known_service_authenticates: MagicMock, mock_config: MagicMock, mock_resolve_credential_source: MagicMock
+) -> None:
+    mock_resolve_credential_source.return_value = CredentialSource.BEARER_TOKEN
+    mock_config.should_probe_known_services.return_value = True
+    denied_service_uri = "https://demo12.westus.kusto.windows.net/"
+    mock_known_service_authenticates.side_effect = lambda service: service.service_uri != denied_service_uri
+
+    services = kusto_known_services()
+
+    service_uris = {service["service_uri"] for service in services}
+    assert service_uris == {
+        "https://demo11.westus.kusto.windows.net/",
+        "https://kuskus.kusto.windows.net/",
+    }
+    assert mock_known_service_authenticates.call_count == 3
+    mock_config.should_probe_known_services.assert_called_once_with(CredentialSource.BEARER_TOKEN)
+
+
+@patch.dict("os.environ", _KNOWN_SERVICES_ENV, clear=True)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.resolve_credential_source")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service._known_service_authenticates")
+def test_kusto_known_services_does_not_filter_when_config_disables_probe(
+    mock_known_service_authenticates: MagicMock, mock_config: MagicMock, mock_resolve_credential_source: MagicMock
+) -> None:
+    mock_resolve_credential_source.return_value = CredentialSource.LOCAL_DEVELOPER
+    mock_config.should_probe_known_services.return_value = False
+
+    services = kusto_known_services()
+
+    assert len(services) == 3
+    mock_known_service_authenticates.assert_not_called()
+    mock_config.should_probe_known_services.assert_called_once_with(CredentialSource.LOCAL_DEVELOPER)
+
+
+def test_kusto_known_services_probe_mode_auto_probes_request_and_mi_credentials() -> None:
+    config = KustoConfig(known_services_probe_mode="auto")
+
+    assert config.should_probe_known_services(CredentialSource.BEARER_TOKEN) is True
+    assert config.should_probe_known_services(CredentialSource.MANAGED_IDENTITY) is True
+    assert config.should_probe_known_services(CredentialSource.LOCAL_DEVELOPER) is False
+    assert config.should_probe_known_services(CredentialSource.UNAVAILABLE) is False
+
+
+@patch.dict("os.environ", {}, clear=True)
+def test_kusto_known_services_probe_mode_defaults_auto() -> None:
+    config = KustoConfig.from_env()
+
+    assert config.known_services_probe_mode == "auto"
+    assert config.should_probe_known_services(CredentialSource.LOCAL_DEVELOPER) is False
+
+
+@patch.dict(
+    "os.environ",
+    {"FABRIC_RTI_KUSTO_KNOWN_SERVICES_PROBE": "always"},
+    clear=True,
+)
+def test_kusto_known_services_probe_mode_env_overrides_default() -> None:
+    config = KustoConfig.from_env()
+
+    assert config.known_services_probe_mode == "always"
+    assert config.should_probe_known_services(CredentialSource.LOCAL_DEVELOPER) is True
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
