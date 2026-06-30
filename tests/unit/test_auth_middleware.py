@@ -1,5 +1,11 @@
+from types import SimpleNamespace
+
 from fabric_rti_mcp.auth.auth_context import TokenTarget
-from fabric_rti_mcp.auth.auth_middleware import token_target_for_jsonrpc_payload, token_target_for_tool_name
+from fabric_rti_mcp.auth.auth_middleware import (
+    cors_allowed_origins,
+    token_target_for_jsonrpc_payload,
+    token_target_for_tool_name,
+)
 
 
 class TestToolTokenTargetRouting:
@@ -26,3 +32,37 @@ class TestJsonRpcTokenTargetRouting:
         payload = {"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "unknown_tool", "arguments": {}}}
 
         assert token_target_for_jsonrpc_payload(payload) is TokenTarget.FABRIC
+
+
+class TestCorsAllowedOrigins:
+    def test_defaults_to_loopback_origins(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            "fabric_rti_mcp.auth.auth_middleware.config",
+            SimpleNamespace(cors_allowed_origins="", http_debug_mode=False, http_port=3000),
+        )
+
+        assert cors_allowed_origins() == [
+            "http://127.0.0.1:3000",
+            "http://localhost:3000",
+            "http://[::1]:3000",
+        ]
+
+    def test_uses_explicit_origins(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            "fabric_rti_mcp.auth.auth_middleware.config",
+            SimpleNamespace(
+                cors_allowed_origins="https://example.com, https://other.example",
+                http_debug_mode=False,
+                http_port=3000,
+            ),
+        )
+
+        assert cors_allowed_origins() == ["https://example.com", "https://other.example"]
+
+    def test_debug_mode_allows_wildcard_when_not_explicitly_configured(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            "fabric_rti_mcp.auth.auth_middleware.config",
+            SimpleNamespace(cors_allowed_origins="", http_debug_mode=True, http_port=3000),
+        )
+
+        assert cors_allowed_origins() == ["*"]

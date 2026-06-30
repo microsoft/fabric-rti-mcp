@@ -329,7 +329,8 @@ The `kusto_get_shots` tool retrieves shots that are most similar to your prompt 
 
 ## 🔑 Authentication
 
-The MCP Server seamlessly integrates with your host operating system's authentication mechanisms. We use Azure Identity via [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac), which tries these authentication methods in order:
+In `stdio` mode (local), the MCP Server integrates with your host operating system's authentication mechanisms.
+We use Azure Identity via [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac), which tries these authentication methods in order:
 
 1. **Environment Variables** (`EnvironmentCredential`) - Perfect for CI/CD pipelines
 2. **Visual Studio** (`VisualStudioCredential`) - Uses your Visual Studio credentials
@@ -338,7 +339,14 @@ The MCP Server seamlessly integrates with your host operating system's authentic
 5. **Azure Developer CLI** (`AzureDeveloperCliCredential`) - Uses your azd login
 6. **Interactive Browser** (`InteractiveBrowserCredential`) - Falls back to browser-based login if needed
 
-If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials.
+If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials in `stdio` mode.
+
+This MCP server is not intended to be exposed directly as a production HTTP endpoint.
+If you choose to run it over HTTP, the deployment must provide its own security boundary before requests reach this server.
+For example, put any Entra-aware authentication layer in front of it.
+The HTTP configuration options below are guardrails and local-development conveniences; they are not a substitute for a production authentication boundary.
+By default, HTTP requests must provide an `Authorization` bearer token; the server performs deployment-agnostic bearer token shape screening and forwards the bearer to downstream Fabric/Kusto services, or exchanges it with OBO when OBO is enabled.
+It does not perform cryptographic Entra JWT signature, issuer, tenant, or audience validation.
 
 ## HTTP Mode Configuration for MCP Server
 
@@ -351,8 +359,27 @@ When the MCP server is running locally to the agent in HTTP mode or is deployed 
 | `FABRIC_RTI_HTTP_PORT` | Port for HTTP server | `3000` | `8080` |
 | `FABRIC_RTI_HTTP_PATH` | HTTP path for MCP endpoint | `/mcp` | `/mcp` |
 | `FABRIC_RTI_STATELESS_HTTP` | Whether to use stateless HTTP mode | `false` | `true` |
+| `FABRIC_RTI_HTTP_ALLOW_MI` | Allow HTTP requests without a bearer to use Managed Identity | `false` | `true` |
+| `FABRIC_RTI_HTTP_DEBUG_MODE` | Local HTTP testing mode that allows local process credentials and permissive CORS | `false` | `true` |
+| `FABRIC_RTI_HTTP_ALLOWED_HOSTS` | Host allow-list for HTTP DNS-rebinding protection | empty | `mcp.example.com:*,127.0.0.1:*` |
+| `FABRIC_RTI_HTTP_ALLOWED_ORIGINS` | Origin allow-list for HTTP DNS-rebinding protection | empty | `https://mcp.example.com` |
+| `FABRIC_RTI_CORS_ORIGINS` | CORS origins. If unset, HTTP uses loopback origins; debug mode uses `*` | empty | `https://mcp.example.com` |
+| `FABRIC_RTI_KUSTO_KNOWN_SERVICES_PROBE` | Filter `kusto_known_services` by probing configured services. Values: `auto`, `always`, `never` | `auto` | `always` |
 
-HTTP clients connecting to the server need to include the appropriate authentication token in the request headers:
+HTTP credential behavior:
+
+| Mode | Behavior |
+|------|----------|
+| Default HTTP | Requires a bearer token. No local process credentials are used when the bearer is missing. |
+| `USE_OBO_FLOW=true` | Exchanges the request bearer for the configured Fabric/Kusto audience. Forged tokens fail the OBO exchange. |
+| `FABRIC_RTI_HTTP_ALLOW_MI=true` | Allows missing bearer tokens and uses `ManagedIdentityCredential` only. Use only behind a trusted hosting/network/auth boundary. |
+| `FABRIC_RTI_HTTP_DEBUG_MODE=true` | Restores local HTTP testing convenience with local process credentials, permissive CORS, and unsafe non-loopback binds. Do not use in production. |
+
+Binding HTTP to a non-loopback address such as `0.0.0.0` exposes the MCP listener outside the local process boundary.
+Non-loopback HTTP without an explicit host allow-list is allowed only in `FABRIC_RTI_HTTP_DEBUG_MODE`.
+This exception is for local testing only; it does not make direct HTTP exposure production-safe.
+
+HTTP clients connecting to the server need to include the appropriate authentication token in the request headers unless `FABRIC_RTI_HTTP_ALLOW_MI` or `FABRIC_RTI_HTTP_DEBUG_MODE` is explicitly enabled:
 
 ```python
 # Example from test_kusto_tools_live_http.py

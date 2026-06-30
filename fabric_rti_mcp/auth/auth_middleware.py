@@ -7,22 +7,26 @@ from typing import Any, cast
 
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from fabric_rti_mcp.auth.auth_context import RequestTokenContext, TokenTarget, reset_request_token, set_request_token
+from fabric_rti_mcp.auth.auth_context import (
+    RequestTokenContext,
+    TokenTarget,
+    http_allows_missing_bearer,
+    reset_request_token,
+    set_request_token,
+)
 from fabric_rti_mcp.auth.token_obo_exchanger import TokenOboExchanger
 from fabric_rti_mcp.config import global_config as config
 from fabric_rti_mcp.config import logger
 from fabric_rti_mcp.config.obo import obo_config
 
-# Secure asymmetric algorithms allowed for JWT validation.
+# Algorithms allowed for bearer token shape screening.
 # Microsoft Entra ID uses RS256 (per https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration).
-# Additional RSA/ECDSA variants included for non-Entra identity providers.
-# Blocks insecure algorithms: "none", HMAC-based (HS256/HS384/HS512).
+# This is not cryptographic token validation; production HTTP deployments should use upstream validation or OBO.
 ALLOWED_JWT_ALGORITHMS = ["RS256"]
 
 
@@ -143,10 +147,12 @@ def _log_token_claims(token_payload: dict[str, Any]) -> None:
 
 def validate_token(token: str) -> tuple[bool, str]:
     """
-    Perform deployment-agnostic token validation:
+    Perform deployment-agnostic bearer token shape screening:
     - Format (3 parts, non-empty)
     - Header decodable with secure algorithm
     - Not expired
+
+    This does not verify the token signature, issuer, or audience.
     """
     is_valid, error_msg = validate_jwt_token_format(token)
     if not is_valid:
@@ -205,8 +211,7 @@ def token_target_for_jsonrpc_payload(payload: object) -> TokenTarget | None:
     return token_target_for_tool_name(tool_name)
 
 
-async def _token_target_for_request(request: Request) -> TokenTarget | None:
-    body = await request.body()
+def token_target_for_request_body(body: bytes) -> TokenTarget | None:
     if not body:
         return None
 
@@ -218,6 +223,19 @@ async def _token_target_for_request(request: Request) -> TokenTarget | None:
     return token_target_for_jsonrpc_payload(payload)
 
 
+def _receive_replayed_body(body: bytes, original_receive: Receive) -> Receive:
+    body_sent = False
+
+    async def receive() -> Message:
+        nonlocal body_sent
+        if body_sent:
+            return await original_receive()
+        body_sent = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    return receive
+
+
 def _audience_for_token_target(token_target: TokenTarget) -> str:
     if token_target is TokenTarget.KUSTO:
         return obo_config.kusto_audience
@@ -226,53 +244,72 @@ def _audience_for_token_target(token_target: TokenTarget) -> str:
     raise ValueError(f"Unsupported auth token target: {token_target}")
 
 
-class AuthMiddleware(BaseHTTPMiddleware):
-    """HTTP middleware that validates authorization tokens for MCP endpoints."""
+class AuthMiddleware:
+    """HTTP middleware that screens bearer tokens and propagates them to MCP tool calls."""
 
     def __init__(self, app: ASGIApp) -> None:
-        super().__init__(app)
+        self.app = app
 
-    async def dispatch(self, request: Request, call_next: Any) -> Any:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         try:
+            request = Request(scope, receive)
+
             # Skip auth check for health endpoint
             if request.url.path == "/health":
-                return await call_next(request)
+                await self.app(scope, receive, send)
+                return
 
             # Skip auth check for OPTIONS requests (preflight)
             if request.method == "OPTIONS":
-                return await call_next(request)
+                await self.app(scope, receive, send)
+                return
 
             # Check for Authorization header
             auth_header = request.headers.get("Authorization", "") or request.headers.get("authorization", "")
 
-            if not auth_header:
-                return JSONResponse(
-                    {"error": "unauthorized", "message": "Authorization header required"}, status_code=401
+            if not auth_header and not http_allows_missing_bearer():
+                response = JSONResponse(
+                    {"error": "unauthorized", "message": "Authorization header required"},
+                    status_code=401,
                 )
+                await response(scope, receive, send)
+                return
 
             request_uri = str(request.url) if "url" in request else ""
             request_method = request.method if "method" in request else "GET"
             logger.info(f"Request URI: {request_uri}, Method: {request_method}")
 
-            token = extract_token_from_header(auth_header)
+            body = await request.body()
+            replay_receive = _receive_replayed_body(body, receive)
 
             try:
-                token_target = await _token_target_for_request(request)
+                token_target = token_target_for_request_body(body)
             except ValueError as e:
                 logger.error(f"Auth token routing failed: {e}")
-                return JSONResponse({"error": "bad_request", "message": str(e)}, status_code=400)
+                response = JSONResponse({"error": "bad_request", "message": str(e)}, status_code=400)
+                await response(scope, receive, send)
+                return
 
-            # Validate token before using it
-            is_valid, error_msg = validate_token(token)
-            if not is_valid:
-                logger.error(f"Token validation failed: {error_msg}")
-                return JSONResponse(
-                    {"error": "unauthorized", "message": f"Invalid token: {error_msg}"}, status_code=401
-                )
+            token = extract_token_from_header(auth_header) if auth_header else ""
+            if token:
+                is_valid, error_msg = validate_token(token)
+                if not is_valid:
+                    logger.error(f"Token screening failed: {error_msg}")
+                    response = JSONResponse(
+                        {"error": "unauthorized", "message": f"Invalid token: {error_msg}"}, status_code=401
+                    )
+                    await response(scope, receive, send)
+                    return
+            else:
+                logger.warning("HTTP request has no bearer token; using explicitly configured credential fallback")
 
             request_token_context: RequestTokenContext | None = None
             try:
-                if token_target:
+                if token_target and token:
                     token_exchanger = TokenOboExchanger() if config.use_obo_flow else None
                     if token_exchanger:
                         logger.info(f"Started performing OBO token exchange for {token_target.value}")
@@ -285,32 +322,34 @@ class AuthMiddleware(BaseHTTPMiddleware):
                         logger.info(f"OBO flow not enabled; using original token for {token_target.value}")
                         token_for_target = token
                     request_token_context = set_request_token(token_target, token_for_target)
+                elif token_target:
+                    logger.info(
+                        f"No bearer token provided; relying on configured credential fallback for {token_target.value}"
+                    )
                 else:
                     logger.info("No auth token target required for request")
             except Exception as e:
                 logger.error(f"Error during OBO token exchange: {e}")
-                return JSONResponse(
+                response = JSONResponse(
                     {
                         "error": "unauthorized",
                         "message": "Unauthorized to get the required token to access the resource",
                     },
                     status_code=401,
                 )
+                await response(scope, receive, send)
+                return
 
             try:
-                # Continue with request
-                response = await call_next(request)
-
-                logger.info(f"Response status code: {response.status_code}")
-
-                return response
+                await self.app(scope, replay_receive, send)
             finally:
                 if request_token_context:
                     reset_request_token(request_token_context)
 
         except Exception as e:
             logger.error(f"Error in auth middleware: {e}")
-            return JSONResponse({"error": "server_error", "message": "Internal server error"}, status_code=500)
+            response = JSONResponse({"error": "server_error", "message": "Internal server error"}, status_code=500)
+            await response(scope, receive, send)
 
 
 def add_auth_middleware(fastmcp: FastMCP) -> None:
@@ -333,7 +372,7 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
         # Add CORS middleware
         app.add_middleware(
             CORSMiddleware,  # ty: ignore[invalid-argument-type]
-            allow_origins=[o.strip() for o in config.cors_allowed_origins.split(",")],
+            allow_origins=cors_allowed_origins(),
             allow_credentials=True,
             allow_methods=["*"],  # Allows all methods
             allow_headers=["*"],  # Allows all headers
@@ -346,3 +385,21 @@ def add_auth_middleware(fastmcp: FastMCP) -> None:
 
     # Replace the streamable_http_app method with auth-enabled version
     fastmcp.streamable_http_app = auth_required_streamable_app  # type: ignore
+
+
+def _split_comma_separated(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def cors_allowed_origins() -> list[str]:
+    """Return CORS origins for HTTP mode; wildcard requires explicit configuration or debug mode."""
+    configured_origins = _split_comma_separated(config.cors_allowed_origins)
+    if configured_origins:
+        return configured_origins
+    if config.http_debug_mode:
+        return ["*"]
+    return [
+        f"http://127.0.0.1:{config.http_port}",
+        f"http://localhost:{config.http_port}",
+        f"http://[::1]:{config.http_port}",
+    ]

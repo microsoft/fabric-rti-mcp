@@ -59,12 +59,12 @@ class TestFromEnvBooleanParsing:
         assert config.use_ai_foundry_compat is False
 
     @patch.dict("os.environ", {}, clear=False)
-    def test_cors_allowed_origins_defaults_to_wildcard(self) -> None:
+    def test_cors_allowed_origins_defaults_to_safe_dynamic_policy(self) -> None:
         import os
 
         os.environ.pop("FABRIC_RTI_CORS_ORIGINS", None)
         config = GlobalFabricRTIConfig.from_env()
-        assert config.cors_allowed_origins == "*"
+        assert config.cors_allowed_origins == ""
 
     @patch.dict("os.environ", {"FABRIC_RTI_CORS_ORIGINS": "https://example.com,https://other.com"}, clear=False)
     def test_cors_allowed_origins_custom_value(self) -> None:
@@ -72,6 +72,29 @@ class TestFromEnvBooleanParsing:
         assert config.cors_allowed_origins == "https://example.com,https://other.com"
         origins = [o.strip() for o in config.cors_allowed_origins.split(",")]
         assert origins == ["https://example.com", "https://other.com"]
+
+    @patch.dict("os.environ", {"FABRIC_RTI_HTTP_ALLOW_MI": "true"}, clear=False)
+    def test_http_allow_mi_true(self) -> None:
+        config = GlobalFabricRTIConfig.from_env()
+        assert config.http_allow_mi is True
+
+    @patch.dict("os.environ", {"FABRIC_RTI_HTTP_DEBUG_MODE": "true"}, clear=False)
+    def test_http_debug_mode_true(self) -> None:
+        config = GlobalFabricRTIConfig.from_env()
+        assert config.http_debug_mode is True
+
+    @patch.dict(
+        "os.environ",
+        {
+            "FABRIC_RTI_HTTP_ALLOWED_HOSTS": "mcp.example.com:*,127.0.0.1:*",
+            "FABRIC_RTI_HTTP_ALLOWED_ORIGINS": "https://mcp.example.com",
+        },
+        clear=False,
+    )
+    def test_http_transport_security_allowlists(self) -> None:
+        config = GlobalFabricRTIConfig.from_env()
+        assert config.http_allowed_hosts == "mcp.example.com:*,127.0.0.1:*"
+        assert config.http_allowed_origins == "https://mcp.example.com"
 
 
 class TestWithArgsCLIOverride:

@@ -16,8 +16,9 @@ from urllib.parse import quote, urlparse
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
+from fabric_rti_mcp.auth.auth_context import TokenTarget, credential_source_cache_key, resolve_credential_source
 from fabric_rti_mcp.config import global_config, logger
-from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig, normalize_service_uri_key
+from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig, KustoServiceConfig, normalize_service_uri_key
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter, KustoResponseFormat
 
@@ -258,7 +259,9 @@ class KustoConnectionManager:
         This method is the single entry point for accessing connections.
         """
         sanitized_uri = sanitize_uri(cluster_uri)
-        cache_key = normalize_service_uri_key(sanitized_uri)
+        service_cache_key = normalize_service_uri_key(sanitized_uri)
+        credential_source = resolve_credential_source(TokenTarget.KUSTO)
+        cache_key = f"{service_cache_key}|{credential_source_cache_key(credential_source)}"
 
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -267,8 +270,8 @@ class KustoConnectionManager:
         known_services = KustoConfig.get_known_services()
         default_database = _DEFAULT_DB_NAME
 
-        if cache_key in known_services:
-            default_database = known_services[cache_key].default_database or _DEFAULT_DB_NAME
+        if service_cache_key in known_services:
+            default_database = known_services[service_cache_key].default_database or _DEFAULT_DB_NAME
         elif not CONFIG.allow_unknown_services:
             raise ValueError(
                 f"Service URI '{sanitized_uri}' is not in the list of approved services, "
@@ -391,6 +394,7 @@ def _execute(
     readonly_override: bool = False,
     database: str | None = None,
     client_request_properties: dict[str, Any] | None = None,
+    log_errors: bool = True,
 ) -> dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
@@ -416,7 +420,8 @@ def _execute(
 
     except Exception as e:
         error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"
-        logger.error(error_msg)
+        if log_errors:
+            logger.error(error_msg)
         raise RuntimeError(error_msg) from e
 
 
@@ -429,7 +434,25 @@ def kusto_known_services() -> list[dict[str, str]]:
     :return: List of objects, {"service": str, "description": str, "default_database": str}
     """
     services = KustoConfig.get_known_services().values()
+    credential_source = resolve_credential_source(TokenTarget.KUSTO)
+    if CONFIG.should_probe_known_services(credential_source):
+        services = [service for service in services if _known_service_authenticates(service)]
     return [asdict(service) for service in services]
+
+
+def _known_service_authenticates(service: KustoServiceConfig) -> bool:
+    try:
+        _execute(
+            ".show version",
+            service.service_uri,
+            readonly_override=True,
+            database=service.default_database,
+            log_errors=False,
+        )
+        return True
+    except Exception as e:
+        logger.info(f"Filtering Kusto known service '{service.service_uri}' because authentication failed: {e}")
+        return False
 
 
 def kusto_query(
