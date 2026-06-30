@@ -11,6 +11,7 @@ from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_service import (
     KustoConnectionManager,
     kusto_command,
+    kusto_show_command,
     kusto_diagnostics,
     kusto_known_services,
     kusto_query,
@@ -426,6 +427,36 @@ def test_blocked_crp_keys_raise_error(
         kusto_query(
             "T | take 1", sample_cluster_uri, database="db", client_request_properties={"Request_Readonly": False}
         )
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_show_command_crp(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that kusto_show_command enforces server-side readonly via CRP flags."""
+    mock_config.response_format = "kusto_response"
+    mock_config.timeout_seconds = None
+    mock_config.offload_enabled = False
+
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    kusto_show_command(".show tables", sample_cluster_uri, database="test_db")
+
+    # Verify the CRP passed to execute has request_readonly set
+    crp = mock_client.execute.call_args[0][2]
+    assert isinstance(crp, ClientRequestProperties)
+    assert crp.has_option("request_readonly")
+    assert crp.client_request_id.startswith("KFRTI_MCP.kusto_show_command:")  # type: ignore
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")

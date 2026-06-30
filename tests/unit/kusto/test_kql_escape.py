@@ -5,6 +5,7 @@ from fabric_rti_mcp.services.kusto.kusto_service import (
     kql_escape_entity_name,
     kql_escape_string,
     kusto_command,
+    kusto_show_command,
     kusto_query,
 )
 
@@ -186,4 +187,53 @@ class TestQueryCommandValidation:
         mock_conn.return_value = connection
 
         result = kusto_command("set notruncation;\n.show tables", "https://help.kusto.windows.net")
+        assert result["format"] == "kusto_response"
+
+
+class TestShowCommandValidation:
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "StormEvents | take 10",
+            ".create table T (col:string)",
+            ".alter table T (col:string)",
+            ".drop table T",
+            ".set-or-append T <| print 1",
+            ".delete table T records <| T",
+            ".rename table T to T2",
+            ".ingest into table T <| print 1",
+        ],
+    )
+    def test_rejects_non_show_commands(self, command: str) -> None:
+        with pytest.raises(ValueError, match="read-only .show commands"):
+            kusto_show_command(command, "https://help.kusto.windows.net")
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            ".show tables",
+            ".show tables | where TableName has 'Storm'",
+            ".show databases",
+            ".show cluster",
+            ".show version",
+            "set notruncation;\n.show tables",
+            "// comment\n.show tables",
+        ],
+    )
+    @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+    @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+    def test_accepts_valid_show_commands(
+        self, mock_conn: MagicMock, mock_config: MagicMock, mock_kusto_response, command: str
+    ) -> None:
+        mock_config.response_format = "kusto_response"
+        mock_config.timeout_seconds = None
+        mock_config.offload_enabled = False
+        mock_client = MagicMock()
+        mock_client.execute.return_value = mock_kusto_response
+        connection = MagicMock()
+        connection.query_client = mock_client
+        connection.default_database = "db"
+        mock_conn.return_value = connection
+
+        result = kusto_show_command(command, "https://help.kusto.windows.net")
         assert result["format"] == "kusto_response"
