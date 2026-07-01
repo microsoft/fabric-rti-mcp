@@ -36,6 +36,7 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
+    custom_watermark = "FABRIC_RTI_KUSTO_CUSTOM_WATERMARK"
     deeplink_style = "FABRIC_RTI_KUSTO_DEEPLINK_STYLE"
     response_format = "FABRIC_RTI_KUSTO_RESPONSE_FORMAT"
     known_services_probe_mode = "FABRIC_RTI_KUSTO_KNOWN_SERVICES_PROBE"
@@ -52,6 +53,7 @@ class KustoEnvVarNames:
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
+            KustoEnvVarNames.custom_watermark,
             KustoEnvVarNames.deeplink_style,
             KustoEnvVarNames.response_format,
             KustoEnvVarNames.known_services_probe_mode,
