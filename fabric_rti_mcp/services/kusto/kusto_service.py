@@ -380,6 +380,7 @@ _FORMAT_DISPATCH: dict[str, Any] = {
     "tsv": KustoFormatter.to_tsv,
     "header_arrays": KustoFormatter.to_header_arrays,
     "kusto_response": KustoFormatter.to_kusto_response,
+    "full_kusto_response": KustoFormatter.to_full_kusto_response,
 }
 
 
