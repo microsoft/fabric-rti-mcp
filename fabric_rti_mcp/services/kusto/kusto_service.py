@@ -318,8 +318,12 @@ _BLOCKED_CRP_KEYS = frozenset(
     {
         "request_readonly",
         "request_readonly_hardline",
+        "request_workload_class",
     }
 )
+
+_AGENTIC_WORKLOAD_CLASS_OPTION = "request_workload_class"
+_AGENTIC_WORKLOAD_CLASS_VALUE = "agentic"
 
 _TIMESPAN_RE = re.compile(r"^(\d+):(\d{1,2}):(\d{1,2})$")
 
@@ -369,6 +373,8 @@ def _crp(
             if key == ClientRequestProperties.request_timeout_option_name:
                 value = _parse_servertimeout(value)
             crp.set_option(key, value)
+
+    crp.set_option(_AGENTIC_WORKLOAD_CLASS_OPTION, _AGENTIC_WORKLOAD_CLASS_VALUE)
 
     return crp
 
