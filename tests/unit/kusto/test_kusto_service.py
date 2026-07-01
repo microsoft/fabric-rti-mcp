@@ -11,10 +11,10 @@ from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_service import (
     KustoConnectionManager,
     kusto_command,
-    kusto_show_command,
     kusto_diagnostics,
     kusto_known_services,
     kusto_query,
+    kusto_show_command,
     kusto_show_queryplan,
 )
 
@@ -186,6 +186,13 @@ def test_kusto_known_services_probe_mode_env_overrides_default() -> None:
 
     assert config.known_services_probe_mode == "always"
     assert config.should_probe_known_services(CredentialSource.LOCAL_DEVELOPER) is True
+
+
+@patch.dict("os.environ", {"FABRIC_RTI_KUSTO_RESPONSE_FORMAT": "full_kusto_response"}, clear=True)
+def test_response_format_env_accepts_full_kusto_response() -> None:
+    config = KustoConfig.from_env()
+
+    assert config.response_format == "full_kusto_response"
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
@@ -626,6 +633,36 @@ def test_execute_kusto_response_format(
     assert "rows" in result["data"]
     assert isinstance(result["data"]["columns"], list)
     assert isinstance(result["data"]["rows"], list)
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_execute_full_kusto_response_format(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that _execute returns all Kusto response tables when configured."""
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    mock_config.response_format = "full_kusto_response"
+    mock_config.timeout_seconds = None
+
+    result = kusto_query("TestTable | take 10", sample_cluster_uri, database="test_db")
+
+    assert result["format"] == "full_kusto_response"
+    assert "tables" in result["data"]
+    assert result["data"]["tables"][0]["name"] == "Table_0"
+    assert result["data"]["tables"][0]["kind"] == "PrimaryResult"
+    assert result["data"]["tables"][0]["columns"] == [{"ColumnName": "TestColumn", "DataType": "string"}]
+    assert result["data"]["tables"][0]["rows"] == [["TestValue"]]
 
 
 # ── kusto_show_queryplan tests ───────────────────────────────────────────────────

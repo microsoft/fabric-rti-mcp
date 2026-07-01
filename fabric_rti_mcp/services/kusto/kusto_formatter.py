@@ -119,6 +119,27 @@ class KustoFormatter:
         )
 
     @staticmethod
+    def to_full_kusto_response(result_set: KustoResponseDataSet | None) -> KustoResponseFormat:
+        if not result_set or not getattr(result_set, "tables", None):
+            return KustoResponseFormat(format="full_kusto_response", data={"tables": []})
+
+        tables: list[dict[str, Any]] = []
+        for table in result_set.tables:
+            table_kind = getattr(table, "table_kind", None)
+            table_kind_value = getattr(table_kind, "value", table_kind)
+            tables.append(
+                {
+                    "name": table.table_name,
+                    "kind": table_kind_value,
+                    "id": table.table_id,
+                    "columns": table.raw_columns,
+                    "rows": table.raw_rows,
+                }
+            )
+
+        return KustoResponseFormat(format="full_kusto_response", data={"tables": tables})
+
+    @staticmethod
     def to_header_arrays(result_set: KustoResponseDataSet | None) -> KustoResponseFormat:
         if not result_set or not getattr(result_set, "primary_results", None):
             return KustoResponseFormat(format="header_arrays", data=[])
@@ -176,6 +197,8 @@ class KustoFormatter:
             return KustoFormatter._parse_header_arrays(data)
         elif format_type == "kusto_response":
             return KustoFormatter._parse_kusto_response(data)
+        elif format_type == "full_kusto_response":
+            return KustoFormatter._parse_full_kusto_response(data)
         else:
             raise ValueError(f"Unsupported format: {format_type}")
 
@@ -334,3 +357,24 @@ class KustoFormatter:
         column_names = [col["ColumnName"] for col in columns]
 
         return [{column_names[i]: row[i] if i < len(row) else None for i in range(len(column_names))} for row in rows]
+
+    @staticmethod
+    def _parse_full_kusto_response(data: Any) -> list[dict[str, Any]]:
+        """Parse full_kusto_response format by returning the primary result rows."""
+        if not isinstance(data, dict):
+            raise ValueError("Invalid full_kusto_response format")
+
+        tables = data.get("tables", [])
+        if not isinstance(tables, list):
+            raise ValueError("Invalid full_kusto_response format")
+
+        primary_table = next((table for table in tables if table.get("kind") == "PrimaryResult"), None)
+        if primary_table is None:
+            primary_table = tables[0] if tables else {"columns": [], "rows": []}
+
+        return KustoFormatter._parse_kusto_response(
+            {
+                "columns": primary_table.get("columns", []),
+                "rows": primary_table.get("rows", []),
+            }
+        )

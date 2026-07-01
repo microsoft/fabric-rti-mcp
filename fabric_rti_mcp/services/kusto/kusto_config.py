@@ -137,7 +137,7 @@ class KustoConfig:
                     "Expected 'adx' or 'fabric'. Ignoring override."
                 )
 
-        valid_formats = ("columnar", "json", "csv", "tsv", "header_arrays", "kusto_response")
+        valid_formats = ("columnar", "json", "csv", "tsv", "header_arrays", "kusto_response", "full_kusto_response")
         response_format = "kusto_response"
         response_format_env = os.getenv(KustoEnvVarNames.response_format)
         if response_format_env:
