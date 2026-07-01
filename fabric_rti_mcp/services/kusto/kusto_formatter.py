@@ -365,7 +365,7 @@ class KustoFormatter:
             raise ValueError("Invalid full_kusto_response format")
 
         tables = data.get("tables", [])
-        if not isinstance(tables, list):
+        if not isinstance(tables, list) or any(not isinstance(table, dict) for table in tables):
             raise ValueError("Invalid full_kusto_response format")
 
         primary_table = next((table for table in tables if table.get("kind") == "PrimaryResult"), None)
