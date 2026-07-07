@@ -231,7 +231,7 @@ def test_execute_basic_query(
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
     assert crp.has_option("request_readonly")
-    assert crp._options["request_workload_class"] == "agentic"
+    assert crp._options["request_is_agentic"] is True
 
     # Verify result format
     assert result["format"] == "columnar"
@@ -287,7 +287,7 @@ def test_execute_with_custom_client_request_properties(
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
     assert crp.has_option("request_readonly")
-    assert crp._options["request_workload_class"] == "agentic"
+    assert crp._options["request_is_agentic"] is True
 
     # Verify custom properties are set
     assert crp.has_option("request_timeout")
@@ -338,7 +338,7 @@ def test_execute_without_client_request_properties_preserves_behavior(
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
     assert crp.has_option("request_readonly")
-    assert crp._options["request_workload_class"] == "agentic"
+    assert crp._options["request_is_agentic"] is True
 
     # Verify result format
     assert isinstance(result, dict)
@@ -391,7 +391,7 @@ def test_destructive_operation_with_custom_client_request_properties(
     # Verify default properties are still set
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_command:")  # type: ignore
-    assert crp._options["request_workload_class"] == "agentic"
+    assert crp._options["request_is_agentic"] is True
 
     # For destructive operations, request_readonly should NOT be set
     assert not crp.has_option("request_readonly")
@@ -420,7 +420,7 @@ def test_blocked_crp_keys_raise_error(
     blocked_keys = [
         "request_readonly",
         "request_readonly_hardline",
-        "request_workload_class",
+        "request_is_agentic",
     ]
 
     for key in blocked_keys:
@@ -462,7 +462,7 @@ def test_show_command_crp(
     assert isinstance(crp, ClientRequestProperties)
     assert crp.has_option("request_readonly")
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_show_command:")  # type: ignore
-    assert crp._options["request_workload_class"] == "agentic"
+    assert crp._options["request_is_agentic"] is True
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
@@ -667,7 +667,7 @@ def test_show_queryplan_constructs_correct_command(
     crp = args[2]
     assert isinstance(crp, ClientRequestProperties)
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_show_queryplan:")
-    assert crp._options["request_workload_class"] == "agentic"
+    assert crp._options["request_is_agentic"] is True
 
     assert result["query_text"] == "StormEvents | count"
     assert result["stats"]["PlanSize"] == 9487
