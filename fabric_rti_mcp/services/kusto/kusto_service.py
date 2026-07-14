@@ -318,8 +318,12 @@ _BLOCKED_CRP_KEYS = frozenset(
     {
         "request_readonly",
         "request_readonly_hardline",
+        "request_is_agentic",
     }
 )
+
+_AGENT_MARKER_OPTION = "request_is_agentic"
+_AGENT_MARKER_VALUE = True
 
 _TIMESPAN_RE = re.compile(r"^(\d+):(\d{1,2}):(\d{1,2})$")
 
@@ -369,6 +373,8 @@ def _crp(
             if key == ClientRequestProperties.request_timeout_option_name:
                 value = _parse_servertimeout(value)
             crp.set_option(key, value)
+
+    crp.set_option(_AGENT_MARKER_OPTION, _AGENT_MARKER_VALUE)
 
     return crp
 
