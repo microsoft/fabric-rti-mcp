@@ -69,10 +69,10 @@ class TestSchemaCompatibleMCP:
         from fabric_rti_mcp.services.kusto import kusto_tools
         from fabric_rti_mcp.services.map import map_tools
 
-        kusto_tools.register_tools(mcp)
-        eventstream_tools.register_tools(mcp)
-        activator_tools.register_tools(mcp)
-        map_tools.register_tools(mcp)
+        kusto_tools.register_tools(mcp.add_tool)
+        eventstream_tools.register_tools(mcp.add_tool)
+        activator_tools.register_tools(mcp.add_tool)
+        map_tools.register_tools(mcp.add_tool)
 
         tools = asyncio.run(mcp.list_tools())
         assert len(tools) > 0

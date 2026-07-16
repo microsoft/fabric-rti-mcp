@@ -930,20 +930,10 @@ def kusto_get_shots(
     client_request_properties: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Retrieves KQL query examples that semantically resemble the user's prompt.
+    Find similar saved KQL queries.
 
-    IMPORTANT: Call this tool BEFORE writing any KQL query. The returned shots contain
-    expert-written KQL examples that reveal the correct databases, tables, column names,
-    and query patterns for this cluster. Without this context, you are likely to query
-    the wrong table or database.
-
-    Use this to:
-    - Discover which databases and tables contain the data you need
-    - Learn the correct column names and schema for a given domain
-    - Find proven query patterns as starting points
-
-    The returned shots come from a curated collection of expert-written examples
-    paired with natural language descriptions.
+    Semantic search returns existing query examples that are relevant to the user's
+    prompt, so they can be used as starting points for similar requests.
 
     :param prompt: The user prompt to find similar shots for.
     :param shots_table_name: Name of the table containing the shots. The table should have "EmbeddingText" (string)
