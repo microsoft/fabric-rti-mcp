@@ -21,6 +21,7 @@ from fabric_rti_mcp.config import global_config, logger
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig, KustoServiceConfig, normalize_service_uri_key
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter, KustoResponseFormat
+from fabric_rti_mcp.services.kusto.kusto_watermark import add_watermark
 
 # ── Deeplink constants ──────────────────────────────────────────────────────────
 
@@ -418,6 +419,7 @@ def _execute(
 
         # agents can send messy inputs
         query = query.strip()
+        query = add_watermark(query)
 
         database = database or connection.default_database
         database = database.strip()

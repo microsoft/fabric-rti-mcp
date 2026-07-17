@@ -1,0 +1,68 @@
+name: Live Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster_uri:
+        description: Kusto cluster URI used by the read-only live tests.
+        required: true
+        default: https://help.kusto.windows.net
+      database:
+        description: Kusto database used by the read-only live tests.
+        required: true
+        default: Samples
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  kusto-live-tests:
+    name: Kusto live tests
+    runs-on: ubuntu-latest
+    environment: live-tests
+
+    env:
+      KUSTO_LIVE_CLUSTER_URI: ${{ inputs.cluster_uri }}
+      KUSTO_LIVE_DATABASE: ${{ inputs.database }}
+      KUSTO_LIVE_MIN_DATABASES: "0"
+      KUSTO_SERVICE_URI: ${{ inputs.cluster_uri }}
+      KUSTO_SERVICE_DEFAULT_DB: ${{ inputs.database }}
+      KUSTO_ALLOW_UNKNOWN_SERVICES: "false"
+      KUSTO_EAGER_CONNECT: "false"
+      FABRIC_RTI_KUSTO_RESPONSE_FORMAT: kusto_response
+      FABRIC_RTI_KUSTO_DEEPLINK_STYLE: adx
+      FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA: "false"
+      FABRIC_RTI_TRANSPORT: stdio
+      USE_OBO_FLOW: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Validate Azure login configuration
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          test -n "$AZURE_CLIENT_ID" || { echo "AZURE_CLIENT_ID environment secret is not configured."; exit 1; }
+          test -n "$AZURE_TENANT_ID" || { echo "AZURE_TENANT_ID environment secret is not configured."; exit 1; }
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run Kusto live tests
+        run: python -m tests.live.test_kusto_tools_live
