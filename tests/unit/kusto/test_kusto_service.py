@@ -6,12 +6,15 @@ from azure.kusto.data import ClientRequestProperties
 from azure.kusto.data.response import KustoResponseDataSet
 
 from fabric_rti_mcp import __version__
+from fabric_rti_mcp.auth.auth_context import CredentialSource
 from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 from fabric_rti_mcp.services.kusto.kusto_service import (
     KustoConnectionManager,
     kusto_command,
     kusto_diagnostics,
+    kusto_known_services,
     kusto_query,
+    kusto_show_command,
     kusto_show_queryplan,
 )
 
@@ -58,6 +61,36 @@ def test_connection_manager_caches_by_normalized_uri(mock_kusto_connection: Magi
     mock_kusto_connection.assert_called_once()
 
 
+@patch.dict("os.environ", _KNOWN_SERVICES_ENV, clear=True)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.credential_source_cache_key")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.resolve_credential_source")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.KustoConnection")
+def test_connection_manager_partitions_cache_by_credential_mode(
+    mock_kusto_connection: MagicMock,
+    mock_resolve_credential_source: MagicMock,
+    mock_credential_source_cache_key: MagicMock,
+) -> None:
+    request_connection = MagicMock()
+    mi_connection = MagicMock()
+    mock_kusto_connection.side_effect = [request_connection, mi_connection]
+    mock_resolve_credential_source.side_effect = [
+        CredentialSource.BEARER_TOKEN,
+        CredentialSource.MANAGED_IDENTITY,
+        CredentialSource.BEARER_TOKEN,
+    ]
+    mock_credential_source_cache_key.side_effect = ["bearer-token", "managed-identity:system", "bearer-token"]
+    manager = KustoConnectionManager()
+
+    first = manager.get("https://demo12.westus.kusto.windows.net")
+    second = manager.get("HTTPS://DEMO12.WESTUS.KUSTO.WINDOWS.NET/")
+    third = manager.get("https://demo12.westus.kusto.windows.net/")
+
+    assert first is third
+    assert second is mi_connection
+    assert first is not second
+    assert mock_kusto_connection.call_count == 2
+
+
 @patch.dict(
     "os.environ",
     {
@@ -84,6 +117,82 @@ def test_get_known_services_warns_on_duplicate_normalized_keys(caplog: pytest.Lo
         "'https://demo.kusto.windows.net/' is overridden by 'HTTPS://DEMO.KUSTO.WINDOWS.NET'."
     )
     assert any(record.message == expected_message for record in caplog.records)
+
+
+@patch.dict("os.environ", _KNOWN_SERVICES_ENV, clear=True)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.resolve_credential_source")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service._known_service_authenticates")
+def test_kusto_known_services_filters_by_sentry_check_in_http(
+    mock_known_service_authenticates: MagicMock, mock_config: MagicMock, mock_resolve_credential_source: MagicMock
+) -> None:
+    mock_resolve_credential_source.return_value = CredentialSource.BEARER_TOKEN
+    mock_config.should_probe_known_services.return_value = True
+    denied_service_uri = "https://demo12.westus.kusto.windows.net/"
+    mock_known_service_authenticates.side_effect = lambda service: service.service_uri != denied_service_uri
+
+    services = kusto_known_services()
+
+    service_uris = {service["service_uri"] for service in services}
+    assert service_uris == {
+        "https://demo11.westus.kusto.windows.net/",
+        "https://kuskus.kusto.windows.net/",
+    }
+    assert mock_known_service_authenticates.call_count == 3
+    mock_config.should_probe_known_services.assert_called_once_with(CredentialSource.BEARER_TOKEN)
+
+
+@patch.dict("os.environ", _KNOWN_SERVICES_ENV, clear=True)
+@patch("fabric_rti_mcp.services.kusto.kusto_service.resolve_credential_source")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service._known_service_authenticates")
+def test_kusto_known_services_does_not_filter_when_config_disables_probe(
+    mock_known_service_authenticates: MagicMock, mock_config: MagicMock, mock_resolve_credential_source: MagicMock
+) -> None:
+    mock_resolve_credential_source.return_value = CredentialSource.LOCAL_DEVELOPER
+    mock_config.should_probe_known_services.return_value = False
+
+    services = kusto_known_services()
+
+    assert len(services) == 3
+    mock_known_service_authenticates.assert_not_called()
+    mock_config.should_probe_known_services.assert_called_once_with(CredentialSource.LOCAL_DEVELOPER)
+
+
+def test_kusto_known_services_probe_mode_auto_probes_request_and_mi_credentials() -> None:
+    config = KustoConfig(known_services_probe_mode="auto")
+
+    assert config.should_probe_known_services(CredentialSource.BEARER_TOKEN) is True
+    assert config.should_probe_known_services(CredentialSource.MANAGED_IDENTITY) is True
+    assert config.should_probe_known_services(CredentialSource.LOCAL_DEVELOPER) is False
+    assert config.should_probe_known_services(CredentialSource.UNAVAILABLE) is False
+
+
+@patch.dict("os.environ", {}, clear=True)
+def test_kusto_known_services_probe_mode_defaults_auto() -> None:
+    config = KustoConfig.from_env()
+
+    assert config.known_services_probe_mode == "auto"
+    assert config.should_probe_known_services(CredentialSource.LOCAL_DEVELOPER) is False
+
+
+@patch.dict(
+    "os.environ",
+    {"FABRIC_RTI_KUSTO_KNOWN_SERVICES_PROBE": "always"},
+    clear=True,
+)
+def test_kusto_known_services_probe_mode_env_overrides_default() -> None:
+    config = KustoConfig.from_env()
+
+    assert config.known_services_probe_mode == "always"
+    assert config.should_probe_known_services(CredentialSource.LOCAL_DEVELOPER) is True
+
+
+@patch.dict("os.environ", {"FABRIC_RTI_KUSTO_RESPONSE_FORMAT": "full_kusto_response"}, clear=True)
+def test_response_format_env_accepts_full_kusto_response() -> None:
+    config = KustoConfig.from_env()
+
+    assert config.response_format == "full_kusto_response"
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
@@ -129,6 +238,7 @@ def test_execute_basic_query(
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
     assert crp.has_option("request_readonly")
+    assert crp._options["request_is_agentic"] is True
 
     # Verify result format
     assert result["format"] == "columnar"
@@ -184,6 +294,7 @@ def test_execute_with_custom_client_request_properties(
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
     assert crp.has_option("request_readonly")
+    assert crp._options["request_is_agentic"] is True
 
     # Verify custom properties are set
     assert crp.has_option("request_timeout")
@@ -234,6 +345,7 @@ def test_execute_without_client_request_properties_preserves_behavior(
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_query:")  # type: ignore
     assert crp.has_option("request_readonly")
+    assert crp._options["request_is_agentic"] is True
 
     # Verify result format
     assert isinstance(result, dict)
@@ -286,6 +398,7 @@ def test_destructive_operation_with_custom_client_request_properties(
     # Verify default properties are still set
     assert crp.application == f"fabric-rti-mcp{{{__version__}}}"
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_command:")  # type: ignore
+    assert crp._options["request_is_agentic"] is True
 
     # For destructive operations, request_readonly should NOT be set
     assert not crp.has_option("request_readonly")
@@ -314,6 +427,7 @@ def test_blocked_crp_keys_raise_error(
     blocked_keys = [
         "request_readonly",
         "request_readonly_hardline",
+        "request_is_agentic",
     ]
 
     for key in blocked_keys:
@@ -325,6 +439,37 @@ def test_blocked_crp_keys_raise_error(
         kusto_query(
             "T | take 1", sample_cluster_uri, database="db", client_request_properties={"Request_Readonly": False}
         )
+
+
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_show_command_crp(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that kusto_show_command enforces server-side readonly via CRP flags."""
+    mock_config.response_format = "kusto_response"
+    mock_config.timeout_seconds = None
+    mock_config.offload_enabled = False
+
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    kusto_show_command(".show tables", sample_cluster_uri, database="test_db")
+
+    # Verify the CRP passed to execute has request_readonly set
+    crp = mock_client.execute.call_args[0][2]
+    assert isinstance(crp, ClientRequestProperties)
+    assert crp.has_option("request_readonly")
+    assert crp.client_request_id.startswith("KFRTI_MCP.kusto_show_command:")  # type: ignore
+    assert crp._options["request_is_agentic"] is True
 
 
 @patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
@@ -496,6 +641,36 @@ def test_execute_kusto_response_format(
     assert isinstance(result["data"]["rows"], list)
 
 
+@patch("fabric_rti_mcp.services.kusto.kusto_service.CONFIG")
+@patch("fabric_rti_mcp.services.kusto.kusto_service.get_kusto_connection")
+def test_execute_full_kusto_response_format(
+    mock_get_kusto_connection: Mock,
+    mock_config: MagicMock,
+    sample_cluster_uri: str,
+    mock_kusto_response: KustoResponseDataSet,
+) -> None:
+    """Test that _execute returns all Kusto response tables when configured."""
+    mock_client = MagicMock()
+    mock_client.execute.return_value = mock_kusto_response
+
+    mock_connection = MagicMock()
+    mock_connection.query_client = mock_client
+    mock_connection.default_database = "default_db"
+    mock_get_kusto_connection.return_value = mock_connection
+
+    mock_config.response_format = "full_kusto_response"
+    mock_config.timeout_seconds = None
+
+    result = kusto_query("TestTable | take 10", sample_cluster_uri, database="test_db")
+
+    assert result["format"] == "full_kusto_response"
+    assert "tables" in result["data"]
+    assert result["data"]["tables"][0]["name"] == "Table_0"
+    assert result["data"]["tables"][0]["kind"] == "PrimaryResult"
+    assert result["data"]["tables"][0]["columns"] == [{"ColumnName": "TestColumn", "DataType": "string"}]
+    assert result["data"]["tables"][0]["rows"] == [["TestValue"]]
+
+
 # ── kusto_show_queryplan tests ───────────────────────────────────────────────────
 
 
@@ -529,6 +704,7 @@ def test_show_queryplan_constructs_correct_command(
     crp = args[2]
     assert isinstance(crp, ClientRequestProperties)
     assert crp.client_request_id.startswith("KFRTI_MCP.kusto_show_queryplan:")
+    assert crp._options["request_is_agentic"] is True
 
     assert result["query_text"] == "StormEvents | count"
     assert result["stats"]["PlanSize"] == 9487

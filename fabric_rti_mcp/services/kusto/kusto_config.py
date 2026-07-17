@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from azure.kusto.data import KustoConnectionStringBuilder
 
+from fabric_rti_mcp.auth.auth_context import CredentialSource
 from fabric_rti_mcp.config import logger
 
 
@@ -38,6 +39,7 @@ class KustoEnvVarNames:
     custom_watermark = "FABRIC_RTI_KUSTO_CUSTOM_WATERMARK"
     deeplink_style = "FABRIC_RTI_KUSTO_DEEPLINK_STYLE"
     response_format = "FABRIC_RTI_KUSTO_RESPONSE_FORMAT"
+    known_services_probe_mode = "FABRIC_RTI_KUSTO_KNOWN_SERVICES_PROBE"
 
     @staticmethod
     def all() -> list[str]:
@@ -54,7 +56,12 @@ class KustoEnvVarNames:
             KustoEnvVarNames.custom_watermark,
             KustoEnvVarNames.deeplink_style,
             KustoEnvVarNames.response_format,
+            KustoEnvVarNames.known_services_probe_mode,
         ]
+
+
+def _env_bool(name: str) -> bool:
+    return os.getenv(name, "false").lower() in ("true", "1")
 
 
 @dataclass(slots=True, frozen=True)
@@ -79,6 +86,9 @@ class KustoConfig:
     deeplink_style: str | None = None
     # Response format for Kusto query results. Default: "kusto_response".
     response_format: str = "kusto_response"
+    # Whether kusto_known_services should probe configured services before returning them.
+    # Values: "auto", "always", "never". Auto probes bearer-token and MI modes, and skips local developer mode.
+    known_services_probe_mode: str = "auto"
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -97,7 +107,7 @@ class KustoConfig:
         shots_table = os.getenv(KustoEnvVarNames.shots_table, None)
         known_services_string = os.getenv(KustoEnvVarNames.known_services, None)
         known_services: list[KustoServiceConfig] | None = None
-        eager_connect = os.getenv(KustoEnvVarNames.eager_connect, "false").lower() in ("true", "1")
+        eager_connect = _env_bool(KustoEnvVarNames.eager_connect)
         allow_unknown_services = os.getenv(KustoEnvVarNames.allow_unknown_services, "true").lower() in ("true", "1")
 
         # Parse timeout configuration
@@ -129,7 +139,7 @@ class KustoConfig:
                     "Expected 'adx' or 'fabric'. Ignoring override."
                 )
 
-        valid_formats = ("columnar", "json", "csv", "tsv", "header_arrays", "kusto_response")
+        valid_formats = ("columnar", "json", "csv", "tsv", "header_arrays", "kusto_response", "full_kusto_response")
         response_format = "kusto_response"
         response_format_env = os.getenv(KustoEnvVarNames.response_format)
         if response_format_env:
@@ -142,6 +152,19 @@ class KustoConfig:
                     f"Expected one of: {', '.join(valid_formats)}. Using default 'kusto_response'."
                 )
 
+        valid_probe_modes = ("auto", "always", "never")
+        known_services_probe_mode = "auto"
+        probe_mode_env = os.getenv(KustoEnvVarNames.known_services_probe_mode)
+        if probe_mode_env:
+            normalized_probe_mode = probe_mode_env.strip().lower()
+            if normalized_probe_mode in valid_probe_modes:
+                known_services_probe_mode = normalized_probe_mode
+            else:
+                logger.warning(
+                    f"Invalid {KustoEnvVarNames.known_services_probe_mode}='{probe_mode_env}'. "
+                    f"Expected one of: {', '.join(valid_probe_modes)}. Using default '{known_services_probe_mode}'."
+                )
+
         return KustoConfig(
             default_service,
             open_ai_embedding_endpoint,
@@ -152,7 +175,15 @@ class KustoConfig:
             timeout_seconds,
             deeplink_style,
             response_format,
+            known_services_probe_mode,
         )
+
+    def should_probe_known_services(self, credential_source: CredentialSource) -> bool:
+        if self.known_services_probe_mode == "always":
+            return True
+        if self.known_services_probe_mode == "never":
+            return False
+        return credential_source in (CredentialSource.BEARER_TOKEN, CredentialSource.MANAGED_IDENTITY)
 
     @staticmethod
     def existing_env_vars() -> list[str]:

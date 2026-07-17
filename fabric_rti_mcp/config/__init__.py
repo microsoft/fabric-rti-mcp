@@ -22,6 +22,10 @@ class GlobalFabricRTIEnvVarNames:
     use_obo_flow = "USE_OBO_FLOW"
     use_ai_foundry_compat = "FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA"
     cors_allowed_origins = "FABRIC_RTI_CORS_ORIGINS"
+    http_allow_mi = "FABRIC_RTI_HTTP_ALLOW_MI"
+    http_debug_mode = "FABRIC_RTI_HTTP_DEBUG_MODE"
+    http_allowed_hosts = "FABRIC_RTI_HTTP_ALLOWED_HOSTS"
+    http_allowed_origins = "FABRIC_RTI_HTTP_ALLOWED_ORIGINS"
 
 
 DEFAULT_FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
@@ -33,7 +37,11 @@ DEFAULT_FABRIC_RTI_HTTP_HOST = "127.0.0.1"
 DEFAULT_FABRIC_RTI_STATELESS_HTTP = False
 DEFAULT_USE_OBO_FLOW = False
 DEFAULT_FABRIC_RTI_AI_FOUNDRY_COMPATIBILITY_SCHEMA = False
-DEFAULT_FABRIC_RTI_CORS_ORIGINS = "*"
+DEFAULT_FABRIC_RTI_CORS_ORIGINS = ""
+DEFAULT_FABRIC_RTI_HTTP_ALLOW_MI = False
+DEFAULT_FABRIC_RTI_HTTP_DEBUG_MODE = False
+DEFAULT_FABRIC_RTI_HTTP_ALLOWED_HOSTS = ""
+DEFAULT_FABRIC_RTI_HTTP_ALLOWED_ORIGINS = ""
 
 
 @dataclass(slots=True, frozen=True)
@@ -48,6 +56,10 @@ class GlobalFabricRTIConfig:
     use_obo_flow: bool
     use_ai_foundry_compat: bool
     cors_allowed_origins: str
+    http_allow_mi: bool
+    http_debug_mode: bool
+    http_allowed_hosts: str
+    http_allowed_origins: str
 
     @staticmethod
     def from_env() -> GlobalFabricRTIConfig:
@@ -73,6 +85,14 @@ class GlobalFabricRTIConfig:
             cors_allowed_origins=os.getenv(
                 GlobalFabricRTIEnvVarNames.cors_allowed_origins, DEFAULT_FABRIC_RTI_CORS_ORIGINS
             ),
+            http_allow_mi=os.getenv(GlobalFabricRTIEnvVarNames.http_allow_mi, "false").lower() in ("true", "1"),
+            http_debug_mode=os.getenv(GlobalFabricRTIEnvVarNames.http_debug_mode, "false").lower() in ("true", "1"),
+            http_allowed_hosts=os.getenv(
+                GlobalFabricRTIEnvVarNames.http_allowed_hosts, DEFAULT_FABRIC_RTI_HTTP_ALLOWED_HOSTS
+            ),
+            http_allowed_origins=os.getenv(
+                GlobalFabricRTIEnvVarNames.http_allowed_origins, DEFAULT_FABRIC_RTI_HTTP_ALLOWED_ORIGINS
+            ),
         )
 
     @staticmethod
@@ -90,6 +110,10 @@ class GlobalFabricRTIConfig:
             GlobalFabricRTIEnvVarNames.use_obo_flow,
             GlobalFabricRTIEnvVarNames.use_ai_foundry_compat,
             GlobalFabricRTIEnvVarNames.cors_allowed_origins,
+            GlobalFabricRTIEnvVarNames.http_allow_mi,
+            GlobalFabricRTIEnvVarNames.http_debug_mode,
+            GlobalFabricRTIEnvVarNames.http_allowed_hosts,
+            GlobalFabricRTIEnvVarNames.http_allowed_origins,
         ]
         for env_var in env_vars:
             if os.getenv(env_var) is not None:
@@ -149,6 +173,10 @@ class GlobalFabricRTIConfig:
             use_obo_flow=use_obo_flow,
             use_ai_foundry_compat=use_ai_foundry_compat,
             cors_allowed_origins=base_config.cors_allowed_origins,
+            http_allow_mi=base_config.http_allow_mi,
+            http_debug_mode=base_config.http_debug_mode,
+            http_allowed_hosts=base_config.http_allowed_hosts,
+            http_allowed_origins=base_config.http_allowed_origins,
         )
 
 

@@ -16,8 +16,9 @@ from urllib.parse import quote, urlparse
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
 
 from fabric_rti_mcp import __version__  # type: ignore
+from fabric_rti_mcp.auth.auth_context import TokenTarget, credential_source_cache_key, resolve_credential_source
 from fabric_rti_mcp.config import global_config, logger
-from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig, normalize_service_uri_key
+from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig, KustoServiceConfig, normalize_service_uri_key
 from fabric_rti_mcp.services.kusto.kusto_connection import KustoConnection, sanitize_uri
 from fabric_rti_mcp.services.kusto.kusto_formatter import KustoFormatter, KustoResponseFormat
 from fabric_rti_mcp.services.kusto.kusto_watermark import add_watermark
@@ -259,7 +260,9 @@ class KustoConnectionManager:
         This method is the single entry point for accessing connections.
         """
         sanitized_uri = sanitize_uri(cluster_uri)
-        cache_key = normalize_service_uri_key(sanitized_uri)
+        service_cache_key = normalize_service_uri_key(sanitized_uri)
+        credential_source = resolve_credential_source(TokenTarget.KUSTO)
+        cache_key = f"{service_cache_key}|{credential_source_cache_key(credential_source)}"
 
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -268,8 +271,8 @@ class KustoConnectionManager:
         known_services = KustoConfig.get_known_services()
         default_database = _DEFAULT_DB_NAME
 
-        if cache_key in known_services:
-            default_database = known_services[cache_key].default_database or _DEFAULT_DB_NAME
+        if service_cache_key in known_services:
+            default_database = known_services[service_cache_key].default_database or _DEFAULT_DB_NAME
         elif not CONFIG.allow_unknown_services:
             raise ValueError(
                 f"Service URI '{sanitized_uri}' is not in the list of approved services, "
@@ -316,8 +319,12 @@ _BLOCKED_CRP_KEYS = frozenset(
     {
         "request_readonly",
         "request_readonly_hardline",
+        "request_is_agentic",
     }
 )
+
+_AGENT_MARKER_OPTION = "request_is_agentic"
+_AGENT_MARKER_VALUE = True
 
 _TIMESPAN_RE = re.compile(r"^(\d+):(\d{1,2}):(\d{1,2})$")
 
@@ -347,6 +354,7 @@ def _crp(
     crp.client_request_id = f"KFRTI_MCP.{action}:{str(uuid.uuid4())}"  # type: ignore
     if not is_destructive and not ignore_readonly:
         crp.set_option("request_readonly", True)
+        crp.set_option("request_readonly_hardline", True)
 
     # The Azure Kusto SDK expects servertimeout as a timedelta — it adds
     # client_server_delta (also a timedelta) to it in client_base.py.
@@ -367,6 +375,8 @@ def _crp(
                 value = _parse_servertimeout(value)
             crp.set_option(key, value)
 
+    crp.set_option(_AGENT_MARKER_OPTION, _AGENT_MARKER_VALUE)
+
     return crp
 
 
@@ -377,6 +387,7 @@ _FORMAT_DISPATCH: dict[str, Any] = {
     "tsv": KustoFormatter.to_tsv,
     "header_arrays": KustoFormatter.to_header_arrays,
     "kusto_response": KustoFormatter.to_kusto_response,
+    "full_kusto_response": KustoFormatter.to_full_kusto_response,
 }
 
 
@@ -391,6 +402,7 @@ def _execute(
     readonly_override: bool = False,
     database: str | None = None,
     client_request_properties: dict[str, Any] | None = None,
+    log_errors: bool = True,
 ) -> dict[str, Any]:
     caller_frame = inspect.currentframe().f_back  # type: ignore
     action_name = caller_frame.f_code.co_name  # type: ignore
@@ -417,7 +429,8 @@ def _execute(
 
     except Exception as e:
         error_msg = f"Error executing Kusto operation '{action_name}' (correlation ID: {correlation_id}): {str(e)}"
-        logger.error(error_msg)
+        if log_errors:
+            logger.error(error_msg)
         raise RuntimeError(error_msg) from e
 
 
@@ -430,7 +443,25 @@ def kusto_known_services() -> list[dict[str, str]]:
     :return: List of objects, {"service": str, "description": str, "default_database": str}
     """
     services = KustoConfig.get_known_services().values()
+    credential_source = resolve_credential_source(TokenTarget.KUSTO)
+    if CONFIG.should_probe_known_services(credential_source):
+        services = [service for service in services if _known_service_authenticates(service)]
     return [asdict(service) for service in services]
+
+
+def _known_service_authenticates(service: KustoServiceConfig) -> bool:
+    try:
+        _execute(
+            ".show version",
+            service.service_uri,
+            readonly_override=True,
+            database=service.default_database,
+            log_errors=False,
+        )
+        return True
+    except Exception as e:
+        logger.info(f"Filtering Kusto known service '{service.service_uri}' because authentication failed: {e}")
+        return False
 
 
 def kusto_query(
@@ -630,6 +661,33 @@ def kusto_command(
     if not first_stmt.startswith("."):
         raise ValueError(
             "kusto_command is for management commands (starting with '.'). KQL queries should use kusto_query instead."
+        )
+    return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)
+
+
+def kusto_show_command(
+    command: str,
+    cluster_uri: str,
+    database: str | None = None,
+    client_request_properties: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Executes a Kusto .show management command on the specified database.
+    If no database is provided, it will use the default database.
+
+    Only .show commands are accepted.
+
+    :param command: The .show command to execute.
+    :param cluster_uri: The URI of the Kusto cluster.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param client_request_properties: Optional dictionary of additional client request properties.
+    :return: The result of the command execution as a list of dictionaries (json).
+    """
+    first_stmt = _find_first_statement(command)
+    if not first_stmt.startswith(".show "):
+        raise ValueError(
+            "kusto_show_command only supports read-only .show commands. "
+            "For mutating commands (.create, .alter, .drop, etc.), use kusto_command instead."
         )
     return _execute(command, cluster_uri, database=database, client_request_properties=client_request_properties)
 
@@ -874,20 +932,10 @@ def kusto_get_shots(
     client_request_properties: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Retrieves KQL query examples that semantically resemble the user's prompt.
+    Find similar saved KQL queries.
 
-    IMPORTANT: Call this tool BEFORE writing any KQL query. The returned shots contain
-    expert-written KQL examples that reveal the correct databases, tables, column names,
-    and query patterns for this cluster. Without this context, you are likely to query
-    the wrong table or database.
-
-    Use this to:
-    - Discover which databases and tables contain the data you need
-    - Learn the correct column names and schema for a given domain
-    - Find proven query patterns as starting points
-
-    The returned shots come from a curated collection of expert-written examples
-    paired with natural language descriptions.
+    Semantic search returns existing query examples that are relevant to the user's
+    prompt, so they can be used as starting points for similar requests.
 
     :param prompt: The user prompt to find similar shots for.
     :param shots_table_name: Name of the table containing the shots. The table should have "EmbeddingText" (string)

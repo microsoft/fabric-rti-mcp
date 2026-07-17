@@ -86,7 +86,7 @@ The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `
 
 ### Available tools
 
-#### Eventhouse (Kusto) - 13 Tools:
+#### Eventhouse (Kusto) - 13 Tools + 1 Optional:
 - **`kusto_known_services`** - List all available Kusto services configured in the MCP
 - **`kusto_query`** - Execute KQL queries on the specified database
 - **`kusto_command`** - Execute Kusto management commands (`.show`, `.create`, `.alter`, `.drop`)
@@ -96,7 +96,7 @@ The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `
 - **`kusto_graph_query`** - Execute graph queries using snapshots or transient graphs
 - **`kusto_sample_entity`** - Retrieve sample records from a table, external table, materialized view, or function
 - **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
-- **`kusto_get_shots`** - Retrieve semantically similar query examples from a shots table using AI embeddings
+- **`kusto_get_shots`** *(when `KUSTO_SHOTS_TABLE` is configured)* - Find similar saved KQL queries
 - **`kusto_deeplink_from_query`** - Generate a deeplink URL to open a KQL query in Azure Data Explorer Web Explorer or Microsoft Fabric query workbench
 - **`kusto_show_queryplan`** - Retrieve the execution plan for a KQL query without running it. Returns planning stats (PlanSize, RelopSize), the logical operator tree, and execution hints (estimated row counts, concurrency/spread hints, per-shard scan info with filter detection). Useful for comparing query approaches, catching expensive joins, and validating query syntax before execution.
 - **`kusto_diagnostics`** - Run a best-effort suite of cluster diagnostic commands and return a unified summary. Sections: capacity (resource slots), cluster (nodes/hardware), principal roles (caller permissions), internal diagnostics (health/utilization), workload groups, rowstores, and ingestion failures (last 24h). Each section runs independently — permission failures on one section don't block others.
@@ -298,10 +298,13 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
 | `FABRIC_RTI_KUSTO_CUSTOM_WATERMARK` | Kusto | Opt-in toggle for query watermarking. When set (use `{}` for default-only), Kusto queries are prefixed with a JSON comment. Accepts a JSON object of custom key-value pairs to include. | Unset (no watermark) | `{}` or `{"team": "my-team", "app_id": "env:MY_APP_ID"}` |
-| `KUSTO_SHOTS_TABLE` | Kusto | Default shots table name for `kusto_get_shots` when not provided as a parameter | None | `MyDatabase.ShotsTable` |
+| `KUSTO_SHOTS_TABLE` | Kusto | Enable `kusto_get_shots` and set its default shots table | None | `MyDatabase.ShotsTable` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
+| `FABRIC_RTI_ALLOWED_TOOLS` | Global | Comma-separated service names or full tool names to expose | All tools | `kusto,map_get` |
 | `FABRIC_RTI_KUSTO_DEEPLINK_STYLE` | Kusto | Override auto-detection of deeplink style | None | `adx` or `fabric` |
+
+`FABRIC_RTI_ALLOWED_TOOLS` accepts service names derived from the registered `*_tools` modules and full tool names.
 
 ### Embedding Endpoint Configuration
 
@@ -360,7 +363,8 @@ This produces a watermark like:
 
 ## 🔑 Authentication
 
-The MCP Server seamlessly integrates with your host operating system's authentication mechanisms. We use Azure Identity via [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac), which tries these authentication methods in order:
+In `stdio` mode (local), the MCP Server integrates with your host operating system's authentication mechanisms.
+We use Azure Identity via [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac), which tries these authentication methods in order:
 
 1. **Environment Variables** (`EnvironmentCredential`) - Perfect for CI/CD pipelines
 2. **Visual Studio** (`VisualStudioCredential`) - Uses your Visual Studio credentials
@@ -369,7 +373,14 @@ The MCP Server seamlessly integrates with your host operating system's authentic
 5. **Azure Developer CLI** (`AzureDeveloperCliCredential`) - Uses your azd login
 6. **Interactive Browser** (`InteractiveBrowserCredential`) - Falls back to browser-based login if needed
 
-If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials.
+If you're already logged in through any of these methods, the Fabric RTI MCP Server will automatically use those credentials in `stdio` mode.
+
+This MCP server is not intended to be exposed directly as a production HTTP endpoint.
+If you choose to run it over HTTP, the deployment must provide its own security boundary before requests reach this server.
+For example, put any Entra-aware authentication layer in front of it.
+The HTTP configuration options below are guardrails and local-development conveniences; they are not a substitute for a production authentication boundary.
+By default, HTTP requests must provide an `Authorization` bearer token; the server performs deployment-agnostic bearer token shape screening and forwards the bearer to downstream Fabric/Kusto services, or exchanges it with OBO when OBO is enabled.
+It does not perform cryptographic Entra JWT signature, issuer, tenant, or audience validation.
 
 ## HTTP Mode Configuration for MCP Server
 
@@ -382,8 +393,27 @@ When the MCP server is running locally to the agent in HTTP mode or is deployed 
 | `FABRIC_RTI_HTTP_PORT` | Port for HTTP server | `3000` | `8080` |
 | `FABRIC_RTI_HTTP_PATH` | HTTP path for MCP endpoint | `/mcp` | `/mcp` |
 | `FABRIC_RTI_STATELESS_HTTP` | Whether to use stateless HTTP mode | `false` | `true` |
+| `FABRIC_RTI_HTTP_ALLOW_MI` | Allow HTTP requests without a bearer to use Managed Identity | `false` | `true` |
+| `FABRIC_RTI_HTTP_DEBUG_MODE` | Local HTTP testing mode that allows local process credentials and permissive CORS | `false` | `true` |
+| `FABRIC_RTI_HTTP_ALLOWED_HOSTS` | Host allow-list for HTTP DNS-rebinding protection | empty | `mcp.example.com:*,127.0.0.1:*` |
+| `FABRIC_RTI_HTTP_ALLOWED_ORIGINS` | Origin allow-list for HTTP DNS-rebinding protection | empty | `https://mcp.example.com` |
+| `FABRIC_RTI_CORS_ORIGINS` | CORS origins. If unset, HTTP uses loopback origins; debug mode uses `*` | empty | `https://mcp.example.com` |
+| `FABRIC_RTI_KUSTO_KNOWN_SERVICES_PROBE` | Filter `kusto_known_services` by probing configured services. Values: `auto`, `always`, `never` | `auto` | `always` |
 
-HTTP clients connecting to the server need to include the appropriate authentication token in the request headers:
+HTTP credential behavior:
+
+| Mode | Behavior |
+|------|----------|
+| Default HTTP | Requires a bearer token. No local process credentials are used when the bearer is missing. |
+| `USE_OBO_FLOW=true` | Exchanges the request bearer for the configured Fabric/Kusto audience. Forged tokens fail the OBO exchange. |
+| `FABRIC_RTI_HTTP_ALLOW_MI=true` | Allows missing bearer tokens and uses `ManagedIdentityCredential` only. Use only behind a trusted hosting/network/auth boundary. |
+| `FABRIC_RTI_HTTP_DEBUG_MODE=true` | Restores local HTTP testing convenience with local process credentials, permissive CORS, and unsafe non-loopback binds. Do not use in production. |
+
+Binding HTTP to a non-loopback address such as `0.0.0.0` exposes the MCP listener outside the local process boundary.
+Non-loopback HTTP without an explicit host allow-list is allowed only in `FABRIC_RTI_HTTP_DEBUG_MODE`.
+This exception is for local testing only; it does not make direct HTTP exposure production-safe.
+
+HTTP clients connecting to the server need to include the appropriate authentication token in the request headers unless `FABRIC_RTI_HTTP_ALLOW_MI` or `FABRIC_RTI_HTTP_DEBUG_MODE` is explicitly enabled:
 
 ```python
 # Example from test_kusto_tools_live_http.py
@@ -420,6 +450,7 @@ Your credentials are always handled securely through the official [Azure Identit
 
 MCP as a phenomenon is very novel and cutting-edge. As with all new technology standards, consider doing a security review to ensure any systems that integrate with MCP servers follow all regulations and standards your system is expected to adhere to. This includes not only the Azure MCP Server, but any MCP client/agent that you choose to implement down to the model provider.
 
+You should follow Microsoft security guidance for MCP servers, including enabling Entra ID authentication, secure token management, and network isolation. Refer to [Microsoft Security Documentation](https://learn.microsoft.com/en-us/azure/api-management/secure-mcp-servers) for details.
 
 ## 👥 Contributing
 
@@ -430,6 +461,21 @@ the rights to use your contribution. For details, visit https://cla.opensource.m
 When you submit a pull request, a CLA bot will automatically determine whether you need to provide
 a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
 provided by the bot. You will only need to do this once across all repos using our CLA.
+
+## Permissions and Risk
+MCP clients can invoke operations based on the user’s Fabric Role-Based Access Control (RBAC) permissions. Autonomous or misconfigured clients may perform destructive actions. You should review and apply least-privilege RBAC roles and implement safeguards before deployment. Certain safeguards, such as flags to prevent destructive operations, are not standardized in the MCP specification and may not be supported by all clients. 
+
+## Compliance Responsibility
+This MCP server may be installed, used and share data with clients and services, such as third party LLMs, AI agents or services that operate outside Fabric’s compliance boundaries. You are responsible for ensuring that any integration complies with applicable organizational, regulatory, and contractual requirements.
+
+## Third Party Components
+This MCP server may use or depend on third party components.  You are responsible for reviewing and complying with the licenses and security posture of any third-party components.
+
+## Export Control
+Use of this software must comply with all applicable export laws and regulations, including U.S. Export Administration Regulations and local jurisdiction requirements.
+
+## No Warranty / Limitation of Liability
+This software is provided “as is” without warranties or conditions of any kind, either express or implied. Microsoft shall not be liable for any damages arising from use, misuse, or misconfiguration of this software.
 
 ## 🤝 Code of Conduct
 

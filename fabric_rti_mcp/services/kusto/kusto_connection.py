@@ -1,34 +1,8 @@
-import time
-from contextvars import ContextVar
-from typing import Any
-
-from azure.core.credentials import AccessToken, TokenCredential
-from azure.identity import DefaultAzureCredential
+from azure.core.credentials import TokenCredential
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.ingest import KustoStreamingIngestClient
 
-# Thread-safe context variable to store the current request's auth token
-_request_token: ContextVar[str | None] = ContextVar("_request_token", default=None)
-
-
-def set_auth_token(token: str | None) -> None:
-    """Set the auth token for the current request context"""
-    _request_token.set(token)
-
-
-def get_auth_token() -> str | None:
-    """Get the auth token from the current request context"""
-    return _request_token.get()
-
-
-class BearerTokenCredential(TokenCredential):
-    """A credential that reads the bearer token from the current request's ContextVar on each call."""
-
-    def get_token(self, *scopes: str, **kwargs: Any) -> AccessToken:
-        token = get_auth_token()
-        if not token:
-            raise ValueError("No auth token available in request context")
-        return AccessToken(token=token, expires_on=int(time.time()) + 3600)
+from fabric_rti_mcp.auth.auth_context import TokenTarget, get_credential
 
 
 class KustoConnection:
@@ -50,16 +24,7 @@ class KustoConnection:
         self.default_database = default_database
 
     def _get_credential(self, login_endpoint: str) -> TokenCredential:
-        # Check if we have a bearer token from HTTP auth
-        token = get_auth_token()
-        if token:
-            return BearerTokenCredential()
-
-        return DefaultAzureCredential(
-            exclude_shared_token_cache_credential=True,
-            exclude_interactive_browser_credential=False,
-            authority=login_endpoint,
-        )
+        return get_credential(TokenTarget.KUSTO, authority=login_endpoint)
 
 
 def sanitize_uri(cluster_uri: str) -> str:

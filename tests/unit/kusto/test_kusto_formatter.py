@@ -407,6 +407,68 @@ class TestParsingFunctionality:
         assert result.format == "kusto_response"
         assert result.data == {"columns": [], "rows": []}
 
+    def test_KustoFormatter_to_full_kusto_response_with_all_tables(self) -> None:
+        """Test full_kusto_response preserves primary, properties, and status tables."""
+        primary = Mock()
+        primary.table_name = "PrimaryResult"
+        primary.table_kind.value = "PrimaryResult"
+        primary.table_id = "primary-id"
+        primary.raw_columns = [{"ColumnName": "State", "DataType": "String"}]
+        primary.raw_rows = [["TEXAS"]]
+
+        properties = Mock()
+        properties.table_name = "@ExtendedProperties"
+        properties.table_kind.value = "QueryProperties"
+        properties.table_id = "properties-id"
+        properties.raw_columns = [{"ColumnName": "Value", "DataType": "String"}]
+        properties.raw_rows = [['{"resource_usage":{"cpu":{"total cpu":"00:00:01"}}}']]
+
+        status = Mock()
+        status.table_name = "QueryStatus"
+        status.table_kind.value = "QueryCompletionInformation"
+        status.table_id = "status-id"
+        status.raw_columns = [{"ColumnName": "Severity", "DataType": "Int32"}]
+        status.raw_rows = [[4]]
+
+        mock_result_set = Mock(spec=KustoResponseDataSet)
+        mock_result_set.tables = [primary, properties, status]
+
+        result = KustoFormatter.to_full_kusto_response(mock_result_set)
+
+        assert result.format == "full_kusto_response"
+        assert result.data == {
+            "tables": [
+                {
+                    "name": "PrimaryResult",
+                    "kind": "PrimaryResult",
+                    "id": "primary-id",
+                    "columns": primary.raw_columns,
+                    "rows": primary.raw_rows,
+                },
+                {
+                    "name": "@ExtendedProperties",
+                    "kind": "QueryProperties",
+                    "id": "properties-id",
+                    "columns": properties.raw_columns,
+                    "rows": properties.raw_rows,
+                },
+                {
+                    "name": "QueryStatus",
+                    "kind": "QueryCompletionInformation",
+                    "id": "status-id",
+                    "columns": status.raw_columns,
+                    "rows": status.raw_rows,
+                },
+            ]
+        }
+
+    def test_KustoFormatter_to_full_kusto_response_empty(self) -> None:
+        """Test full_kusto_response with no result tables."""
+        result = KustoFormatter.to_full_kusto_response(None)
+
+        assert result.format == "full_kusto_response"
+        assert result.data == {"tables": []}
+
     def test_parse_kusto_response_format(self) -> None:
         """Test parsing kusto_response format back to canonical JSON."""
         data = {
@@ -426,3 +488,32 @@ class TestParsingFunctionality:
         """Test parsing kusto_response with empty columns."""
         result = KustoFormatter.parse({"format": "kusto_response", "data": {"columns": [], "rows": []}})
         assert result == []
+
+    def test_parse_full_kusto_response_format(self) -> None:
+        """Test parsing full_kusto_response returns primary result rows."""
+        data = {
+            "tables": [
+                {
+                    "name": "PrimaryResult",
+                    "kind": "PrimaryResult",
+                    "columns": [
+                        {"ColumnName": "State", "DataType": "String"},
+                        {"ColumnName": "Count", "DataType": "Int64"},
+                    ],
+                    "rows": [["TEXAS", 4701], ["KANSAS", 3166]],
+                },
+                {
+                    "name": "@ExtendedProperties",
+                    "kind": "QueryProperties",
+                    "columns": [{"ColumnName": "Value", "DataType": "String"}],
+                    "rows": [["{}"]],
+                },
+            ]
+        }
+
+        result = KustoFormatter.parse({"format": "full_kusto_response", "data": data})
+
+        assert result == [
+            {"State": "TEXAS", "Count": 4701},
+            {"State": "KANSAS", "Count": 3166},
+        ]
