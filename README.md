@@ -86,7 +86,7 @@ The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `
 
 ### Available tools
 
-#### Eventhouse (Kusto) - 13 Tools:
+#### Eventhouse (Kusto) - 13 Tools + 1 Optional:
 - **`kusto_known_services`** - List all available Kusto services configured in the MCP
 - **`kusto_query`** - Execute KQL queries on the specified database
 - **`kusto_command`** - Execute Kusto management commands (`.show`, `.create`, `.alter`, `.drop`)
@@ -96,7 +96,7 @@ The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `
 - **`kusto_graph_query`** - Execute graph queries using snapshots or transient graphs
 - **`kusto_sample_entity`** - Retrieve sample records from a table, external table, materialized view, or function
 - **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
-- **`kusto_get_shots`** - Retrieve semantically similar query examples using local SLM or Azure OpenAI embeddings
+- **`kusto_get_shots`** *(when `KUSTO_SHOTS_TABLE` is configured)* - Find semantically similar saved KQL queries using local SLM or Azure OpenAI embeddings
 - **`kusto_deeplink_from_query`** - Generate a deeplink URL to open a KQL query in Azure Data Explorer Web Explorer or Microsoft Fabric query workbench
 - **`kusto_show_queryplan`** - Retrieve the execution plan for a KQL query without running it. Returns planning stats (PlanSize, RelopSize), the logical operator tree, and execution hints (estimated row counts, concurrency/spread hints, per-shard scan info with filter detection). Useful for comparing query approaches, catching expensive joins, and validating query syntax before execution.
 - **`kusto_diagnostics`** - Run a best-effort suite of cluster diagnostic commands and return a unified summary. Sections: capacity (resource slots), cluster (nodes/hardware), principal roles (caller permissions), internal diagnostics (health/utilization), workload groups, rowstores, and ingestion failures (last 24h). Each section runs independently — permission failures on one section don't block others.
@@ -338,12 +338,15 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_KNOWN_SERVICES` | Kusto | JSON array of preconfigured Kusto services | None | `[{"service_uri":"https://cluster1.kusto.windows.net","default_database":"DB1","description":"Prod"}]` |
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
-| `KUSTO_SHOTS_TABLE` | Kusto | Default shots table name for `kusto_get_shots` when not provided as a parameter | None | `MyDatabase.ShotsTable` |
+| `KUSTO_SHOTS_TABLE` | Kusto | Enable `kusto_get_shots` and set its default shots table | None | `MyDatabase.ShotsTable` |
 | `KUSTO_SHOTS_EMBEDDING_METHOD` | Kusto | Default embedding method for `kusto_get_shots` | `aoai` | `slm` or `aoai` |
 | `KUSTO_SHOTS_SLM_MODEL` | Kusto | Default SLM model for `kusto_get_shots` | `harrier-v1-270m` | `harrier-v1-270m` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
+| `FABRIC_RTI_ALLOWED_TOOLS` | Global | Comma-separated service names or full tool names to expose | All tools | `kusto,map_get` |
 | `FABRIC_RTI_KUSTO_DEEPLINK_STYLE` | Kusto | Override auto-detection of deeplink style | None | `adx` or `fabric` |
+
+`FABRIC_RTI_ALLOWED_TOOLS` accepts service names derived from the registered `*_tools` modules and full tool names.
 
 ### Shots Embedding Configuration
 

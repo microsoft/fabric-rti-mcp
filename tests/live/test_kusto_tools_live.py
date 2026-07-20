@@ -33,11 +33,12 @@ EXPECTED_KUSTO_TOOLS = [
     "kusto_graph_query",
     "kusto_sample_entity",
     "kusto_ingest_inline_into_table",
-    "kusto_get_shots",
     "kusto_deeplink_from_query",
     "kusto_show_queryplan",
     "kusto_diagnostics",
 ]
+if os.getenv("KUSTO_SHOTS_TABLE"):
+    EXPECTED_KUSTO_TOOLS.append("kusto_get_shots")
 
 
 @dataclass
@@ -579,61 +580,53 @@ class KustoToolsLiveTester:
         print(f"✅ Diagnostics completed; successful sections: {successful_sections}")
 
     async def test_get_shots(self) -> None:
-        """Test kusto_get_shots when configured, otherwise verify its validation path."""
+        """Test kusto_get_shots when configured."""
         print("\n🎯 Testing kusto_get_shots...")
         if not self.client:
             raise RuntimeError("Client not initialized")
 
-        shots_table = os.getenv("KUSTO_LIVE_SHOTS_TABLE") or os.getenv("KUSTO_SHOTS_TABLE")
-        embedding_method = os.getenv("KUSTO_LIVE_SHOTS_EMBEDDING_METHOD", "aoai")
+        shots_table = os.getenv("KUSTO_SHOTS_TABLE")
+        if not shots_table:
+            print("⚠️  Skipping kusto_get_shots: KUSTO_SHOTS_TABLE is not configured")
+            return
+
+        embedding_method = os.getenv("KUSTO_LIVE_SHOTS_EMBEDDING_METHOD") or os.getenv(
+            "KUSTO_SHOTS_EMBEDDING_METHOD", "aoai"
+        )
         embedding_endpoint = os.getenv("AZ_OPENAI_EMBEDDING_ENDPOINT")
         slm_model_name = os.getenv("KUSTO_LIVE_SHOTS_SLM_MODEL", "harrier-v1-270m")
 
-        if shots_table and embedding_method:
-            normalized_method = embedding_method.strip().lower()
-            tool_arguments = {
-                "prompt": "Find a few storm events in Texas",
-                "cluster_uri": self.test_cluster_uri,
-                "database": self.test_database,
-                "shots_table_name": shots_table,
-                "embedding_method": normalized_method,
-                "sample_size": 1,
-            }
+        normalized_method = embedding_method.strip().lower()
+        tool_arguments = {
+            "prompt": "Find a few storm events in Texas",
+            "cluster_uri": self.test_cluster_uri,
+            "database": self.test_database,
+            "shots_table_name": shots_table,
+            "embedding_method": normalized_method,
+            "sample_size": 1,
+        }
 
-            if normalized_method == "aoai":
-                if not embedding_endpoint:
-                    print("⚠️  Skipping AOAI kusto_get_shots call: AZ_OPENAI_EMBEDDING_ENDPOINT is not configured")
-                    return
-                tool_arguments["embedding_endpoint"] = embedding_endpoint
-            elif normalized_method == "slm":
-                tool_arguments["slm_model_name"] = slm_model_name
-            else:
-                raise ValueError("KUSTO_LIVE_SHOTS_EMBEDDING_METHOD must be 'slm' or 'aoai'")
-
-            result = await self.client.call_tool(
-                "kusto_get_shots",
-                tool_arguments,
-            )
-
-            if not result.get("success"):
-                raise AssertionError(f"kusto_get_shots failed: {result}")
-
-            shots_result = self._payload(result)
-            parsed_data = KustoFormatter.parse(shots_result) or []
-            print(f"✅ kusto_get_shots returned {len(parsed_data)} shot(s)")
-            return
+        if normalized_method == "aoai":
+            if not embedding_endpoint:
+                print("⚠️  Skipping AOAI kusto_get_shots call: AZ_OPENAI_EMBEDDING_ENDPOINT is not configured")
+                return
+            tool_arguments["embedding_endpoint"] = embedding_endpoint
+        elif normalized_method == "slm":
+            tool_arguments["slm_model_name"] = slm_model_name
+        else:
+            raise ValueError("KUSTO_LIVE_SHOTS_EMBEDDING_METHOD must be 'slm' or 'aoai'")
 
         result = await self.client.call_tool(
             "kusto_get_shots",
-            {
-                "prompt": "Find a few storm events in Texas",
-                "cluster_uri": self.test_cluster_uri,
-                "database": self.test_database,
-            },
+            tool_arguments,
         )
-        assert not result.get("success"), "Expected kusto_get_shots to require a shots table when not configured"
-        assert "shots_table_name" in result.get("error", ""), f"Unexpected validation error: {result}"
-        print("✅ kusto_get_shots validation path confirmed")
+
+        if not result.get("success"):
+            raise AssertionError(f"kusto_get_shots failed: {result}")
+
+        shots_result = self._payload(result)
+        parsed_data = KustoFormatter.parse(shots_result) or []
+        print(f"✅ kusto_get_shots returned {len(parsed_data)} shot(s)")
 
     async def test_describe_database(self) -> None:
         """Test kusto_describe_database tool."""
@@ -833,7 +826,7 @@ class KustoToolsLiveTester:
             await self._run_test("kusto_deeplink_from_query", optional_scope, False, self.test_deeplink_from_query)
             await self._run_test("kusto_show_queryplan", optional_scope, False, self.test_show_queryplan)
             await self._run_test("kusto_diagnostics", optional_scope, False, self.test_diagnostics)
-            await self._run_test("kusto_get_shots validation", optional_scope, False, self.test_get_shots)
+            await self._run_test("kusto_get_shots", optional_scope, False, self.test_get_shots)
             await self._run_test("kusto_describe_database", optional_scope, False, self.test_describe_database)
             await self._run_test(
                 "kusto_describe_database_entity",

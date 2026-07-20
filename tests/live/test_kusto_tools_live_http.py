@@ -313,8 +313,9 @@ class KustoHttpClientTester:
                 "kusto_graph_query",
                 "kusto_sample_entity",
                 "kusto_ingest_inline_into_table",
-                "kusto_get_shots",
             ]
+            if os.getenv("KUSTO_SHOTS_TABLE"):
+                expected_kusto_tools.append("kusto_get_shots")
 
             missing_tools = set(expected_kusto_tools) - set(kusto_tools)
             if missing_tools:
