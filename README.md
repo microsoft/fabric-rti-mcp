@@ -96,7 +96,7 @@ The skill references the Fabric RTI MCP tools (`kusto_query`, `kusto_command`, `
 - **`kusto_graph_query`** - Execute graph queries using snapshots or transient graphs
 - **`kusto_sample_entity`** - Retrieve sample records from a table, external table, materialized view, or function
 - **`kusto_ingest_inline_into_table`** - Ingest inline CSV data into a specified table
-- **`kusto_get_shots`** *(when `KUSTO_SHOTS_TABLE` is configured)* - Find similar saved KQL queries
+- **`kusto_get_shots`** *(when `KUSTO_SHOTS_TABLE` is configured)* - Find semantically similar saved KQL queries using local SLM or Azure OpenAI embeddings
 - **`kusto_deeplink_from_query`** - Generate a deeplink URL to open a KQL query in Azure Data Explorer Web Explorer or Microsoft Fabric query workbench
 - **`kusto_show_queryplan`** - Retrieve the execution plan for a KQL query without running it. Returns planning stats (PlanSize, RelopSize), the logical operator tree, and execution hints (estimated row counts, concurrency/spread hints, per-shard scan info with filter detection). Useful for comparing query approaches, catching expensive joins, and validating query syntax before execution.
 - **`kusto_diagnostics`** - Run a best-effort suite of cluster diagnostic commands and return a unified summary. Sections: capacity (resource slots), cluster (nodes/hardware), principal roles (caller permissions), internal diagnostics (health/utilization), workload groups, rowstores, and ingestion failures (last 24h). Each section runs independently — permission failures on one section don't block others.
@@ -181,7 +181,7 @@ The process should end with the below settings in your `settings.json` or your `
 }
 ```
 
-> **Note**: All environment variables are optional. The `KUSTO_SERVICE_URI` and `KUSTO_SERVICE_DEFAULT_DB` provide default cluster and database settings. The `AZ_OPENAI_EMBEDDING_ENDPOINT` is only needed for semantic search functionality in the `kusto_get_shots` tool.
+> **Note**: All environment variables are optional. The `KUSTO_SERVICE_URI` and `KUSTO_SERVICE_DEFAULT_DB` provide default cluster and database settings. `AZ_OPENAI_EMBEDDING_ENDPOINT` configures the default AOAI embedding method used by `kusto_get_shots`.
 
 #### From GitHub Copilot CLI
 
@@ -261,13 +261,54 @@ pip install -e ".[dev]"
 Follow the [Manual Install](#🔧-manual-install-install-from-source) instructions.
 
 ### Attach the debugger
-Use the `Python: Attach` configuration in your `launch.json` to attach to the running server. 
-Once VS Code picks up the server and starts it, navigate to its output: 
-1. Open command palette (Ctrl+Shift+P) and run the command `MCP: List Servers`
-2. Navigate to `fabric-rti-mcp` and select `Show Output`
-3. Pick up the process ID (PID) of the server from the output
-4. Run the `Python: Attach` configuration in your `launch.json` file, and paste the PID of the server in the prompt
-5. The debugger will attach to the server process, and you can start debugging
+
+Start the MCP server normally from the client that will invoke its tools, then set a breakpoint on an executable
+line. If you changed the Python source after the server started, restart the MCP server before attaching.
+
+#### Option 1: Attach by process ID
+
+Press F5 and select `Python Debugger: Attach by Process ID`. VS Code needs the PID of the Python process that is
+running `-m fabric_rti_mcp.server`. You can identify it in either of these ways:
+
+1. **VS Code process picker:** Select the matching Python process from the list. If several related processes are
+   shown, select the deepest Python child running `-m fabric_rti_mcp.server`, not the `uv` wrapper.
+2. **Manual PID lookup:** If VS Code asks you to enter a PID instead of displaying the process list, find it with
+   Task Manager or PowerShell:
+   - In Task Manager, open **Details**, enable the **PID** and **Command line** columns, and locate the matching
+     `python.exe` process.
+   - In PowerShell, run:
+
+     ```powershell
+     $servers = @(Get-CimInstance Win32_Process | Where-Object {
+         $_.Name -eq "python.exe" -and
+         $_.CommandLine -match "-m\s+fabric_rti_mcp\.server"
+     })
+
+     $servers |
+         Where-Object { $_.ProcessId -notin $servers.ParentProcessId } |
+         Sort-Object CreationDate -Descending |
+         Select-Object -First 1 ProcessId, CommandLine
+     ```
+
+   Enter the returned `ProcessId` in the VS Code prompt.
+
+On newer Windows versions, `wmic.exe` is disabled or removed. Some Python debugger versions still use it to
+populate the process picker, causing process enumeration to fail. The manual methods above do not require WMIC.
+
+#### Option 2: Inject debugpy and attach on port 5678
+
+This repository includes the `Python Debugger: Attach to Fabric RTI MCP` launch configuration and its
+`Inject debugger into Fabric RTI MCP` pre-launch task. This Windows-specific option uses PowerShell to find the
+deepest Fabric RTI MCP Python process, inject `debugpy`, and connect VS Code to `127.0.0.1:5678`.
+
+1. Ensure the MCP server is already running.
+2. Press F5 and select `Python Debugger: Attach to Fabric RTI MCP`.
+3. Wait for the VS Code debug toolbar to appear.
+4. Invoke the target tool from the same MCP client session that started the attached server.
+
+Do not add `debugpy --listen` to the MCP server command. Some clients may start or reconnect to the command more
+than once, which can cause port collisions. If multiple MCP client sessions are running, close the unrelated
+sessions first so the debugger attaches to the intended server process.
 
 
 ## 🧪 Test the MCP Server
@@ -293,11 +334,13 @@ None - the server will work with default settings for demo purposes.
 |----------|---------|-------------|---------|---------|
 | `KUSTO_SERVICE_URI` | Kusto | Default Kusto cluster URI | None | `https://mycluster.westus.kusto.windows.net` |
 | `KUSTO_SERVICE_DEFAULT_DB` | Kusto | Default database name for Kusto queries | `NetDefaultDB` | `MyDatabase` |
-| `AZ_OPENAI_EMBEDDING_ENDPOINT` | Kusto | Azure OpenAI embedding endpoint for semantic search in `kusto_get_shots` | None | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate` |
+| `AZ_OPENAI_EMBEDDING_ENDPOINT` | Kusto | Azure OpenAI endpoint used when `kusto_get_shots` selects `embedding_method="aoai"` | None | `https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate` |
 | `KUSTO_KNOWN_SERVICES` | Kusto | JSON array of preconfigured Kusto services | None | `[{"service_uri":"https://cluster1.kusto.windows.net","default_database":"DB1","description":"Prod"}]` |
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
 | `KUSTO_SHOTS_TABLE` | Kusto | Enable `kusto_get_shots` and set its default shots table | None | `MyDatabase.ShotsTable` |
+| `KUSTO_SHOTS_EMBEDDING_METHOD` | Kusto | Default embedding method for `kusto_get_shots` | `aoai` | `slm` or `aoai` |
+| `KUSTO_SHOTS_SLM_MODEL` | Kusto | Default SLM model for `kusto_get_shots` | `harrier-v1-270m` | `harrier-v1-270m` |
 | `FABRIC_API_BASE` | Global | Base URL for Microsoft Fabric API | `https://api.fabric.microsoft.com/v1` | `https://api.fabric.microsoft.com/v1` |
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
 | `FABRIC_RTI_ALLOWED_TOOLS` | Global | Comma-separated service names or full tool names to expose | All tools | `kusto,map_get` |
@@ -305,9 +348,65 @@ None - the server will work with default settings for demo purposes.
 
 `FABRIC_RTI_ALLOWED_TOOLS` accepts service names derived from the registered `*_tools` modules and full tool names.
 
-### Embedding Endpoint Configuration
+### Shots Embedding Configuration
 
-The `AZ_OPENAI_EMBEDDING_ENDPOINT` is used by the semantic search functionality (e.g., `kusto_get_shots` function) to find similar query examples. 
+All supported AOAI and SLM embedding paths return L2-normalized vectors. `kusto_get_shots` uses their known unit
+magnitudes when calculating cosine similarity to avoid recalculating vector magnitudes for every shot. Custom or
+manually generated `EmbeddingVector` values must therefore also be L2-normalized.
+
+#### SLM embeddings
+
+`kusto_get_shots` defaults to Azure OpenAI embeddings for backward compatibility. To use local SLM embeddings,
+set `embedding_method` to `slm` for an individual call, or set `KUSTO_SHOTS_EMBEDDING_METHOD=slm` for the MCP
+server. Configure the server's default model with `KUSTO_SHOTS_SLM_MODEL`; it defaults to
+`harrier-v1-270m`. Explicit tool arguments override these server defaults. The queried database must contain a
+pre-deployed `slm_embeddings_fl` function. Follow the [SLM embeddings function documentation](https://learn.microsoft.com/en-us/kusto/functions-library/slm-embeddings-fl)
+and select either **Azure Data Explorer** or **Microsoft Fabric** from the **Version** selector in the left pane
+for the correct deployment instructions.
+
+The documented `slm_embeddings_fl` implementation supports:
+
+| Model | Vector dimensions |
+|---|---:|
+| `jina-v2-small` | 512 |
+| `e5-small-v2` | 384 |
+| `harrier-v1-270m` (default) | 640 |
+
+Example SLM arguments:
+
+```json
+{
+  "prompt": "Find a few storm events in Texas",
+  "cluster_uri": "https://mycluster.westus.kusto.windows.net",
+  "database": "MyDatabase",
+  "shots_table_name": "Shots",
+  "embedding_method": "slm",
+  "slm_model_name": "harrier-v1-270m"
+}
+```
+
+The SLM prompt is embedded with the `query:` prefix. The table's `EmbeddingVector` values must use the same model and vector dimension; for retrieval models, embed the stored `EmbeddingText` corpus with the corresponding `passage:` convention.
+
+The MCP tool does not deploy the function or migrate existing shot vectors.
+
+#### Azure OpenAI embeddings
+
+AOAI is the default embedding method. Follow the [AI embeddings plugin documentation](https://learn.microsoft.com/en-us/kusto/query/ai-embeddings-plugin) and select either **Azure Data Explorer** or **Microsoft Fabric** from the **Version** selector in the left pane for the applicable setup instructions.
+
+Example AOAI arguments:
+
+```json
+{
+  "prompt": "Find a few storm events in Texas",
+  "cluster_uri": "https://mycluster.westus.kusto.windows.net",
+  "database": "MyDatabase",
+  "shots_table_name": "Shots",
+  "embedding_method": "aoai",
+  "embedding_endpoint": "https://your-resource.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-10-21;impersonate"
+}
+```
+
+If `embedding_endpoint` isn't supplied, AOAI calls use `AZ_OPENAI_EMBEDDING_ENDPOINT`.
 
 **Format Requirements:**
 ```
@@ -328,7 +427,9 @@ https://{your-openai-resource}.openai.azure.com/openai/deployments/{deployment-n
 ### Configuration of Shots Table
 The `kusto_get_shots` tool retrieves shots that are most similar to your prompt from the shots table. This function requires configuration of:
 - **Shots table**: Should have an "EmbeddingText" (string) column containing the natural language prompt, "AugmentedText" (string) column containing the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector of the EmbeddingText.
-- **Azure OpenAI embedding endpoint**: Used to create embedding vectors for your prompt. Note that this endpoint must use the same model that was used for creating the "EmbeddingVector" column in the shots table.
+- **Matching embeddings**: The prompt and `EmbeddingVector` column must use the same provider, model, vector dimension, and compatible query/corpus conventions.
+
+Existing AOAI calls remain backward compatible. When `embedding_method="slm"` is selected, `embedding_endpoint` is ignored.
 
 ## 🔑 Authentication
 

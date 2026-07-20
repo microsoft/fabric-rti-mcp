@@ -188,6 +188,21 @@ def test_kusto_known_services_probe_mode_env_overrides_default() -> None:
     assert config.should_probe_known_services(CredentialSource.LOCAL_DEVELOPER) is True
 
 
+@patch.dict(
+    "os.environ",
+    {
+        "KUSTO_SHOTS_EMBEDDING_METHOD": "slm",
+        "KUSTO_SHOTS_SLM_MODEL": "harrier-v1-270m",
+    },
+    clear=True,
+)
+def test_kusto_shots_embedding_defaults_load_from_env() -> None:
+    config = KustoConfig.from_env()
+
+    assert config.shots_embedding_method == "slm"
+    assert config.shots_slm_model == "harrier-v1-270m"
+
+
 @patch.dict("os.environ", {"FABRIC_RTI_KUSTO_RESPONSE_FORMAT": "full_kusto_response"}, clear=True)
 def test_response_format_env_accepts_full_kusto_response() -> None:
     config = KustoConfig.from_env()
