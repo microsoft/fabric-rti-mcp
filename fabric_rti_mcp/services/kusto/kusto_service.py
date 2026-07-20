@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import asdict
 from datetime import timedelta
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 from urllib.parse import quote, urlparse
 
 from azure.kusto.data import ClientRequestProperties, KustoConnectionStringBuilder
@@ -922,6 +922,8 @@ def kusto_get_shots(
     database: str | None = None,
     embedding_endpoint: str | None = None,
     client_request_properties: dict[str, Any] | None = None,
+    embedding_method: Literal["slm", "aoai"] | None = None,
+    slm_model_name: str | None = None,
 ) -> dict[str, Any]:
     """
     Retrieves KQL query examples that semantically resemble the user's prompt.
@@ -942,16 +944,20 @@ def kusto_get_shots(
     :param prompt: The user prompt to find similar shots for.
     :param shots_table_name: Name of the table containing the shots. The table should have "EmbeddingText" (string)
                              column containing the natural language prompt, "AugmentedText" (string) column containing
-                             the respective KQL, and "EmbeddingVector" (dynamic) column containing the embedding vector
-                             for the NL.
+                             the respective KQL, and "EmbeddingVector" (dynamic) column containing an L2-normalized
+                             embedding vector for the NL.
                              If not provided, uses the KUSTO_SHOTS_TABLE environment variable.
     :param cluster_uri: The URI of the Kusto cluster.
     :param sample_size: Number of most similar shots to retrieve. Defaults to 3.
-    :param database: Optional database name. If not provided, uses the "AI" database or the default database.
-    :param embedding_endpoint: Optional endpoint for the embedding model to use. If not provided, uses the
-                             AZ_OPENAI_EMBEDDING_ENDPOINT environment variable. If no valid endpoint is set,
-                             this function should not be called.
+    :param database: Optional database name. If not provided, uses the default database.
+    :param embedding_endpoint: Azure OpenAI embedding endpoint. Used only when embedding_method is "aoai".
+                             If not provided for AOAI, uses the AZ_OPENAI_EMBEDDING_ENDPOINT environment variable.
     :param client_request_properties: Optional dictionary of additional client request properties.
+    :param embedding_method: Embedding method for the prompt. "slm" invokes a pre-deployed slm_embeddings_fl
+                             function in the queried database. "aoai" uses ai_embeddings and requires an embedding
+                             endpoint. If not provided, uses KUSTO_SHOTS_EMBEDDING_METHOD, which defaults to "aoai".
+    :param slm_model_name: SLM model passed to slm_embeddings_fl. The shots table vectors must use the same model.
+                           If not provided, uses KUSTO_SHOTS_SLM_MODEL, which defaults to "harrier-v1-270m".
     :return: List of dictionaries containing the shots records.
     """
     resolved_table = shots_table_name or CONFIG.shots_table
@@ -960,19 +966,56 @@ def kusto_get_shots(
             "shots_table_name must be provided either as a parameter or via the KUSTO_SHOTS_TABLE environment variable."
         )
 
-    # Use provided endpoint, or fall back to environment variable, or use default
-    endpoint = embedding_endpoint or CONFIG.open_ai_embedding_endpoint
+    resolved_embedding_method = embedding_method if embedding_method is not None else CONFIG.shots_embedding_method
+    normalized_embedding_method = resolved_embedding_method.strip().lower()
+    if normalized_embedding_method not in ("slm", "aoai"):
+        raise ValueError("embedding_method must be either 'slm' or 'aoai'.")
+
+    escaped_prompt = kql_escape_string(prompt)
+    if normalized_embedding_method == "slm":
+        resolved_model_name = slm_model_name if slm_model_name is not None else CONFIG.shots_slm_model
+        normalized_model_name = resolved_model_name.strip()
+        if not normalized_model_name:
+            raise ValueError("slm_model_name must not be empty.")
+
+        embedding_query = f"""
+        let embedded_term = toscalar(
+            print EmbeddingText = '{escaped_prompt}'
+            | extend EmbeddingVector = dynamic(null)
+            | invoke slm_embeddings_fl(
+                text_col='EmbeddingText',
+                embeddings_col='EmbeddingVector',
+                model_name='{kql_escape_string(normalized_model_name)}',
+                prefix='query:')
+            | project EmbeddingVector
+        );"""
+    else:
+        endpoint = embedding_endpoint or CONFIG.open_ai_embedding_endpoint
+        if not endpoint:
+            raise ValueError(
+                "embedding_endpoint must be provided for embedding_method='aoai' either as a parameter "
+                "or via the AZ_OPENAI_EMBEDDING_ENDPOINT environment variable."
+            )
+
+        embedding_query = f"""
+        let model_endpoint = '{kql_escape_string(endpoint)}';
+        let embedded_term = toscalar(evaluate ai_embeddings('{escaped_prompt}', model_endpoint));"""
 
     kql_query = f"""
-        let model_endpoint = '{kql_escape_string(endpoint or "")}';
-        let embedded_term = toscalar(evaluate ai_embeddings('{kql_escape_string(prompt)}', model_endpoint));
+        {embedding_query}
         {kql_escape_entity_name(resolved_table)}
-        | extend similarity = series_cosine_similarity(embedded_term, EmbeddingVector)
+        | extend similarity = series_cosine_similarity(embedded_term, EmbeddingVector, 1.0, 1.0)
         | top {sample_size} by similarity
         | project similarity, EmbeddingText, AugmentedText
     """
 
-    return _execute(kql_query, cluster_uri, database=database, client_request_properties=client_request_properties)
+    return _execute(
+        kql_query,
+        cluster_uri,
+        readonly_override=normalized_embedding_method == "slm",
+        database=database,
+        client_request_properties=client_request_properties,
+    )
 
 
 def _rows_to_dicts(result: dict[str, Any]) -> list[dict[str, Any]]:

@@ -3,8 +3,10 @@
 ## Unreleased
 ### Features
 - Added `kusto_deeplink_from_query` tool to generate deeplink URLs for opening KQL queries in the appropriate web explorer UI (Azure Data Explorer Web Explorer or Microsoft Fabric query workbench). Auto-detects cluster type from URI with `.show version` fallback.
+- Added local SLM embedding support to `kusto_get_shots` through a pre-deployed `slm_embeddings_fl` function. Azure OpenAI remains the default for backward compatibility; select `embedding_method="slm"` or configure `KUSTO_SHOTS_EMBEDDING_METHOD=slm`. The SLM model defaults to `harrier-v1-270m` and can be configured with `KUSTO_SHOTS_SLM_MODEL`.
 
 ### Other Changes
+- Optimize `kusto_get_shots` similarity ranking by using the known unit magnitudes of supported embedding vectors.
 - Use docstring as tool description
 - Add annotations (readonly, destructive)
 - Add Attach to proc id + tracing pid on start so we can debug locally
@@ -65,4 +67,3 @@
 ### Other Changes
 - Refactor kusto connection cache and known service URIs
 - Add authority ID support for Kusto
-

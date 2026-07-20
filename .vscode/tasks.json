@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Inject debugger into Fabric RTI MCP",
+            "type": "shell",
+            "command": "$listener = Get-NetTCPConnection -LocalPort 5678 -State Listen -ErrorAction SilentlyContinue; if ($listener) { exit 0 }; $servers = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match '-m\\s+fabric_rti_mcp\\.server' }); if (-not $servers) { throw 'No running fabric_rti_mcp.server Python process was found.' }; $target = $servers | Where-Object { $_.ProcessId -notin $servers.ParentProcessId } | Sort-Object CreationDate -Descending | Select-Object -First 1; if (-not $target) { throw 'Could not identify the Fabric RTI MCP child Python process.' }; $uv = (Get-Command uv -ErrorAction Stop).Source; Start-Process -FilePath $uv -ArgumentList @('--directory', '${workspaceFolder}', 'run', '--with', 'debugpy', 'python', '-m', 'debugpy', '--listen', '127.0.0.1:5678', '--pid', $target.ProcessId) -WindowStyle Hidden; for ($attempt = 0; $attempt -lt 50; $attempt++) { Start-Sleep -Milliseconds 200; if (Get-NetTCPConnection -LocalPort 5678 -State Listen -ErrorAction SilentlyContinue) { exit 0 } }; throw \"debugpy did not start listening for PID $($target.ProcessId).\"",
+            "options": {
+                "shell": {
+                    "executable": "pwsh.exe",
+                    "args": [
+                        "-NoProfile",
+                        "-Command"
+                    ]
+                }
+            },
+            "problemMatcher": []
+        }
+    ]
+}

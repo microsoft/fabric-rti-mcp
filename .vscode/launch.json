@@ -5,10 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Attach to Process Id",
+            "name": "Python Debugger: Attach by Process ID",
             "type": "debugpy",
             "request": "attach",
             "processId": "${command:pickProcess}",
+            "justMyCode": true
+        },
+        {
+            "name": "Python Debugger: Attach to Fabric RTI MCP",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "127.0.0.1",
+                "port": 5678
+            },
+            "preLaunchTask": "Inject debugger into Fabric RTI MCP",
+            "justMyCode": true
         },
         {
             "name": "Python Debugger: Debug server.py with Arguments",
