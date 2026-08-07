@@ -338,6 +338,7 @@ None - the server will work with default settings for demo purposes.
 | `KUSTO_KNOWN_SERVICES` | Kusto | JSON array of preconfigured Kusto services | None | `[{"service_uri":"https://cluster1.kusto.windows.net","default_database":"DB1","description":"Prod"}]` |
 | `KUSTO_EAGER_CONNECT` | Kusto | Whether to eagerly connect to default service on startup (not recommended) | `false` | `true` or `false` |
 | `KUSTO_ALLOW_UNKNOWN_SERVICES` | Kusto | Security setting to allow connections to services not in `KUSTO_KNOWN_SERVICES` | `true` | `true` or `false` |
+| `FABRIC_RTI_KUSTO_CUSTOM_WATERMARK` | Kusto | Opt-in toggle for query watermarking. When set (use `{}` for default-only), Kusto queries are prefixed with a JSON comment. Accepts a JSON object of custom key-value pairs to include. | Unset (no watermark) | `{}` or `{"team": "my-team", "app_id": "env:MY_APP_ID"}` |
 | `KUSTO_SHOTS_TABLE` | Kusto | Enable `kusto_get_shots` and set its default shots table | None | `MyDatabase.ShotsTable` |
 | `KUSTO_SHOTS_EMBEDDING_METHOD` | Kusto | Default embedding method for `kusto_get_shots` | `aoai` | `slm` or `aoai` |
 | `KUSTO_SHOTS_SLM_MODEL` | Kusto | Default SLM model for `kusto_get_shots` | `harrier-v1-270m` | `harrier-v1-270m` |
@@ -430,6 +431,36 @@ The `kusto_get_shots` tool retrieves shots that are most similar to your prompt 
 - **Matching embeddings**: The prompt and `EmbeddingVector` column must use the same provider, model, vector dimension, and compatible query/corpus conventions.
 
 Existing AOAI calls remain backward compatible. When `embedding_method="slm"` is selected, `embedding_endpoint` is ignored.
+
+### Query Watermarking
+
+Kusto queries can be watermarked with a JSON comment containing the package version, current user, and any custom key-value pairs. **Watermarking is opt-in**: it is disabled by default and is enabled when either the `FABRIC_RTI_KUSTO_CUSTOM_WATERMARK` environment variable is set or the `--custom-watermark` CLI argument is passed (CLI takes priority). To enable watermarking without any custom entries, set the value to `{}`.
+
+Values can be:
+- **Literal strings** — used as-is, e.g. `"my-team"`
+- **`env:VAR_NAME`** — resolved from an environment variable at runtime, e.g. `"env:MY_APP_ID"`
+
+**Examples:**
+
+Enable with default fields only (version + user):
+```bash
+FABRIC_RTI_KUSTO_CUSTOM_WATERMARK='{}'
+```
+
+Enable with custom fields:
+```bash
+FABRIC_RTI_KUSTO_CUSTOM_WATERMARK='{"team": "data-eng", "app_id": "env:MY_APP_ID"}'
+```
+
+Or via CLI:
+```bash
+--custom-watermark '{"team": "data-eng", "app_id": "env:MY_APP_ID"}'
+```
+
+This produces a watermark like:
+```
+// {"fabric_rti_mcp_version": "0.1.0", "user": "alice", "app_id": "cool-app-123", "team": "data-eng"}
+```
 
 ## 🔑 Authentication
 
