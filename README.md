@@ -2,6 +2,8 @@
 
 ## 🎯 Overview
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2Fmicrosoft%2Ffabric-rti-mcp.svg)](https://mcptoplist.com/server/glama%2Fmicrosoft%2Ffabric-rti-mcp)
+
 A comprehensive Model Context Protocol (MCP) server implementation for [Microsoft Fabric Real-Time Intelligence (RTI)](https://aka.ms/fabricrti).
 This server enables AI agents to interact with Fabric RTI services by providing tools through the MCP interface, allowing for seamless data querying, analysis, and streaming capabilities.
 
