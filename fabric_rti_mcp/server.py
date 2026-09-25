@@ -31,7 +31,10 @@ def setup_shutdown_handler(sig: int, frame: types.FrameType | None) -> None:
     signal_name = signal.Signals(sig).name
     logger.info(f"Received signal {sig} ({signal_name}), shutting down...")
 
-    # Exit the process
+    # The MCP reader may still hold stdin's buffer lock, so stdio must skip interpreter finalization.
+    if config.transport != "http":
+        os._exit(0)
+
     sys.exit(0)
 
 
@@ -201,6 +204,7 @@ def main() -> None:
         else:
             logger.info(f"Starting {name} (stdio)")
             fastmcp_server.run(transport="stdio")
+            os._exit(0)
 
     except KeyboardInterrupt:
         logger.info("Server interrupted by user")
