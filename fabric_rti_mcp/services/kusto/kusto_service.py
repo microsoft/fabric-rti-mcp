@@ -371,6 +371,12 @@ def _crp(
             timedelta(seconds=CONFIG.timeout_seconds),
         )
 
+    # Limit results at the service before the SDK downloads and formats them.
+    if CONFIG.max_result_size_bytes is not None:
+        crp.set_option("truncationmaxsize", CONFIG.max_result_size_bytes)
+    if CONFIG.max_records is not None:
+        crp.set_option("truncationmaxrecords", CONFIG.max_records)
+
     if client_request_properties:
         blocked = [k for k in client_request_properties if k.lower() in _BLOCKED_CRP_KEYS]
         if blocked:
@@ -484,6 +490,7 @@ def kusto_query(
     :param cluster_uri: The URI of the Kusto cluster.
     :param database: Optional database name. If not provided, uses the default database.
     :param client_request_properties: Optional dictionary of additional client request properties.
+        Use truncationmaxsize (bytes) and truncationmaxrecords (rows) to override configured result limits.
     :return: The result of the query execution as a list of dictionaries (json).
     """
     first_stmt = _find_first_statement(query)

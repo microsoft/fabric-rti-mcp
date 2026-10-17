@@ -47,6 +47,8 @@ class KustoEnvVarNames:
     eager_connect = "KUSTO_EAGER_CONNECT"
     allow_unknown_services = "KUSTO_ALLOW_UNKNOWN_SERVICES"
     timeout = "FABRIC_RTI_KUSTO_TIMEOUT"
+    max_result_size_bytes = "FABRIC_RTI_KUSTO_MAX_RESULT_SIZE_BYTES"
+    max_records = "FABRIC_RTI_KUSTO_MAX_RECORDS"
     deeplink_style = "FABRIC_RTI_KUSTO_DEEPLINK_STYLE"
     response_format = "FABRIC_RTI_KUSTO_RESPONSE_FORMAT"
     known_services_probe_mode = "FABRIC_RTI_KUSTO_KNOWN_SERVICES_PROBE"
@@ -65,6 +67,8 @@ class KustoEnvVarNames:
             KustoEnvVarNames.eager_connect,
             KustoEnvVarNames.allow_unknown_services,
             KustoEnvVarNames.timeout,
+            KustoEnvVarNames.max_result_size_bytes,
+            KustoEnvVarNames.max_records,
             KustoEnvVarNames.deeplink_style,
             KustoEnvVarNames.response_format,
             KustoEnvVarNames.known_services_probe_mode,
@@ -73,6 +77,19 @@ class KustoEnvVarNames:
 
 def _env_bool(name: str) -> bool:
     return os.getenv(name, "false").lower() in ("true", "1")
+
+
+def _env_positive_int(name: str) -> int | None:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return None
+    try:
+        value = int(raw_value)
+        if value > 0:
+            return value
+    except ValueError:
+        pass
+    raise ValueError(f"Invalid {name}='{raw_value}'. Expected a positive integer.")
 
 
 def _env_choice(name: str, default: str, supported_values: tuple[str, ...]) -> str:
@@ -116,6 +133,9 @@ class KustoConfig:
     # Whether kusto_known_services should probe configured services before returning them.
     # Values: "auto", "always", "never". Auto probes bearer-token and MI modes, and skips local developer mode.
     known_services_probe_mode: str = "auto"
+    # Optional server-side result truncation defaults; per-request properties can override them.
+    max_result_size_bytes: int | None = None
+    max_records: int | None = None
 
     @staticmethod
     def from_env() -> KustoConfig:
@@ -215,6 +235,8 @@ class KustoConfig:
             deeplink_style=deeplink_style,
             response_format=response_format,
             known_services_probe_mode=known_services_probe_mode,
+            max_result_size_bytes=_env_positive_int(KustoEnvVarNames.max_result_size_bytes),
+            max_records=_env_positive_int(KustoEnvVarNames.max_records),
         )
 
     def should_probe_known_services(self, credential_source: CredentialSource) -> bool:
