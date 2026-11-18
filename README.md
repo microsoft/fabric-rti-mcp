@@ -345,8 +345,42 @@ None - the server will work with default settings for demo purposes.
 | `FABRIC_BASE_URL` | Global | Base URL for Microsoft Fabric web interface | `https://fabric.microsoft.com` | `https://fabric.microsoft.com` |
 | `FABRIC_RTI_ALLOWED_TOOLS` | Global | Comma-separated service names or full tool names to expose | All tools | `kusto,map_get` |
 | `FABRIC_RTI_KUSTO_DEEPLINK_STYLE` | Kusto | Override auto-detection of deeplink style | None | `adx` or `fabric` |
+| `FABRIC_RTI_KUSTO_MAX_RESULT_SIZE_BYTES` | Kusto | Default maximum query result size in bytes (positive integer) | None (service default) | `1048576` |
+| `FABRIC_RTI_KUSTO_MAX_RECORDS` | Kusto | Default maximum number of query result records (positive integer) | None (service default) | `1000` |
 
 `FABRIC_RTI_ALLOWED_TOOLS` accepts service names derived from the registered `*_tools` modules and full tool names.
+
+### Eventhouse query result limits
+
+To reduce large responses sent to an agent, set either or both result limits in the MCP server's environment:
+
+```json
+{
+    "FABRIC_RTI_KUSTO_MAX_RESULT_SIZE_BYTES": "1048576",
+    "FABRIC_RTI_KUSTO_MAX_RECORDS": "1000"
+}
+```
+
+These settings apply the Kusto `truncationmaxsize` (bytes) and `truncationmaxrecords` (rows) request properties
+through the shared Kusto execution path, including graph queries and entity sampling. They work with both
+Fabric Eventhouse and Azure Data Explorer. Unset variables preserve the service defaults; invalid or non-positive
+values fail configuration loading with an error naming the variable.
+
+Tools that accept `client_request_properties` can override either default for an individual request:
+
+```json
+{
+    "truncationmaxsize": 2097152,
+    "truncationmaxrecords": 2000
+}
+```
+
+These are configurable defaults, not administrator-enforced ceilings. Kusto enforces truncation before results
+are downloaded; the byte limit measures query result data, not the final formatted MCP response. Exceeding a limit
+produces a query failure (`E_QUERY_RESULT_SET_TOO_LARGE`), surfaced by the tool rather than returned as a successful
+partial result. Use KQL `take`, `project`, or `summarize` to reduce the result, or increase the relevant limit.
+Kusto ignores `notruncation` when an explicit truncation limit is present and uses the lower value when the same
+limit is specified in both the query and request properties. See [Kusto query limits](https://learn.microsoft.com/en-us/kusto/concepts/query-limits).
 
 ### Shots Embedding Configuration
 
