@@ -1,10 +1,13 @@
 import asyncio
+import signal
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from mcp.server.fastmcp import FastMCP
 
+import fabric_rti_mcp.server as server
 from fabric_rti_mcp.compat.ms_foundry import SchemaCompatibleMCP
 from fabric_rti_mcp.server import add_allowed_tools, build_transport_security_settings, register_tools
 from fabric_rti_mcp.services import AddTool
@@ -16,6 +19,49 @@ from fabric_rti_mcp.services.kusto.kusto_config import KustoConfig
 
 def _tool_names(mcp: FastMCP) -> set[str]:
     return {tool.name for tool in asyncio.run(mcp.list_tools())}
+
+
+def test_stdio_signal_handler_exits_without_finalization(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(server, "config", SimpleNamespace(transport="stdio"))
+    exit_process = MagicMock(side_effect=SystemExit(0))
+    monkeypatch.setattr(server.os, "_exit", exit_process)
+
+    with pytest.raises(SystemExit) as exception:
+        server.setup_shutdown_handler(signal.SIGTERM, None)
+
+    assert exception.value.code == 0
+    exit_process.assert_called_once_with(0)
+
+
+def test_http_signal_handler_uses_normal_exit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(server, "config", SimpleNamespace(transport="http"))
+    exit_process = MagicMock()
+    monkeypatch.setattr(server.os, "_exit", exit_process)
+
+    with pytest.raises(SystemExit) as exception:
+        server.setup_shutdown_handler(signal.SIGTERM, None)
+
+    assert exception.value.code == 0
+    exit_process.assert_not_called()
+
+
+def test_main_exits_without_finalization_after_stdio_server_stops(monkeypatch: pytest.MonkeyPatch) -> None:
+    fastmcp_server = MagicMock()
+    exit_process = MagicMock()
+    monkeypatch.setattr(
+        server,
+        "config",
+        SimpleNamespace(transport="stdio", use_obo_flow=False, use_ai_foundry_compat=False),
+    )
+    monkeypatch.setattr(server, "FastMCP", MagicMock(return_value=fastmcp_server))
+    monkeypatch.setattr(server, "register_tools", MagicMock())
+    monkeypatch.setattr(server.signal, "signal", MagicMock())
+    monkeypatch.setattr(server.os, "_exit", exit_process)
+
+    server.main()
+
+    fastmcp_server.run.assert_called_once_with(transport="stdio")
+    exit_process.assert_called_once_with(0)
 
 
 def test_add_allowed_tools_skips_services_and_filters_tools() -> None:
